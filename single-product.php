@@ -30,8 +30,6 @@ while ( have_posts() ) :
 	$fs_code     = $fs_id;
 	$fs_code_pc  = fs_product_field( $fs_id, 'computer_code' );
 	$fs_views    = fs_product_views( $fs_id );
-	$fs_pages    = fs_product_field( $fs_id, 'page_count' );
-	$fs_qcount   = fs_product_questions( $fs_id );
 	$fs_created  = $product->get_date_created();
 	$fs_is_fresh = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY_IN_SECONDS;
 	$fs_sold     = (int) $product->get_total_sales();
@@ -117,70 +115,36 @@ while ( have_posts() ) :
 
 			<h1 class="fs-product__title"><?php the_title(); ?></h1>
 
+			<?php
+			/*
+			 * این نوار فقط «شناسه و آمار» محصول است — کد محصول، کد رایانه‌کار و
+			 * بازدید. مشخصات خود فایل (فرمت، تعداد سوال، تعداد صفحه، پاسخنامه و
+			 * ضمیمه‌ها) یک‌جا در کارت‌های پایین می‌آید تا تکرار نشود، و تاریخ
+			 * بروزرسانی هم روی خود تصویر محصول نمایش داده می‌شود.
+			 */
+			?>
 			<div class="fs-pmeta">
-				<div class="fs-pmeta__cell">
-					<span class="fs-pmeta__icon"><?php fs_the_icon( 'hash', 15, array( 'width' => '2' ) ); ?></span>
-					<span class="fs-pmeta__body">
-						<span class="fs-pmeta__k">کد محصول</span>
-						<span class="fs-pmeta__v">#<?php echo esc_html( fs_fa_num( $fs_code ) ); ?></span>
-					</span>
-				</div>
+				<span class="fs-pmeta__cell">
+					<span class="fs-pmeta__icon"><?php fs_the_icon( 'hash', 14, array( 'width' => '2.1' ) ); ?></span>
+					<span class="fs-pmeta__k">کد محصول</span>
+					<span class="fs-pmeta__v">#<?php echo esc_html( fs_fa_num( $fs_code ) ); ?></span>
+				</span>
 
 				<?php if ( $fs_code_pc ) : ?>
-					<div class="fs-pmeta__cell">
-						<span class="fs-pmeta__icon"><?php fs_the_icon( 'grid', 15, array( 'width' => '2' ) ); ?></span>
-						<span class="fs-pmeta__body">
-							<span class="fs-pmeta__k">کد رایانه‌کار</span>
-							<span class="fs-pmeta__v"><?php echo esc_html( fs_fa_num( $fs_code_pc ) ); ?></span>
-						</span>
-					</div>
-				<?php endif; ?>
-
-				<div class="fs-pmeta__cell">
-					<span class="fs-pmeta__icon"><?php fs_the_icon( 'file', 15, array( 'width' => '2' ) ); ?></span>
-					<span class="fs-pmeta__body">
-						<span class="fs-pmeta__k">فرمت فایل</span>
-						<span class="fs-pmeta__v">PDF</span>
+					<span class="fs-pmeta__cell">
+						<span class="fs-pmeta__icon"><?php fs_the_icon( 'grid', 14, array( 'width' => '2.1' ) ); ?></span>
+						<span class="fs-pmeta__k">کد رایانه‌کار</span>
+						<span class="fs-pmeta__v"><?php echo esc_html( fs_fa_num( $fs_code_pc ) ); ?></span>
 					</span>
-				</div>
-
-				<?php if ( $fs_qcount ) : ?>
-					<div class="fs-pmeta__cell">
-						<span class="fs-pmeta__icon"><?php fs_the_icon( 'file-lines', 15, array( 'width' => '2' ) ); ?></span>
-						<span class="fs-pmeta__body">
-							<span class="fs-pmeta__k">تعداد سوال</span>
-							<span class="fs-pmeta__v"><?php echo esc_html( $fs_qcount ); ?></span>
-						</span>
-					</div>
-				<?php endif; ?>
-
-				<?php if ( $fs_pages ) : ?>
-					<div class="fs-pmeta__cell">
-						<span class="fs-pmeta__icon"><?php fs_the_icon( 'layers', 15, array( 'width' => '2' ) ); ?></span>
-						<span class="fs-pmeta__body">
-							<span class="fs-pmeta__k">تعداد صفحه</span>
-							<span class="fs-pmeta__v"><?php echo esc_html( fs_fa_num( $fs_pages ) ); ?></span>
-						</span>
-					</div>
 				<?php endif; ?>
 
 				<?php if ( $fs_views ) : ?>
-					<div class="fs-pmeta__cell">
-						<span class="fs-pmeta__icon"><?php fs_the_icon( 'eye', 15, array( 'width' => '2' ) ); ?></span>
-						<span class="fs-pmeta__body">
-							<span class="fs-pmeta__k">بازدید</span>
-							<span class="fs-pmeta__v"><?php echo esc_html( $fs_views ); ?></span>
-						</span>
-					</div>
-				<?php endif; ?>
-
-				<div class="fs-pmeta__cell">
-					<span class="fs-pmeta__icon"><?php fs_the_icon( 'calendar', 15, array( 'width' => '2' ) ); ?></span>
-					<span class="fs-pmeta__body">
-						<span class="fs-pmeta__k">آخرین بروزرسانی</span>
-						<span class="fs-pmeta__v"><?php echo esc_html( $fs_updated ); ?></span>
+					<span class="fs-pmeta__cell">
+						<span class="fs-pmeta__icon"><?php fs_the_icon( 'eye', 14, array( 'width' => '2.1' ) ); ?></span>
+						<span class="fs-pmeta__k">بازدید</span>
+						<span class="fs-pmeta__v"><?php echo esc_html( $fs_views ); ?></span>
 					</span>
-				</div>
+				<?php endif; ?>
 			</div>
 
 			<?php if ( $fs_audio || $fs_video['src'] ) : ?>
@@ -389,17 +353,14 @@ while ( have_posts() ) :
 									<?php endif; ?>
 								</div>
 
+								<?php
+								/*
+								 * جعبهٔ «در یک نگاه» حذف شد: همان مشخصات دقیقاً بالاتر
+								 * در کارت‌های مشخصات فایل آمده و تکرارش روی یک صفحه اضافی بود؛
+								 * این ستون حالا فقط سایدبار اطمینان و لوگوی بانک‌هاست.
+								 */
+								?>
 								<div class="fs-pside">
-									<aside class="fs-glance">
-										<div class="fs-glance__title">در یک نگاه</div>
-										<?php foreach ( $fs_specs as $fs_spec ) : ?>
-											<div class="fs-glance__row">
-												<span><?php echo esc_html( $fs_spec['k'] ); ?></span>
-												<b><?php echo esc_html( $fs_spec['v'] ); ?></b>
-											</div>
-										<?php endforeach; ?>
-									</aside>
-
 									<?php
 									$fs_assurances = fs_get_assurances();
 

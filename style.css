@@ -2665,7 +2665,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 
 .fs-product__specs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 11px;
   margin-top: 18px;
 }
@@ -5715,27 +5715,29 @@ a.fs-otable__row:last-child { border-bottom: 0; }
 }
 
 .fs-pmeta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
-  gap: 10px;
-  margin: 16px 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
 }
 
 .fs-pmeta__cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   background: #fff;
   border: 1px solid var(--fs-line-2);
-  border-radius: 14px;
-  padding: 11px 12px;
+  border-radius: 999px;
+  padding: 7px 13px 7px 9px;
+  white-space: nowrap;
 }
 
 .fs-pmeta__icon {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   flex: none;
-  border-radius: 10px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5743,19 +5745,14 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   color: var(--fs-green-d);
 }
 
-.fs-pmeta__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-
 .fs-pmeta__k {
-  font: 600 9.5px var(--fs-font);
+  font: 600 10.5px var(--fs-font);
   color: var(--fs-muted-2);
 }
 
 .fs-pmeta__v {
   font: 800 12px var(--fs-font);
   color: var(--fs-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* جعبه قیمت ---------------------------------------------------------------- */
@@ -6250,8 +6247,9 @@ a.fs-fbox:hover {
 }
 
 @media (max-width: 1023px) {
-  .fs-pmeta { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .fs-pmeta__cell { padding: 9px 10px; border-radius: 12px; }
+  .fs-pmeta__cell { padding: 6px 11px 6px 7px; }
+  .fs-pmeta__k { font-size: 10px; }
+  .fs-pmeta__v { font-size: 11px; }
   .fs-price__now-v { font-size: 20px; }
   .fs-audio { min-width: 0; width: 100%; }
   .fs-audio__time { font-size: 10px; }
@@ -6260,7 +6258,6 @@ a.fs-fbox:hover {
 }
 
 @media (max-width: 560px) {
-  .fs-pmeta { grid-template-columns: 1fr; }
   .fs-footer__grid { grid-template-columns: 1fr; }
   .fs-fbanks { grid-template-columns: repeat(4, 1fr); }
   .fs-fsym__item { width: 66px; height: 76px; }
