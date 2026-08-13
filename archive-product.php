@@ -47,9 +47,7 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 }
 ?>
 
-<nav class="fs-crumbs" aria-label="مسیر">
-	<?php woocommerce_breadcrumb( array( 'delimiter' => '' ) ); ?>
-</nav>
+<?php fs_the_breadcrumb(); ?>
 
 <section class="fs-cathero">
 	<div class="fs-cathero__head">
@@ -63,7 +61,6 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 				}
 				?>
 			</h1>
-			<p class="fs-cathero__desc"><?php echo esc_html( fs_copy( 'cathero_tagline' ) ); ?></p>
 		</div>
 
 		<div class="fs-cathero__stats">

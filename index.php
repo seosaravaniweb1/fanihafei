@@ -49,12 +49,34 @@ get_header();
 
 		<?php else : ?>
 
-			<div class="fs-articles">
+			<?php
+			// نتایج جست‌وجوی محصول با همان کارت گرید فروشگاه نمایش داده می‌شوند
+			// تا همه‌جای سایت باکس محصول یک شکل باشد.
+			$fs_is_products = fs_has_woo() && ( 'product' === get_query_var( 'post_type' ) || is_post_type_archive( 'product' ) );
+			?>
+
+			<div class="<?php echo $fs_is_products ? 'fs-cgrid' : 'fs-articles'; ?>">
 				<?php
 				$fs_i = 0;
 
 				while ( have_posts() ) :
 					the_post();
+
+					$fs_p = $fs_is_products ? wc_get_product( get_the_ID() ) : null;
+
+					if ( $fs_p ) {
+						get_template_part(
+							'template-parts/card/grid',
+							null,
+							array(
+								'product' => $fs_p,
+								'index'   => $fs_i,
+							)
+						);
+
+						++$fs_i;
+						continue;
+					}
 					?>
 					<a class="fs-article" href="<?php the_permalink(); ?>">
 						<span class="fs-article__thumb" style="background:<?php echo esc_attr( fs_grad( $fs_i ) ); ?>">

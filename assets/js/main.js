@@ -432,10 +432,39 @@
 				}
 			}
 
-			audio.addEventListener( 'loadedmetadata', function () {
-				if ( duration ) {
+			function showDuration() {
+				if ( duration && isFinite( audio.duration ) ) {
 					duration.textContent = clock( audio.duration );
 				}
+			}
+
+			audio.addEventListener( 'loadedmetadata', showDuration );
+			audio.addEventListener( 'durationchange', showDuration );
+			showDuration();
+
+			// اگر فایل صوتی در دسترس نباشد، پخش‌کننده اصلاً نمایش داده نمی‌شود
+			// تا به‌جایش یک جعبه‌ی خراب روی صفحه نماند.
+			audio.addEventListener( 'error', function () {
+				player.setAttribute( 'hidden', '' );
+			} );
+
+			// فقط یک فایل صوتی هم‌زمان پخش شود.
+			audio.addEventListener( 'play', function () {
+				Array.prototype.forEach.call( players, function ( other ) {
+					var otherAudio = other.querySelector( 'audio' );
+
+					if ( otherAudio && otherAudio !== audio && ! otherAudio.paused ) {
+						otherAudio.pause();
+					}
+				} );
+
+				player.classList.add( 'is-playing' );
+			} );
+
+			audio.addEventListener( 'pause', function () {
+				player.classList.remove( 'is-playing' );
+				toggle( playIcon, true );
+				toggle( pauseIcon, false );
 			} );
 
 			audio.addEventListener( 'timeupdate', paint );
@@ -475,6 +504,22 @@
 					paint();
 				} );
 			}
+		} );
+	}
+
+	/* --------------------------------------------- تب محصولات پاورقی */
+	function initFooterProducts() {
+		var boxes = document.querySelectorAll( '[data-fprod]' );
+
+		Array.prototype.forEach.call( boxes, function ( box ) {
+			var tabs = box.querySelectorAll( '.fs-fprod__tab' );
+			var panes = box.querySelectorAll( '.fs-fprod__pane' );
+
+			Array.prototype.forEach.call( tabs, function ( tab, i ) {
+				tab.addEventListener( 'click', function () {
+					activate( tabs, panes, i, 'is-active' );
+				} );
+			} );
 		} );
 	}
 
@@ -1024,6 +1069,7 @@
 		initProfileForm();
 		initInfinite();
 		initAudio();
+		initFooterProducts();
 		initVideoModal();
 		initMega();
 		initMobileMenu();

@@ -26,10 +26,9 @@ if ( ! $fs_recent ) {
 
 			<h2 class="fs-recent__title"><?php echo esc_html( $fs_recent['title'] ); ?></h2>
 
-			<div class="fs-recent__meta fs-only-desktop"><?php echo esc_html( $fs_recent['meta'] ); ?></div>
+			<?php fs_the_product_features( $fs_recent['id'], 'wide' ); ?>
 
 			<div class="fs-recent__row fs-only-mobile fs-flex">
-				<span class="fs-recent__meta"><?php echo esc_html( $fs_recent['meta_m'] ); ?></span>
 				<span class="fs-recent__price"><?php echo wp_kses_post( $fs_recent['price'] ); ?></span>
 			</div>
 		</div>

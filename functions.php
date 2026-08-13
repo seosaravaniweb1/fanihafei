@@ -7,7 +7,26 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '1.0.0' );
+define( 'FS_VERSION', '1.1.0' );
+
+/**
+ * نسخه‌ی یک فایل قالب بر پایه‌ی زمان آخرین تغییر آن.
+ *
+ * بدون این، مرورگر و افزونه‌های کش نسخه‌ی قدیمی style.css یا main.js را نگه
+ * می‌دارند و تغییرهای تازه‌ی قالب اصلاً دیده نمی‌شوند.
+ *
+ * @param string $relative مسیر فایل نسبت به ریشه‌ی قالب.
+ * @return string
+ */
+function fs_asset_version( $relative ) {
+	$path = get_theme_file_path( $relative );
+
+	if ( file_exists( $path ) ) {
+		return FS_VERSION . '.' . filemtime( $path );
+	}
+
+	return FS_VERSION;
+}
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );
@@ -69,9 +88,8 @@ function fs_setup() {
 	register_nav_menus(
 		array(
 			'primary'    => 'منوی سربرگ (کنار دسته‌بندی‌ها و منوی موبایل)',
-			'footer-1'   => 'پاورقی — ستون اول',
-			'footer-2'   => 'پاورقی — ستون دوم',
-			'footer-3'   => 'پاورقی — ستون سوم',
+			'footer-1'   => 'پاورقی — لینک‌های مهم (ستون اول)',
+			'footer-2'   => 'پاورقی — لینک‌های مهم (ستون دوم)',
 			'footer-seo' => 'پاورقی — لینک‌های سئو',
 		)
 	);
@@ -92,13 +110,13 @@ function fs_assets() {
 		null // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- نسخه در URL گوگل مدیریت می‌شود.
 	);
 
-	wp_enqueue_style( 'fs-style', get_stylesheet_uri(), array( 'fs-vazirmatn' ), FS_VERSION );
+	wp_enqueue_style( 'fs-style', get_stylesheet_uri(), array( 'fs-vazirmatn' ), fs_asset_version( 'style.css' ) );
 
 	wp_enqueue_script(
 		'fs-main',
 		get_theme_file_uri( 'assets/js/main.js' ),
 		array(),
-		FS_VERSION,
+		fs_asset_version( 'assets/js/main.js' ),
 		array(
 			'strategy'  => 'defer',
 			'in_footer' => true,
@@ -278,6 +296,48 @@ function fs_the_logo( $variant = 'header' ) {
 	}
 
 	echo '</a>';
+}
+
+/**
+ * مسیر راهنما (بردکرامب) با جداکننده‌ی درست.
+ *
+ * جداکننده‌ی خالی باعث می‌شد لینک‌ها به‌هم بچسبند و خوانده نشوند؛ اینجا هر
+ * مرحله در یک span جدا و با یک شورون بین‌شان چاپ می‌شود.
+ *
+ * @return void
+ */
+function fs_the_breadcrumb() {
+	if ( ! fs_has_woo() ) {
+		return;
+	}
+
+	$crumbs = ( new WC_Breadcrumb() )->generate();
+
+	if ( ! $crumbs ) {
+		return;
+	}
+
+	$last = count( $crumbs ) - 1;
+
+	echo '<nav class="fs-crumbs" aria-label="مسیر"><ol class="fs-crumbs__list">';
+
+	foreach ( $crumbs as $i => $crumb ) {
+		echo '<li class="fs-crumbs__item">';
+
+		if ( ! empty( $crumb[1] ) && $i !== $last ) {
+			printf( '<a href="%s">%s</a>', esc_url( $crumb[1] ), esc_html( $crumb[0] ) );
+		} else {
+			printf( '<span aria-current="page">%s</span>', esc_html( $crumb[0] ) );
+		}
+
+		if ( $i !== $last ) {
+			echo '<span class="fs-crumbs__sep" aria-hidden="true">' . fs_icon( 'chevron-prev', 12, array( 'width' => '2.4' ) ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG ثابت قالب.
+		}
+
+		echo '</li>';
+	}
+
+	echo '</ol></nav>';
 }
 
 /**

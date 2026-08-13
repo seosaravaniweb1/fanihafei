@@ -333,7 +333,7 @@ add_filter( 'woocommerce_add_to_cart_validation', 'fs_buy_now_empty_cart', 20 );
  * @return string
  */
 function fs_buy_now_text() {
-	return 'دانلود و خرید نمونه سوال';
+	return 'خرید و دانلود نمونه سوال';
 }
 add_filter( 'woocommerce_product_single_add_to_cart_text', 'fs_buy_now_text' );
 add_filter( 'woocommerce_product_add_to_cart_text', 'fs_buy_now_text' );
@@ -362,3 +362,42 @@ function fs_redirect_after_add() {
 	return 'yes';
 }
 add_filter( 'pre_option_woocommerce_cart_redirect_after_add', 'fs_redirect_after_add' );
+
+/**
+ * برگه‌های سبد خرید و تسویه‌حساب را روی نسخه‌ی کلاسیک نگه دار.
+ *
+ * نصب‌های تازه‌ی ووکامرس این دو برگه را با بلوک می‌سازند و بلوک‌ها قالب‌های
+ * قالب را نادیده می‌گیرند؛ نتیجه‌اش همان فرم پیش‌فرض با فیلدهای نشانی است که
+ * این فروشگاه اصلاً لازم ندارد. اینجا محتوای بلوکی با کدکوتاه معادل جایگزین
+ * می‌شود تا قالب‌های `woocommerce/checkout/*` قالب اجرا شوند.
+ *
+ * @param string $content محتوای برگه.
+ * @return string
+ */
+function fs_force_classic_cart_checkout( $content ) {
+	if ( ! fs_has_woo() || is_admin() || ! in_the_loop() || ! is_main_query() ) {
+		return $content;
+	}
+
+	if ( is_cart() && has_block( 'woocommerce/cart' ) ) {
+		return '[woocommerce_cart]';
+	}
+
+	if ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) && has_block( 'woocommerce/checkout' ) ) {
+		return '[woocommerce_checkout]';
+	}
+
+	return $content;
+}
+add_filter( 'the_content', 'fs_force_classic_cart_checkout', 5 );
+
+/**
+ * برای همیشه از قالب‌های کلاسیک استفاده شود، حتی وقتی ووکامرس پیشنهاد
+ * می‌دهد نسخه‌ی بلوکی را جایگزین کند.
+ *
+ * @return string
+ */
+function fs_disable_block_checkout_default() {
+	return 'no';
+}
+add_filter( 'pre_option_woocommerce_feature_cart_checkout_blocks_enabled', 'fs_disable_block_checkout_default' );

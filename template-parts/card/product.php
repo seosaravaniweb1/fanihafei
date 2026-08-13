@@ -33,9 +33,7 @@ $fs_is_new = ! empty( $args['badge'] );
 	<span class="fs-pcard__body">
 		<span class="fs-pcard__title"><?php echo esc_html( $fs_card['title'] ); ?></span>
 
-		<span class="fs-pcard__meta">
-			<?php echo $fs_card['q'] ? esc_html( $fs_card['q'] ) . ' سوال · ' . esc_html( $fs_card['badges'] ) : esc_html( $fs_card['badges'] ); ?>
-		</span>
+		<?php fs_the_product_features( $fs_card['id'], 'card', true ); ?>
 
 		<span class="fs-pcard__foot">
 			<span class="fs-pcard__price"><?php echo wp_kses_post( $fs_card['price'] ); ?></span>

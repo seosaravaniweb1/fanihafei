@@ -152,6 +152,21 @@ function fs_icon( $name, $size = 16, $args = array() ) {
 		'clock'       => '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
 		'trash'       => '<path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 13h10l1-13"></path><path d="M9 7V4h6v3"></path>',
 		'trending'    => '<path d="m3 17 5-5 4 4 8-8"></path><path d="M16 8h4v4"></path>',
+		'phone'       => '<path d="M21 16.9v2.5a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3 19.3 19.3 0 0 1-6-6 19.6 19.6 0 0 1-3-8.6A2 2 0 0 1 3.3 2h2.5a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L6.9 9.8a16 16 0 0 0 6 6l1.2-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"></path>',
+		'send'        => '<path d="M21.5 2.5 10.5 13.5"></path><path d="M21.5 2.5 14.5 21.5l-4-8-8-4z"></path>',
+		'chat'        => '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 20.5l1.6-4.9A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"></path>',
+		'mail'        => '<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3.5 6.5 8.5 6 8.5-6"></path>',
+		'headset'     => '<path d="M4 14v-2a8 8 0 0 1 16 0v2"></path><path d="M4 14h2.5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"></path><path d="M20 14h-2.5a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1H19a1 1 0 0 0 1-1z"></path>',
+		'instagram'   => '<rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><path d="M17.5 6.5h.01"></path>',
+		'map'         => '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle>',
+		'book-open'   => '<path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2z"></path><path d="M12 6.5v13"></path>',
+		'shield'      => '<path d="M12 2.5 4.5 6v6c0 4.6 3.1 8.4 7.5 9.5 4.4-1.1 7.5-4.9 7.5-9.5V6z"></path><path d="m9 12 2 2 4-4"></path>',
+		'star'        => '<path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6-5.4-2.8-5.4 2.8 1-6L3.2 9.4l6.1-.9z"></path>',
+		'infinity'    => '<path d="M7 15.5a3.5 3.5 0 1 1 0-7c3 0 4 7 7 7a3.5 3.5 0 0 0 0-7c-3 0-4 7-7 7z"></path>',
+		'layers'      => '<path d="m12 3 9 5-9 5-9-5z"></path><path d="m3 13 9 5 9-5"></path>',
+		'hash'        => '<path d="M5 9h14"></path><path d="M5 15h14"></path><path d="M10 4 8.5 20"></path><path d="M15.5 4 14 20"></path>',
+		'eye'         => '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle>',
+		'calendar'    => '<rect x="3.5" y="5" width="17" height="16" rx="2"></rect><path d="M3.5 10h17"></path><path d="M8 3v4"></path><path d="M16 3v4"></path>',
 	);
 
 	if ( ! isset( $paths[ $name ] ) ) {

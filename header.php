@@ -7,8 +7,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$fs_cats = fs_get_categories();
-$fs_menu = fs_menu_items( 'primary' );
+$fs_cats     = fs_get_categories();
+$fs_menu     = fs_menu_items( 'primary' );
+$fs_settings = fs_get_theme_settings();
+$fs_notice   = trim( $fs_settings['header_notice'] );
+$fs_hphone   = trim( $fs_settings['header_phone'] );
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?> dir="rtl">
@@ -23,6 +26,32 @@ $fs_menu = fs_menu_items( 'primary' );
 <a class="fs-skip-link" href="#fs-main">پرش به محتوای اصلی</a>
 
 <div class="fs-container">
+
+	<?php if ( $fs_notice || $fs_hphone ) : ?>
+		<div class="fs-topbar">
+			<?php if ( $fs_notice ) : ?>
+				<?php $fs_notice_link = trim( $fs_settings['header_notice_link'] ); ?>
+				<?php if ( $fs_notice_link ) : ?>
+					<a class="fs-topbar__notice" href="<?php echo esc_url( $fs_notice_link ); ?>">
+						<?php fs_the_icon( 'zap', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.2' ) ); ?>
+						<?php echo esc_html( $fs_notice ); ?>
+					</a>
+				<?php else : ?>
+					<span class="fs-topbar__notice">
+						<?php fs_the_icon( 'zap', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.2' ) ); ?>
+						<?php echo esc_html( $fs_notice ); ?>
+					</span>
+				<?php endif; ?>
+			<?php endif; ?>
+
+			<?php if ( $fs_hphone ) : ?>
+				<a class="fs-topbar__phone" href="tel:<?php echo esc_attr( fs_en_num( $fs_hphone ) ); ?>">
+					<?php fs_the_icon( 'phone', 13, array( 'stroke' => 'currentColor', 'width' => '2' ) ); ?>
+					<?php echo esc_html( fs_fa_num( $fs_hphone ) ); ?>
+				</a>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 
 	<header class="fs-header">
 

@@ -20,19 +20,17 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 
 			<h2 class="fs-auth__side-title">با یک حساب، همه فایل‌هایتان همیشه در دسترس است</h2>
 
+			<?php if ( get_bloginfo( 'description' ) ) : ?>
+				<p class="fs-auth__side-desc"><?php echo esc_html( get_bloginfo( 'description' ) ); ?></p>
+			<?php endif; ?>
+
 			<ul class="fs-auth__side-list">
-				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
-					دانلود فوری فایل‌ها بعد از پرداخت
-				</li>
-				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
-					دسترسی همیشگی به همه خریدها
-				</li>
-				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
-					ذخیره نمونه سوال‌های مورد علاقه
-				</li>
+				<?php foreach ( array_slice( fs_data_trust(), 0, 4 ) as $fs_point ) : ?>
+					<li>
+						<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
+						<?php echo esc_html( $fs_point ); ?>
+					</li>
+				<?php endforeach; ?>
 			</ul>
 
 			<p class="fs-auth__side-foot">با ادامه، <span>قوانین و حریم خصوصی</span> <?php bloginfo( 'name' ); ?> را می‌پذیرید.</p>

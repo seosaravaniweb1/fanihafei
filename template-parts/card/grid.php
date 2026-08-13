@@ -18,7 +18,6 @@ if ( ! $fs_product instanceof WC_Product ) {
 
 $fs_index = isset( $args['index'] ) ? (int) $args['index'] : 0;
 $fs_id    = $fs_product->get_id();
-$fs_q     = fs_product_questions( $fs_id );
 
 // «جدید»: محصولی که در ۱۴ روز گذشته منتشر شده — نه یک برچسب دلبخواه.
 $fs_created = $fs_product->get_date_created();
@@ -45,16 +44,9 @@ $fs_is_new  = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY
 		</span>
 
 		<span class="fs-gcard__body">
-			<span class="fs-gcard__fmt">
-				<?php fs_the_icon( 'file', 12, array( 'stroke' => '#94a3b8' ) ); ?>
-				<?php echo esc_html( fs_product_badges_line( $fs_id ) ); ?>
-			</span>
-
 			<span class="fs-gcard__title"><?php echo esc_html( $fs_product->get_name() ); ?></span>
 
-			<?php if ( $fs_q ) : ?>
-				<span class="fs-gcard__q"><?php echo esc_html( $fs_q ); ?> سوال</span>
-			<?php endif; ?>
+			<?php fs_the_product_features( $fs_id, 'card', true ); ?>
 
 			<span class="fs-gcard__price"><?php echo wp_kses_post( fs_product_price( $fs_product ) ); ?></span>
 		</span>

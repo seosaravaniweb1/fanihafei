@@ -65,29 +65,20 @@ if ( ! $fs_popular ) {
 							<?php foreach ( $fs_tab['items'] as $fs_item ) : ?>
 								<a class="fs-vcard" href="<?php echo esc_url( fs_url( $fs_item['link'] ) ); ?>">
 
-									<span class="fs-vcard__top">
-										<span class="fs-vcard__fmt">
-											<?php fs_the_icon( 'file', 12, array( 'stroke' => '#94a3b8' ) ); ?>
-											<span class="fs-only-desktop">PDF</span>
-											<span class="fs-only-mobile">PDF · پاسخنامه دارد</span>
-										</span>
-										<?php if ( $fs_item['views'] ) : ?>
+									<?php if ( $fs_item['views'] ) : ?>
+										<span class="fs-vcard__top">
 											<span class="fs-vcard__views">
-												<span class="fs-only-desktop"><?php echo esc_html( $fs_item['views'] ); ?> بازدید</span>
-												<span class="fs-only-mobile"><?php echo esc_html( $fs_item['views'] ); ?></span>
+												<?php fs_the_icon( 'eye', 12, array( 'stroke' => '#94a3b8' ) ); ?>
+												<?php echo esc_html( $fs_item['views'] ); ?> بازدید
 											</span>
-										<?php endif; ?>
-									</span>
+										</span>
+									<?php endif; ?>
 
 									<span class="fs-vcard__title"><?php echo esc_html( $fs_item['title'] ); ?></span>
 
-									<span class="fs-vcard__ans">
-										<?php fs_the_icon( 'check', 11, array( 'stroke' => '#059669', 'width' => '2.6' ) ); ?>
-										پاسخنامه دارد
-									</span>
+									<?php fs_the_product_features( $fs_item['id'], 'card', true ); ?>
 
 									<span class="fs-vcard__foot">
-										<span class="fs-vcard__q"><?php echo esc_html( $fs_item['q'] ); ?> سوال</span>
 										<span class="fs-vcard__price"><?php echo wp_kses_post( $fs_item['price'] ); ?></span>
 									</span>
 

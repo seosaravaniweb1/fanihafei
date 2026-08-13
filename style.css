@@ -40,8 +40,8 @@ Tags: rtl-language-support, e-commerce, custom-menu, translation-ready
   --fs-orange-wash: #fff7ed;
   --fs-orange-edge: #fed7aa;
   --fs-orange-deep: #7c2d12;
-  --fs-container: 1320px;
-  --fs-pad: 32px;
+  --fs-container: 1660px;
+  --fs-pad: 34px;
   --fs-mq-speed: 26s;
 }
 
@@ -2213,14 +2213,8 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   }
 
   .fs-footer__grid {
-    display: block;
-  }
-
-  .fs-footer__cols {
-    display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 18px;
-    margin-top: 18px;
+    gap: 20px;
   }
 
   .fs-footer__head { font-size: 11.5px; margin-bottom: 9px; }
@@ -5530,4 +5524,807 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   .fs-thanks__title { font-size: 19px; }
   .fs-thanks__body { padding: 16px; }
   .fs-thanks__side { position: static; }
+}
+
+/* =========================================================================
+   ۲۰. اصلاحیه‌های نسخه ۱.۱ — چیپ‌های ویژگی، مسیر راهنما، قیمت، سایدبار
+       اطمینان، امتیاز نظرات، پخش‌کننده صوت و پاورقی تازه
+   ========================================================================= */
+
+/* عرض بیشتر در نمایشگرهای بزرگ ---------------------------------------------- */
+@media (min-width: 1800px) {
+  :root { --fs-container: 1780px; }
+}
+
+/* نوار اعلان بالای هدر ------------------------------------------------------- */
+.fs-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--fs-ink);
+  color: #e2e8f0;
+  padding: 9px var(--fs-pad);
+  font: 600 11.5px var(--fs-font);
+}
+
+.fs-topbar__notice,
+.fs-topbar__phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #e2e8f0;
+}
+
+.fs-topbar__notice:hover { color: var(--fs-green-mint); }
+
+.fs-topbar__phone {
+  color: var(--fs-green-mint);
+  direction: ltr;
+}
+
+/* مسیر راهنما با جداکننده --------------------------------------------------- */
+.fs-crumbs__list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fs-crumbs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+}
+
+.fs-crumbs__item > a,
+.fs-crumbs__item > span[aria-current] {
+  padding: 3px 2px;
+  border-radius: 6px;
+}
+
+.fs-crumbs__item > span[aria-current] {
+  color: var(--fs-ink);
+  font-weight: 700;
+}
+
+.fs-crumbs__sep {
+  display: inline-flex;
+  color: var(--fs-muted-2);
+  margin: 0 6px;
+}
+
+/* ووکامرس گاهی خودش بردکرامب چاپ می‌کند — آن نسخه پنهان می‌ماند. */
+.fs-crumbs .woocommerce-breadcrumb { display: none; }
+
+/* چیپ‌های ویژگی محصول روی کارت‌ها -------------------------------------------- */
+.fs-feats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fs-feats--wide { gap: 7px; margin-top: 10px; }
+
+.fs-feat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font: 600 9.5px var(--fs-font);
+  line-height: 1.6;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.fs-feats--wide .fs-feat { font-size: 11px; padding: 6px 11px; border-radius: 10px; }
+
+.fs-feat svg { flex: none; }
+
+.fs-feat--slate {
+  background: var(--fs-bg-2);
+  border-color: var(--fs-line);
+  color: var(--fs-ink-3);
+}
+
+.fs-feat--green {
+  background: var(--fs-green-wash);
+  border-color: var(--fs-green-edge);
+  color: var(--fs-green-d);
+}
+
+.fs-feat--orange {
+  background: var(--fs-orange-wash);
+  border-color: var(--fs-orange-edge);
+  color: var(--fs-orange-t);
+}
+
+/* داخل کارت‌های تیره (بخش پربازدیدترین‌ها) رنگ‌ها روشن می‌شوند. */
+.fs-pop .fs-feat--slate,
+.fs-vcard .fs-feat--slate {
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .1);
+  color: #cbd5e1;
+}
+
+.fs-pop .fs-feat--green,
+.fs-vcard .fs-feat--green {
+  background: rgba(16, 185, 129, .14);
+  border-color: rgba(16, 185, 129, .3);
+  color: #6ee7b7;
+}
+
+.fs-pop .fs-feat--orange,
+.fs-vcard .fs-feat--orange {
+  background: rgba(249, 115, 22, .14);
+  border-color: rgba(249, 115, 22, .3);
+  color: #fdba74;
+}
+
+.fs-gcard .fs-feats,
+.fs-pcard .fs-feats { margin: 2px 0 4px; }
+
+.fs-vcard .fs-feats { margin: 8px 0; }
+
+/* برچسب‌ها و جدول مشخصات صفحه محصول ----------------------------------------- */
+.fs-product__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.fs-ptag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font: 700 11px var(--fs-font);
+  border: 1px solid transparent;
+}
+
+.fs-ptag--accent {
+  background: linear-gradient(135deg, var(--fs-orange), var(--fs-orange-d));
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, .28);
+}
+
+.fs-ptag--new {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.fs-ptag--sold {
+  background: var(--fs-orange-wash);
+  border-color: var(--fs-orange-edge);
+  color: var(--fs-orange-t);
+}
+
+.fs-ptag--ok {
+  background: var(--fs-green-wash);
+  border-color: var(--fs-green-edge);
+  color: var(--fs-green-d);
+}
+
+.fs-pmeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 10px;
+  margin: 16px 0 4px;
+}
+
+.fs-pmeta__cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  padding: 11px 12px;
+}
+
+.fs-pmeta__icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fs-green-wash);
+  color: var(--fs-green-d);
+}
+
+.fs-pmeta__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.fs-pmeta__k {
+  font: 600 9.5px var(--fs-font);
+  color: var(--fs-muted-2);
+}
+
+.fs-pmeta__v {
+  font: 800 12px var(--fs-font);
+  color: var(--fs-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* جعبه قیمت ---------------------------------------------------------------- */
+.fs-price { display: flex; flex-direction: column; gap: 8px; }
+
+.fs-price__old {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fs-price__old-k {
+  font: 600 10.5px var(--fs-font);
+  color: var(--fs-muted-2);
+}
+
+.fs-price__old-v {
+  font: 600 12.5px var(--fs-font);
+  color: var(--fs-muted-2);
+  text-decoration: line-through;
+  text-decoration-color: rgba(148, 163, 184, .8);
+}
+
+.fs-price__now {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fs-price__now-k {
+  font: 700 11px var(--fs-font);
+  color: var(--fs-green-d);
+}
+
+.fs-price__now-v {
+  font: 900 24px var(--fs-font);
+  color: var(--fs-ink);
+  letter-spacing: -.3px;
+}
+
+.fs-price__now-v .woocommerce-Price-currencySymbol {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fs-muted);
+  margin-inline-start: 4px;
+}
+
+.fs-price__off {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--fs-green-wash);
+  border: 1px solid var(--fs-green-edge);
+  border-radius: 12px;
+  padding: 9px 11px;
+}
+
+.fs-price__off-badge {
+  flex: none;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  font: 800 12px var(--fs-font);
+  padding: 5px 10px;
+  border-radius: 8px;
+  box-shadow: 0 6px 14px rgba(220, 38, 38, .3);
+}
+
+.fs-price__off-text {
+  font: 700 11px var(--fs-font);
+  color: var(--fs-green-d);
+}
+
+.fs-price--plain {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* تعداد در جعبه خرید هیچ‌وقت نمایش داده نمی‌شود — هر فایل تک‌فروشی است. */
+.fs-buybox .quantity,
+.fs-buybox .qty,
+.woocommerce div.product form.cart .quantity,
+.fs-mobar .quantity { display: none !important; }
+
+/* سایدبار توضیحات محصول ---------------------------------------------------- */
+.fs-pside { display: flex; flex-direction: column; gap: 16px; }
+
+.fs-assure {
+  background: linear-gradient(165deg, #0f172a, #134e4a);
+  border-radius: 18px;
+  padding: 18px;
+  color: #e2e8f0;
+}
+
+.fs-assure__title {
+  font: 800 13px var(--fs-font);
+  color: #fff;
+  margin-bottom: 14px;
+}
+
+.fs-assure__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.fs-assure__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 600 11.5px/1.9 var(--fs-font);
+  color: #e2e8f0;
+  list-style: none;
+}
+
+.fs-assure__icon {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 185, 129, .16);
+  color: var(--fs-green-mint);
+}
+
+.fs-assure__icon--1 { background: rgba(59, 130, 246, .16); color: #93c5fd; }
+.fs-assure__icon--2 { background: rgba(249, 115, 22, .16); color: #fdba74; }
+.fs-assure__icon--3 { background: rgba(168, 85, 247, .16); color: #d8b4fe; }
+.fs-assure__icon--4 { background: rgba(20, 184, 166, .16); color: #5eead4; }
+
+.fs-assure .fs-banks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+}
+
+.fs-assure .fs-bank {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 5px;
+}
+
+.fs-assure .fs-bank img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.fs-assure .fs-banks__caption {
+  font: 500 10px/1.9 var(--fs-font);
+  color: var(--fs-muted-2);
+  text-align: center;
+  margin: 12px 0 0;
+}
+
+/* پخش‌کننده صوت ------------------------------------------------------------- */
+.fs-audio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 16px;
+  padding: 11px 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .05);
+  flex: 1;
+  min-width: 260px;
+}
+
+.fs-audio__play {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--fs-green-l), var(--fs-green-deep));
+  box-shadow: 0 8px 18px rgba(5, 150, 105, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.fs-audio__icon--play {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  /* مثلث پخش در چیدمان راست‌به‌چپ رو به راست است. */
+  border-width: 7px 0 7px 11px;
+  border-color: transparent transparent transparent #fff;
+  margin-inline-start: 2px;
+}
+
+.fs-audio__icon--pause {
+  width: 11px;
+  height: 13px;
+  border-inline-start: 3.5px solid #fff;
+  border-inline-end: 3.5px solid #fff;
+}
+
+.fs-audio__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fs-audio__label {
+  font: 600 10.5px var(--fs-font);
+  color: var(--fs-muted);
+}
+
+.fs-audio__wave {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.fs-audio__wave span {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--fs-line);
+  transition: background .15s;
+}
+
+.fs-audio__wave span.is-played { background: var(--fs-green); }
+
+.fs-audio__time {
+  flex: none;
+  font: 700 11px var(--fs-font);
+  color: var(--fs-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* امتیاز ستاره‌ای فرم دیدگاه ------------------------------------------------- */
+.fs-rating {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.fs-rating__label {
+  font: 700 12px var(--fs-font);
+  color: var(--fs-ink);
+}
+
+/* ستاره‌ها در DOM از ۵ به ۱ چیده شده‌اند تا با `~` بتوان ستاره‌های پیش از
+   ستاره‌ی انتخاب‌شده را هم رنگی کرد. */
+.fs-rating__stars {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.fs-rating__stars input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fs-rating__stars label {
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--fs-line);
+  transition: color .15s;
+}
+
+.fs-rating__stars label:hover,
+.fs-rating__stars label:hover ~ label,
+.fs-rating__stars input:checked ~ label { color: #f59e0b; }
+
+.fs-rating__stars input:focus-visible + label { outline: 2px solid var(--fs-green); outline-offset: 2px; }
+
+/* پاورقی تازه --------------------------------------------------------------- */
+.fs-fboxes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  padding-bottom: 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.fs-fbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 16px;
+  padding: 14px 16px;
+  transition: all .2s;
+}
+
+a.fs-fbox:hover {
+  background: rgba(16, 185, 129, .12);
+  border-color: rgba(16, 185, 129, .3);
+}
+
+.fs-fbox__icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--fs-green-l), var(--fs-green-deep));
+}
+
+.fs-fbox__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.fs-fbox__title {
+  font: 700 12px var(--fs-font);
+  color: #fff;
+}
+
+.fs-fbox__text {
+  font: 600 11px var(--fs-font);
+  color: var(--fs-muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fs-footer__grid {
+  grid-template-columns: 1.5fr 1fr 1fr 1.3fr 1.2fr;
+  align-items: start;
+}
+
+.fs-footer__links a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fs-footer__links a svg { flex: none; opacity: .5; }
+
+.fs-fprod__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.fs-fprod__tab {
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .04);
+  color: var(--fs-muted-2);
+  font: 700 10.5px var(--fs-font);
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.fs-fprod__tab.is-active {
+  background: linear-gradient(135deg, var(--fs-green-l), var(--fs-green-deep));
+  border-color: transparent;
+  color: #fff;
+}
+
+.fs-fprod__pane { display: flex; flex-direction: column; gap: 9px; }
+
+.fs-fprod__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 12px;
+  padding: 8px;
+  transition: all .2s;
+}
+
+.fs-fprod__item:hover {
+  background: rgba(16, 185, 129, .1);
+  border-color: rgba(16, 185, 129, .26);
+}
+
+.fs-fprod__thumb {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fs-fprod__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.fs-fprod__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.fs-fprod__title {
+  font: 600 10.5px/1.7 var(--fs-font);
+  color: #e2e8f0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fs-fprod__price {
+  font: 800 11px var(--fs-font);
+  color: var(--fs-green-mint);
+}
+
+.fs-fsym__row {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.fs-fsym__item {
+  width: 74px;
+  height: 84px;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.fs-fsym__item img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.fs-fbanks {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.fs-fbank {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .07);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.fs-fbank img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.fs-fbanks__caption {
+  font: 500 10px/1.9 var(--fs-font);
+  color: var(--fs-muted);
+  margin: 12px 0 0;
+}
+
+@media (max-width: 1300px) {
+  .fs-footer__grid { grid-template-columns: 1.4fr 1fr 1fr 1.2fr; }
+  .fs-fsym { grid-column: 1 / -1; }
+  .fs-fsym__row { justify-content: flex-start; }
+  .fs-fbanks { grid-template-columns: repeat(12, 1fr); max-width: 520px; }
+}
+
+@media (max-width: 900px) {
+  .fs-fboxes { grid-template-columns: 1fr; }
+  .fs-footer__grid { grid-template-columns: 1fr 1fr; }
+  .fs-footer__about { grid-column: 1 / -1; }
+  .fs-fbanks { grid-template-columns: repeat(6, 1fr); max-width: none; }
+}
+
+@media (max-width: 1023px) {
+  .fs-pmeta { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .fs-pmeta__cell { padding: 9px 10px; border-radius: 12px; }
+  .fs-price__now-v { font-size: 20px; }
+  .fs-audio { min-width: 0; width: 100%; }
+  .fs-audio__time { font-size: 10px; }
+  .fs-topbar { font-size: 10.5px; padding: 8px 16px; justify-content: center; text-align: center; }
+  .fs-crumbs__list { font-size: 10.5px; }
+}
+
+@media (max-width: 560px) {
+  .fs-pmeta { grid-template-columns: 1fr; }
+  .fs-footer__grid { grid-template-columns: 1fr; }
+  .fs-fbanks { grid-template-columns: repeat(4, 1fr); }
+  .fs-fsym__item { width: 66px; height: 76px; }
+}
+
+/* پیشخوان کاربری و تسویه‌حساب داخل قالب برگه -------------------------------- */
+
+/* برگه‌های ووکامرس داخل .fs-rich رندر می‌شوند؛ استایل متنی نباید روی اجزای
+   ساخت‌یافته‌ی پیشخوان و تسویه‌حساب (فهرست‌ها، جدول‌ها، فرم‌ها) بنشیند. */
+.fs-page--account .fs-page__body,
+.fs-page--checkout .fs-page__body,
+.fs-page--cart .fs-page__body {
+  font-size: inherit;
+  color: var(--fs-ink);
+}
+
+.fs-page--account .fs-page__body ul,
+.fs-page--account .fs-page__body ol,
+.fs-page--checkout .fs-page__body ul,
+.fs-page--checkout .fs-page__body ol,
+.fs-page--cart .fs-page__body ul,
+.fs-page--cart .fs-page__body ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fs-page--account .fs-page__body li,
+.fs-page--checkout .fs-page__body li,
+.fs-page--cart .fs-page__body li {
+  list-style: none;
+  margin-bottom: 0;
+}
+
+/* چیدمان دوستونی پیشخوان با گرید — پایدارتر از float. */
+.woocommerce-account.logged-in .woocommerce-MyAccount-navigation + .woocommerce-MyAccount-content,
+.woocommerce-account.logged-in .woocommerce {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .woocommerce-account.logged-in .fs-page__body > .woocommerce {
+    display: grid;
+    grid-template-columns: 262px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .woocommerce-account.logged-in .woocommerce-MyAccount-navigation {
+    width: auto;
+    float: none;
+    margin-left: 0;
+  }
+}
+
+/* کارت‌ها با چیپ‌های ویژگی ---------------------------------------------------- */
+.fs-pcard { min-width: 246px; }
+.fs-pcard__foot { margin-top: auto; padding-top: 11px; }
+.fs-gcard__price { padding-top: 11px; }
+.fs-vcard__foot { margin-top: auto; }
+.fs-vcard__top { margin-bottom: 8px; }
+
+.fs-vcard__views {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }

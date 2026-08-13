@@ -246,6 +246,41 @@ function fs_get_popular( $tabs = 5, $items = 8 ) {
 }
 
 /**
+ * محصولات ستون پاورقی — سبک‌تر از کارت‌های کامل: فقط تصویر، نام و قیمت.
+ *
+ * @param string $orderby ترتیب: date یا popularity.
+ * @param int    $limit   تعداد.
+ * @return array<int, array{title:string,link:string,price:string,thumb:string}>
+ */
+function fs_get_footer_products( $orderby = 'date', $limit = 4 ) {
+	if ( ! fs_has_woo() ) {
+		return array();
+	}
+
+	$products = wc_get_products(
+		array(
+			'status'  => 'publish',
+			'limit'   => $limit,
+			'orderby' => 'popularity' === $orderby ? 'popularity' : 'date',
+			'order'   => 'DESC',
+		)
+	);
+
+	$out = array();
+
+	foreach ( $products as $product ) {
+		$out[] = array(
+			'title' => $product->get_name(),
+			'link'  => get_permalink( $product->get_id() ),
+			'price' => fs_product_price( $product ),
+			'thumb' => get_the_post_thumbnail( $product->get_id(), 'thumbnail', array( 'loading' => 'lazy', 'decoding' => 'async' ) ),
+		);
+	}
+
+	return $out;
+}
+
+/**
  * مقالات.
  *
  * @param int $limit تعداد.
@@ -391,10 +426,10 @@ function fs_get_recently_viewed() {
 	$badges    = fs_product_badges_line( $id );
 
 	return array(
+		'id'     => $id,
 		'title'  => $product->get_name(),
 		'link'   => get_permalink( $id ),
 		'meta'   => $questions ? sprintf( '%s سوال · %s', $questions, $badges ) : $badges,
-		'meta_m' => $questions ? sprintf( '%s سوال · PDF', $questions ) : 'PDF',
 		'price'  => fs_product_price( $product ),
 	);
 }

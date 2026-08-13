@@ -23,6 +23,11 @@ function fs_product_fields() {
 				'type'  => 'text',
 				'desc'  => 'فقط عدد. مثلاً ۱۷۰',
 			),
+			'page_count'        => array(
+				'label' => 'تعداد صفحات',
+				'type'  => 'text',
+				'desc'  => 'فقط عدد. روی کارت محصول و مشخصات فایل نمایش داده می‌شود.',
+			),
 			'computer_code'     => array(
 				'label' => 'کد رایانه‌کار',
 				'type'  => 'text',
@@ -239,6 +244,15 @@ function fs_get_product_specs( $product_id ) {
 		);
 	}
 
+	$pages = fs_product_field( $product_id, 'page_count' );
+
+	if ( $pages ) {
+		$out[] = array(
+			'k' => 'تعداد صفحات',
+			'v' => fs_fa_num( $pages ) . ' صفحه',
+		);
+	}
+
 	if ( fs_product_flag( $product_id, 'has_answers' ) ) {
 		$out[] = array(
 			'k' => 'پاسخنامه',
@@ -278,6 +292,193 @@ function fs_product_badges_line( $product_id ) {
 
 	return implode( ' · ', $parts );
 }
+
+/**
+ * ویژگی‌های یک محصول برای نمایش روی کارت‌ها — همان چیزی که در همه‌ی صفحه‌های
+ * سایت زیر نام و قیمت محصول می‌آید: فرمت فایل، پاسخنامه، تعداد سوال، تعداد
+ * صفحه و ضمیمه‌ها.
+ *
+ * فقط مواردی برگردانده می‌شوند که برای همان محصول واقعاً ثبت شده‌اند.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return array<int, array{icon:string,text:string,tone:string}>
+ */
+function fs_product_features( $product_id ) {
+	$out = array();
+
+	$out[] = array(
+		'icon' => 'file',
+		'text' => 'فرمت PDF',
+		'tone' => 'slate',
+	);
+
+	if ( fs_product_flag( $product_id, 'has_answers' ) ) {
+		$out[] = array(
+			'icon' => 'check',
+			'text' => 'دارای پاسخنامه',
+			'tone' => 'green',
+		);
+	}
+
+	$questions = fs_product_field( $product_id, 'question_count' );
+
+	if ( $questions ) {
+		$out[] = array(
+			'icon' => 'hash',
+			'text' => fs_fa_num( $questions ) . ' سوال',
+			'tone' => 'slate',
+		);
+	}
+
+	$pages = fs_product_field( $product_id, 'page_count' );
+
+	if ( $pages ) {
+		$out[] = array(
+			'icon' => 'layers',
+			'text' => fs_fa_num( $pages ) . ' صفحه',
+			'tone' => 'slate',
+		);
+	}
+
+	if ( fs_product_flag( $product_id, 'attach_note' ) ) {
+		$out[] = array(
+			'icon' => 'file-lines',
+			'text' => 'جزوه',
+			'tone' => 'orange',
+		);
+	}
+
+	if ( fs_product_flag( $product_id, 'attach_book' ) ) {
+		$out[] = array(
+			'icon' => 'book-open',
+			'text' => 'کتاب آموزشی',
+			'tone' => 'orange',
+		);
+	}
+
+	return apply_filters( 'fs_product_features', $out, $product_id );
+}
+
+/**
+ * چاپ ویژگی‌های محصول به شکل چیپ‌های آیکون‌دار.
+ *
+ * @param int    $product_id شناسه محصول.
+ * @param string $variant    'card' یا 'wide'.
+ * @param bool   $as_span    اگر کارت داخل یک <a> باشد باید span باشد نه div.
+ * @return void
+ */
+function fs_the_product_features( $product_id, $variant = 'card', $as_span = false ) {
+	$features = fs_product_features( $product_id );
+
+	if ( ! $features ) {
+		return;
+	}
+
+	$tag = $as_span ? 'span' : 'div';
+
+	printf( '<%1$s class="fs-feats fs-feats--%2$s">', esc_html( $tag ), esc_attr( $variant ) );
+
+	foreach ( $features as $feature ) {
+		printf(
+			'<%1$s class="fs-feat fs-feat--%2$s">%3$s<%1$s class="fs-feat__t">%4$s</%1$s></%1$s>',
+			esc_html( $tag ),
+			esc_attr( $feature['tone'] ),
+			fs_icon( $feature['icon'], 12, array( 'width' => '2.1' ) ), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG ثابت قالب.
+			esc_html( $feature['text'] )
+		);
+	}
+
+	printf( '</%1$s>', esc_html( $tag ) );
+}
+
+/**
+ * فقط قیمت نهایی نمایش داده شود — نه قیمت خط‌خورده کنارش.
+ *
+ * تقریباً همه‌ی محصولات این فروشگاه دو قیمت دارند (عادی و تخفیف‌خورده) و
+ * نمایش هردو کنار هم روی کارت‌ها شلوغ و گیج‌کننده است. قیمت قبلی و درصد
+ * تخفیف فقط در جعبه‌ی خرید صفحه محصول، با طراحی خودش، نشان داده می‌شود.
+ *
+ * @param string     $html    خروجی پیش‌فرض.
+ * @param WC_Product $product محصول.
+ * @return string
+ */
+function fs_price_html_final_only( $html, $product ) {
+	if ( ! $product instanceof WC_Product || $product->is_type( 'variable' ) ) {
+		return $html;
+	}
+
+	if ( '' === $product->get_price() ) {
+		return $html;
+	}
+
+	$price = wc_get_price_to_display( $product );
+
+	// محصول رایگان متن خودش را دارد؛ دست نمی‌خورد.
+	if ( ! $price ) {
+		return $html;
+	}
+
+	return fs_fa_num_html( wc_price( $price ) );
+}
+add_filter( 'woocommerce_get_price_html', 'fs_price_html_final_only', 20, 2 );
+
+/**
+ * هر فایل تک‌فروشی است: نه انتخاب تعداد، نه چند نسخه در سبد.
+ *
+ * @return bool
+ */
+function fs_sold_individually() {
+	return true;
+}
+add_filter( 'woocommerce_is_sold_individually', 'fs_sold_individually', 20 );
+
+/**
+ * تعداد همیشه یک است — ورودی تعداد با CSS هم پنهان می‌شود، این فیلتر
+ * اطمینان می‌دهد حتی اگر جایی رندر شد، مقدارش قابل تغییر نباشد.
+ *
+ * @param array $args آرگومان‌های ورودی تعداد.
+ * @return array
+ */
+function fs_quantity_args( $args ) {
+	$args['min_value']   = 1;
+	$args['max_value']   = 1;
+	$args['input_value'] = 1;
+
+	return $args;
+}
+add_filter( 'woocommerce_quantity_input_args', 'fs_quantity_args', 20 );
+
+/**
+ * امتیاز ستاره‌ای در فرم دیدگاه صفحه محصول.
+ *
+ * ووکامرس خودش مقدار `rating` را در قلاب `comment_post` ذخیره می‌کند؛ فقط
+ * لازم است ورودی‌اش در فرم باشد.
+ *
+ * @param string $field فیلد متن دیدگاه.
+ * @return string
+ */
+function fs_review_rating_field( $field ) {
+	if ( ! is_singular( 'product' ) ) {
+		return $field;
+	}
+
+	$stars = '';
+
+	for ( $i = 5; $i >= 1; $i-- ) {
+		$stars .= sprintf(
+			'<input type="radio" id="fs-rating-%1$d" name="rating" value="%1$d" required><label for="fs-rating-%1$d" title="%1$d از ۵">★</label>',
+			$i
+		);
+	}
+
+	$rating = '<div class="comment-form-rating fs-rating">'
+		. '<span class="fs-rating__label">امتیاز شما به این فایل</span>'
+		. '<span class="fs-rating__stars">' . $stars . '</span>'
+		. '</div>';
+
+	return $rating . $field;
+}
+add_filter( 'comment_form_field_comment', 'fs_review_rating_field', 20 );
 
 /**
  * سرفصل‌های محصول.
