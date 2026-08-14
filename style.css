@@ -6340,3 +6340,10 @@ a.fs-fbox:hover {
   align-items: center;
   gap: 5px;
 }
+
+/* یادداشت جای لینک بازیابی رمز، برای کاربرانی که ایمیل ندارند. */
+.fs-profile-form__hint {
+  font: 500 11px/1.9 var(--fs-font);
+  color: var(--fs-muted);
+  align-self: center;
+}

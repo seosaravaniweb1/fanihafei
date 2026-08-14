@@ -26,8 +26,9 @@ $fs_downloads = fs_has_woo() ? wc_get_customer_available_downloads( $fs_user->ID
 		<div>
 			<div class="fs-greet__hi">سلام، <?php echo esc_html( $fs_name ); ?> عزیز</div>
 			<div class="fs-greet__meta">
-				<?php if ( $fs_user->user_email && ! preg_match( '/^09\d{9}@/', $fs_user->user_email ) ) : ?>
-					<span><?php fs_the_icon( 'file', 14, array( 'stroke' => '#6ee7b7', 'width' => '1.9' ) ); ?> <?php echo esc_html( $fs_user->user_email ); ?></span>
+				<?php $fs_email = fs_real_email( $fs_user ); ?>
+				<?php if ( $fs_email ) : ?>
+					<span><?php fs_the_icon( 'mail', 14, array( 'stroke' => '#6ee7b7', 'width' => '1.9' ) ); ?> <?php echo esc_html( $fs_email ); ?></span>
 				<?php endif; ?>
 				<?php if ( $fs_phone ) : ?>
 					<span><?php fs_the_icon( 'user', 14, array( 'stroke' => '#6ee7b7', 'width' => '1.9' ) ); ?> <?php echo esc_html( fs_fa_num( $fs_phone ) ); ?></span>
@@ -72,7 +73,7 @@ $fs_downloads = fs_has_woo() ? wc_get_customer_available_downloads( $fs_user->ID
 			<span class="fs-quickform__icon"><?php fs_the_icon( 'file-lines', 17, array( 'stroke' => '#059669', 'width' => '1.9' ) ); ?></span>
 			<div>
 				<div class="fs-quickform__title">تکمیل سریع پروفایل کاربری</div>
-				<div class="fs-quickform__sub">برای ارسال لینک دانلود، مشخصات خود را کامل کنید. (سایت فایلی است — نیازی به آدرس پستی نیست.)</div>
+				<div class="fs-quickform__sub">نام و شماره موبایلتان را کامل کنید. ایمیل و آدرس پستی لازم نیست؛ فایل‌ها همین‌جا در پیشخوان قابل دانلودند.</div>
 			</div>
 		</div>
 

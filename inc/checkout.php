@@ -60,19 +60,53 @@ function fs_checkout_fields( $fields ) {
 		$fields['billing']['billing_phone']['class']    = array( 'form-row-wide' );
 	}
 
-	// ایمیل خودکار است؛ نمایش داده می‌شود ولی اجباری نیست و اگر خالی بماند
-	// از روی شماره موبایل ساخته می‌شود.
+	// ایمیل واقعاً اختیاری است: خرید و دانلود با شماره موبایل انجام می‌شود و
+	// اگر کاربر ایمیلی نداشته باشد، خودکار از روی شماره ساخته می‌شود.
 	if ( isset( $fields['billing']['billing_email'] ) ) {
 		$fields['billing']['billing_email']['label']       = 'ایمیل (اختیاری)';
 		$fields['billing']['billing_email']['required']    = false;
 		$fields['billing']['billing_email']['priority']    = 40;
 		$fields['billing']['billing_email']['class']       = array( 'form-row-wide' );
-		$fields['billing']['billing_email']['description'] = 'اگر خالی بگذارید، خودکار از روی شماره موبایل ساخته می‌شود.';
+		$fields['billing']['billing_email']['description'] = 'اگر ایمیل ندارید خالی بگذارید؛ لینک دانلود در پیشخوان کاربری‌تان فعال می‌شود.';
 	}
 
 	return $fields;
 }
 add_filter( 'woocommerce_checkout_fields', 'fs_checkout_fields', 20 );
+
+/**
+ * نشانی ساختگی هیچ‌وقت داخل فیلد ایمیل تسویه‌حساب نیفتد.
+ *
+ * وگرنه کاربری که فقط با موبایل ثبت‌نام کرده، یک ایمیل ناآشنا مثل
+ * 09121234567@site.com جلوی چشمش می‌بیند و فکر می‌کند اشتباهی رخ داده.
+ *
+ * @param string $value مقدار پیش‌فرض.
+ * @param string $key   کلید فیلد.
+ * @return string
+ */
+function fs_hide_placeholder_email_value( $value, $key ) {
+	if ( 'billing_email' === $key && fs_is_placeholder_email( $value ) ) {
+		return '';
+	}
+
+	return $value;
+}
+add_filter( 'woocommerce_checkout_get_value', 'fs_hide_placeholder_email_value', 20, 2 );
+
+/**
+ * پرسش «آدرس ایمیل خود را برای تایید وارد کنید» حذف می‌شود.
+ *
+ * ووکامرس این فرم را در صفحه‌ی «سفارش دریافت شد» و جزئیات سفارش نشان می‌دهد تا
+ * مطمئن شود بیننده صاحب سفارش است. در این فروشگاه خرید فقط با حساب کاربری
+ * ممکن است و هر سفارش به همان حساب وصل می‌شود، پس این تایید لازم نیست — و
+ * برای کسی که با موبایل ثبت‌نام کرده و ایمیل ندارد، یک بن‌بست کامل است.
+ *
+ * @return bool
+ */
+function fs_no_order_email_verification() {
+	return false;
+}
+add_filter( 'woocommerce_order_email_verification_required', 'fs_no_order_email_verification', 20 );
 
 /**
  * حذف همان فیلدها از هر جای دیگر (پیشخوان، ویرایش نشانی).

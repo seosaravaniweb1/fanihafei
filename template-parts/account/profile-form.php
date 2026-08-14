@@ -33,7 +33,7 @@ $fs_compact = ! empty( $args['compact'] );
 
 		<label class="fs-pfield">
 			<span class="fs-pfield__label">ایمیل <span class="fs-auth__optional">اختیاری</span></span>
-			<input class="fs-pfield__input" type="email" name="email" value="<?php echo esc_attr( preg_match( '/^09\d{9}@/', $fs_user->user_email ) ? '' : $fs_user->user_email ); ?>" placeholder="user@example.com" dir="ltr">
+			<input class="fs-pfield__input" type="email" name="email" value="<?php echo esc_attr( fs_real_email( $fs_user ) ); ?>" placeholder="اگر ایمیل ندارید خالی بگذارید" dir="ltr">
 		</label>
 	</div>
 
@@ -45,9 +45,19 @@ $fs_compact = ! empty( $args['compact'] );
 			<?php echo $fs_compact ? 'ثبت و ذخیره' : 'ذخیره تغییرات'; ?>
 		</button>
 
-		<?php if ( ! $fs_compact ) : ?>
-			<a class="fs-profile-form__pass" href="<?php echo esc_url( wp_lostpassword_url() ); ?>">تغییر رمز عبور</a>
-		<?php endif; ?>
+		<?php
+		// بازیابی رمز از راه ایمیل انجام می‌شود؛ برای کاربری که ایمیل ندارد این
+		// لینک بن‌بست است، پس به‌جایش راه ورود واقعی‌اش یادآوری می‌شود.
+		if ( ! $fs_compact ) :
+			if ( fs_real_email( $fs_user ) ) :
+				?>
+				<a class="fs-profile-form__pass" href="<?php echo esc_url( wp_lostpassword_url() ); ?>">تغییر رمز عبور</a>
+			<?php else : ?>
+				<span class="fs-profile-form__hint">ورود شما با کد پیامکی انجام می‌شود و به رمز عبور نیازی ندارید.</span>
+				<?php
+			endif;
+		endif;
+		?>
 	</div>
 
 </form>

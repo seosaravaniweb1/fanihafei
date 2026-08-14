@@ -113,11 +113,12 @@ function fs_account_stats( $user_id ) {
  * @return int
  */
 function fs_profile_completeness( $user ) {
+	// ایمیل عمداً شمرده نمی‌شود: خرید و دانلود با شماره موبایل انجام می‌شود و
+	// کاربری که ایمیل ندارد نباید تا ابد جعبه‌ی «تکمیل پروفایل» را ببیند.
 	$checks = array(
 		(bool) $user->first_name,
 		(bool) $user->last_name,
 		(bool) get_user_meta( $user->ID, FS_PHONE_META, true ),
-		(bool) ( $user->user_email && ! preg_match( '/^09\d{9}@/', $user->user_email ) ),
 	);
 
 	$done = count( array_filter( $checks ) );

@@ -65,6 +65,85 @@ function fs_auth_phone_email( $phone ) {
 }
 
 /**
+ * آیا این ایمیل، ایمیل واقعی کاربر است یا نشانی ساختگی‌ای که خود قالب از روی
+ * شماره موبایل ساخته؟
+ *
+ * کاربری که فقط با موبایل ثبت‌نام کرده ایمیل ندارد؛ نشانی 09xxxxxxxxx@دامنه
+ * صرفاً برای این ساخته می‌شود که ووکامرس بدون ایمیل کار نمی‌کند. این نشانی
+ * نباید به کاربر نشان داده شود، ازش پرسیده شود یا نامه‌ای به آن فرستاده شود.
+ *
+ * @param string $email نشانی ایمیل.
+ * @return bool
+ */
+function fs_is_placeholder_email( $email ) {
+	$email = trim( (string) $email );
+
+	if ( ! $email ) {
+		return false;
+	}
+
+	return (bool) preg_match( '/^09\d{9}@' . preg_quote( fs_auth_email_domain(), '/' ) . '$/i', $email );
+}
+
+/**
+ * ایمیل واقعی کاربر — اگر فقط نشانی ساختگی داشته باشد، رشته‌ی خالی.
+ *
+ * @param int|WP_User|null $user کاربر.
+ * @return string
+ */
+function fs_real_email( $user = null ) {
+	if ( is_numeric( $user ) ) {
+		$user = get_userdata( (int) $user );
+	}
+
+	if ( ! $user instanceof WP_User ) {
+		$user = wp_get_current_user();
+	}
+
+	if ( ! $user || ! $user->exists() ) {
+		return '';
+	}
+
+	return fs_is_placeholder_email( $user->user_email ) ? '' : $user->user_email;
+}
+
+/**
+ * جلوی ارسال نامه به نشانی‌های ساختگی گرفته می‌شود.
+ *
+ * این نشانی‌ها صندوق واقعی ندارند؛ فرستادن نامه به آن‌ها فقط برگشت می‌خورد و
+ * به اعتبار دامنه‌ی سایت لطمه می‌زند. از دید ووکامرس و وردپرس، ارسال «موفق»
+ * گزارش می‌شود تا روند خرید یا ثبت‌نام متوقف نشود.
+ *
+ * @param null|bool $short_circuit مقدار میان‌بر.
+ * @param array     $atts          آرگومان‌های wp_mail.
+ * @return null|bool
+ */
+function fs_skip_placeholder_mail( $short_circuit, $atts ) {
+	if ( null !== $short_circuit || empty( $atts['to'] ) ) {
+		return $short_circuit;
+	}
+
+	$recipients = is_array( $atts['to'] ) ? $atts['to'] : explode( ',', (string) $atts['to'] );
+	$real       = false;
+
+	foreach ( $recipients as $recipient ) {
+		// ممکن است به شکل «نام <ایمیل>» باشد.
+		if ( preg_match( '/<([^>]+)>/', $recipient, $m ) ) {
+			$recipient = $m[1];
+		}
+
+		if ( ! fs_is_placeholder_email( trim( $recipient ) ) ) {
+			$real = true;
+			break;
+		}
+	}
+
+	// اگر حتی یک گیرنده‌ی واقعی وجود داشته باشد، نامه عادی فرستاده می‌شود.
+	return $real ? $short_circuit : true;
+}
+add_filter( 'pre_wp_mail', 'fs_skip_placeholder_mail', 10, 2 );
+
+/**
  * یافتن کاربر با شماره موبایل.
  *
  * @param string $phone شماره.
