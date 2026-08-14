@@ -6292,24 +6292,39 @@ a.fs-fbox:hover {
   margin-bottom: 0;
 }
 
-/* چیدمان دوستونی پیشخوان با گرید — پایدارتر از float. */
-.woocommerce-account.logged-in .woocommerce-MyAccount-navigation + .woocommerce-MyAccount-content,
-.woocommerce-account.logged-in .woocommerce {
-  min-width: 0;
-}
+/* چیدمان دوستونی پیشخوان.
+ *
+ * ووکامرس پیش از منوی پیشخوان یک <div class="woocommerce-notices-wrapper">
+ * خالی چاپ می‌کند. با جای‌گذاری خودکار گرید، همان جعبه‌ی نامرئی خانه‌ی اول را
+ * می‌گرفت و منو و محتوا یک خانه جلو می‌افتادند: منو تمام‌عرض و محتوا در ستون
+ * باریکِ سطر بعد. برای همین جای هر ستون صریح تعیین شده و هر عنصر ناشناخته‌ی
+ * دیگری تمام‌عرض می‌شود تا ستون‌ها را جابه‌جا نکند. */
+.woocommerce-account.logged-in .woocommerce { min-width: 0; }
+.woocommerce-notices-wrapper:empty { display: none; }
 
 @media (min-width: 1024px) {
   .woocommerce-account.logged-in .fs-page__body > .woocommerce {
     display: grid;
     grid-template-columns: 262px minmax(0, 1fr);
-    gap: 20px;
+    column-gap: 20px;
+    row-gap: 0;
     align-items: start;
   }
 
-  .woocommerce-account.logged-in .woocommerce-MyAccount-navigation {
+  .woocommerce-account.logged-in .fs-page__body > .woocommerce > * {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .woocommerce-account.logged-in .fs-page__body > .woocommerce > .woocommerce-MyAccount-navigation {
+    grid-column: 1;
     width: auto;
     float: none;
     margin-left: 0;
+  }
+
+  .woocommerce-account.logged-in .fs-page__body > .woocommerce > .woocommerce-MyAccount-content {
+    grid-column: 2;
   }
 }
 
