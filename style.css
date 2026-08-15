@@ -5795,11 +5795,11 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   letter-spacing: -.3px;
 }
 
+/* نماد واحد پول کوچک‌تر و کم‌رنگ‌تر از خود عدد است — چه راست بنشیند چه چپ. */
 .fs-price__now-v .woocommerce-Price-currencySymbol {
   font-size: 13px;
   font-weight: 700;
   color: var(--fs-muted);
-  margin-inline-start: 4px;
 }
 
 .fs-price__off {

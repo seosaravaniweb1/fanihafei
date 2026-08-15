@@ -92,22 +92,33 @@ function fs_en_num( $value ) {
 }
 
 /**
- * تبدیل ارقام درون HTML بدون دست‌زدن به تگ‌ها و اتریبیوت‌ها.
+ * تبدیل ارقام درون HTML بدون دست‌زدن به تگ‌ها، اتریبیوت‌ها و موجودیت‌های HTML.
+ *
+ * موجودیت‌ها هم باید دست‌نخورده بمانند: نماد واحد پول «تومان» در ووکامرس به شکل
+ * &#x062A;&#x0648;&#x0645;&#x0627;&#x0646; ذخیره شده است. اگر ارقام داخل همین
+ * موجودیت‌ها فارسی شوند، موجودیت خراب می‌شود و مرورگر به‌جای «تومان» خودِ کد را
+ * روی صفحه چاپ می‌کند.
  *
  * @param string $html رشته HTML.
  * @return string
  */
 function fs_fa_num_html( $html ) {
-	$parts = preg_split( '/(<[^>]*>)/', (string) $html, -1, PREG_SPLIT_DELIM_CAPTURE );
+	$parts = preg_split(
+		'/(<[^>]*>|&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]{1,30});)/',
+		(string) $html,
+		-1,
+		PREG_SPLIT_DELIM_CAPTURE
+	);
 
 	if ( ! is_array( $parts ) ) {
 		return $html;
 	}
 
 	foreach ( $parts as $i => $part ) {
-		if ( '' === $part || '<' === $part[0] ) {
+		if ( '' === $part || '<' === $part[0] || '&' === $part[0] ) {
 			continue;
 		}
+
 		$parts[ $i ] = fs_fa_num( $part );
 	}
 
