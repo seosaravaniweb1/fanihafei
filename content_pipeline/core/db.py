@@ -348,3 +348,168 @@ def all_keywords(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
            WHERE c.run_id=? ORDER BY k.canonical_id, k.position""",
         (run_id,),
     ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# ویرایش دستی (پنل وب)
+# ---------------------------------------------------------------------------
+
+
+def merge_canonicals(conn: sqlite3.Connection, target_id: int, source_id: int) -> int:
+    """ادغام دستی دو محصول. همه‌ی عنوان‌های خام و کلمات ``source`` به
+    ``target`` منتقل و رکورد مبدأ حذف می‌شود. خروجی: تعداد عنوان منتقل‌شده."""
+    if target_id == source_id:
+        raise ValueError("محصول مبدأ و مقصد یکی است.")
+    target = conn.execute(
+        "SELECT * FROM canonical_products WHERE id=?", (target_id,)
+    ).fetchone()
+    source = conn.execute(
+        "SELECT * FROM canonical_products WHERE id=?", (source_id,)
+    ).fetchone()
+    if target is None or source is None:
+        raise ValueError("محصول پیدا نشد.")
+    if target["run_id"] != source["run_id"]:
+        raise ValueError("دو محصول از دو اجرای متفاوت‌اند.")
+
+    moved = 0
+    with transaction(conn):
+        for row in conn.execute(
+            "SELECT raw_id FROM product_mapping WHERE canonical_id=?", (source_id,)
+        ).fetchall():
+            conn.execute(
+                "INSERT OR IGNORE INTO product_mapping (raw_id, canonical_id) VALUES (?,?)",
+                (row["raw_id"], target_id),
+            )
+            moved += 1
+        for row in conn.execute(
+            "SELECT keyword, position FROM lsi_keywords WHERE canonical_id=?", (source_id,)
+        ).fetchall():
+            conn.execute(
+                """INSERT OR IGNORE INTO lsi_keywords (canonical_id, keyword, position)
+                   VALUES (?,?,?)""",
+                (target_id, row["keyword"], row["position"]),
+            )
+        # توکن‌های تمایزدهنده‌ی هر دو طرف نگه داشته می‌شوند
+        tokens = json.loads(target["entity_tokens"] or "[]")
+        for token in json.loads(source["entity_tokens"] or "[]"):
+            if token not in tokens:
+                tokens.append(token)
+
+        conn.execute("DELETE FROM product_mapping WHERE canonical_id=?", (source_id,))
+        conn.execute("DELETE FROM lsi_keywords WHERE canonical_id=?", (source_id,))
+        conn.execute("DELETE FROM canonical_products WHERE id=?", (source_id,))
+        conn.execute(
+            """UPDATE canonical_products
+               SET entity_tokens=?, needs_review=0, merge_confidence=1.0
+               WHERE id=?""",
+            (json.dumps(tokens, ensure_ascii=False), target_id),
+        )
+        _refresh_suggest_status(conn, target_id)
+    return moved
+
+
+def detach_raw_product(conn: sqlite3.Connection, raw_id: int) -> int:
+    """جدا کردن یک عنوان خام از محصولش و ساخت یک محصول مستقل برای آن.
+
+    راه بازگشت از یک ادغام اشتباه. خروجی: شناسه‌ی محصول تازه.
+    """
+    raw = conn.execute("SELECT * FROM raw_products WHERE id=?", (raw_id,)).fetchone()
+    if raw is None:
+        raise ValueError("عنوان خام پیدا نشد.")
+    current = conn.execute(
+        "SELECT canonical_id FROM product_mapping WHERE raw_id=?", (raw_id,)
+    ).fetchone()
+    siblings = 0
+    if current is not None:
+        siblings = int(
+            conn.execute(
+                "SELECT COUNT(*) c FROM product_mapping WHERE canonical_id=?",
+                (current["canonical_id"],),
+            ).fetchone()["c"]
+        )
+        if siblings <= 1:
+            raise ValueError("این عنوان تنها عضو محصولش است؛ چیزی برای جدا کردن نیست.")
+
+    title = raw["raw_title"] or raw["normalized_title"] or f"عنوان {raw_id}"
+    with transaction(conn):
+        base, index = title, 2
+        while conn.execute(
+            "SELECT 1 FROM canonical_products WHERE run_id=? AND canonical_title=?",
+            (raw["run_id"], title),
+        ).fetchone():
+            title = f"{base} #{index}"
+            index += 1
+        new_id = insert_canonical(conn, raw["run_id"], title, [], 1.0, True)
+        if current is not None:
+            conn.execute(
+                "DELETE FROM product_mapping WHERE raw_id=? AND canonical_id=?",
+                (raw_id, current["canonical_id"]),
+            )
+        conn.execute(
+            "INSERT OR IGNORE INTO product_mapping (raw_id, canonical_id) VALUES (?,?)",
+            (raw_id, new_id),
+        )
+    return new_id
+
+
+def rename_canonical(conn: sqlite3.Connection, canonical_id: int, title: str) -> None:
+    title = (title or "").strip()
+    if not title:
+        raise ValueError("عنوان خالی است.")
+    row = conn.execute(
+        "SELECT run_id FROM canonical_products WHERE id=?", (canonical_id,)
+    ).fetchone()
+    if row is None:
+        raise ValueError("محصول پیدا نشد.")
+    clash = conn.execute(
+        "SELECT id FROM canonical_products WHERE run_id=? AND canonical_title=? AND id<>?",
+        (row["run_id"], title, canonical_id),
+    ).fetchone()
+    if clash is not None:
+        raise ValueError("محصول دیگری با همین عنوان وجود دارد.")
+    with transaction(conn):
+        conn.execute(
+            "UPDATE canonical_products SET canonical_title=? WHERE id=?", (title, canonical_id)
+        )
+
+
+def set_needs_review(conn: sqlite3.Connection, canonical_id: int, flag: bool) -> None:
+    with transaction(conn):
+        conn.execute(
+            "UPDATE canonical_products SET needs_review=? WHERE id=?",
+            (int(flag), canonical_id),
+        )
+
+
+def _refresh_suggest_status(conn: sqlite3.Connection, canonical_id: int) -> None:
+    """پس از ادغام دستی، وضعیت ساجست باید با کلمات واقعی بخواند."""
+    row = conn.execute(
+        "SELECT suggest_status FROM canonical_products WHERE id=?", (canonical_id,)
+    ).fetchone()
+    if row is None or row["suggest_status"] is None:
+        return
+    count = conn.execute(
+        "SELECT COUNT(*) c FROM lsi_keywords WHERE canonical_id=?", (canonical_id,)
+    ).fetchone()["c"]
+    conn.execute(
+        "UPDATE canonical_products SET suggest_status=? WHERE id=?",
+        ("has_suggest" if count else "no_suggest", canonical_id),
+    )
+
+
+def delete_run(conn: sqlite3.Connection, run_id: str) -> None:
+    """حذف کامل یک اجرا با همه‌ی داده‌هایش."""
+    with transaction(conn):
+        conn.execute(
+            """DELETE FROM product_mapping WHERE canonical_id IN
+               (SELECT id FROM canonical_products WHERE run_id=?)""",
+            (run_id,),
+        )
+        conn.execute(
+            """DELETE FROM lsi_keywords WHERE canonical_id IN
+               (SELECT id FROM canonical_products WHERE run_id=?)""",
+            (run_id,),
+        )
+        conn.execute("DELETE FROM canonical_products WHERE run_id=?", (run_id,))
+        conn.execute("DELETE FROM raw_products WHERE run_id=?", (run_id,))
+        conn.execute("DELETE FROM runs WHERE run_id=?", (run_id,))

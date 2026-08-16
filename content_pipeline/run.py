@@ -20,27 +20,17 @@ from typing import Optional
 
 import typer
 
-from .core import db, normalizer
-from .core.cache import QueryCache
+from .core import db, normalizer, pipeline
 from .core.config import Config, ConfigError, load_config
-from .core.embeddings import TopicMatcher, get_encoder
-from .core.http import fetcher_from_config
-from .core.suggest import suggest_from_config
 from .output import exporter
-from .phases import p1_crawl, p2_resolve, p3_suggest
 
 app = typer.Typer(
     add_completion=False,
     help="پایپ‌لاین موضوع‌محور استخراج و تحلیل خوراک محتوایی (بدون هزینه‌ی API)",
 )
 
-PHASE_NAMES = {
-    1: "کراول و تشخیص موضوعی",
-    2: "Entity Resolution",
-    3: "گوگل ساجست",
-    4: "خروجی",
-}
-LAST_PHASE = 4
+PHASE_NAMES = pipeline.PHASE_NAMES
+LAST_PHASE = pipeline.LAST_PHASE
 
 
 @dataclass
@@ -90,60 +80,23 @@ def _open(
     return Context(config=config, conn=conn, run_id=resolved)
 
 
-def _topic_matcher(config: Config) -> TopicMatcher:
-    encoder = get_encoder(config.get("embeddings.model"))
-    typer.echo(f"  انکودر: {encoder.name}")
-    if not config.target_topic:
-        raise ValueError("run.target_topic در config خالی است.")
-    return TopicMatcher.build(encoder, config.target_topic, config.topic_examples)
-
-
 # ---------------------------------------------------------------------------
-# فازها
+# فازها — پیاده‌سازی مشترک با پنل وب در core/pipeline.py است
 # ---------------------------------------------------------------------------
 
 
 def _run_phase(context: Context, phase: int) -> None:
-    config, conn, run_id = context.config, context.conn, context.run_id
-    typer.secho(f"\n▶ فاز {phase} — {PHASE_NAMES[phase]}", fg=typer.colors.CYAN, bold=True)
-
-    if phase == 1:
-        matcher = _topic_matcher(config)
-        with fetcher_from_config(config) as fetcher:
-            typer.echo(f"  backend HTTP: {fetcher.backend}")
-            if fetcher.backend != "curl_cffi":
-                typer.secho(
-                    "  ⚠ curl_cffi نصب نیست؛ اثرانگشت TLS ممکن است شناسایی شود. "
-                    "نصب کنید: pip install curl_cffi",
-                    fg=typer.colors.YELLOW,
-                )
-            stats = p1_crawl.run(conn, run_id, config, fetcher, matcher)
-        typer.echo(stats.render())
-
-    elif phase == 2:
-        stats = p2_resolve.run(conn, run_id, config)
-        typer.echo(stats.render())
-
-    elif phase == 3:
-        cache = QueryCache(conn, ttl_days=int(config.get("suggest.cache_ttl_days", 30)))
-        client = suggest_from_config(config, cache)
-        pending = len(p3_suggest.pending_products(conn, run_id))
-        typer.echo(
-            f"  {pending} محصول در صف؛ سقف این نشست: {client.config.max_per_session} کوئری، "
-            f"تأخیر {client.config.delay_min}–{client.config.delay_max} ثانیه"
-        )
-        stats = p3_suggest.run(conn, run_id, config, client)
-        typer.echo(stats.render())
-        typer.echo(f"  کش: {cache.hits} hit / {cache.misses} miss")
-
-    elif phase == 4:
-        stats = exporter.run(conn, run_id, config)
-        typer.echo(stats.render())
-
-    else:  # pragma: no cover
+    if phase not in PHASE_NAMES:
         _fail(f"شماره فاز نامعتبر: {phase}")
-
-    db.set_run_status(conn, run_id, db.RUNNING, phase)
+    typer.secho(f"\n▶ فاز {phase} — {PHASE_NAMES[phase]}", fg=typer.colors.CYAN, bold=True)
+    summary = pipeline.run_phase(
+        context.conn,
+        context.run_id,
+        context.config,
+        phase,
+        log=lambda line: typer.echo(f"  {line}"),
+    )
+    typer.echo(summary)
 
 
 # ---------------------------------------------------------------------------
@@ -242,18 +195,20 @@ def status_command(
         f"موضوع: {row['target_topic']}  |  وضعیت: {row['status']}  |  فاز: {row['current_phase']}"
     )
 
-    counts = {
-        "عنوان خام": "SELECT COUNT(*) c FROM raw_products WHERE run_id=?",
-        "مرتبط": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant=1",
-        "مرزی (شیت C)": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant IS NULL",
-        "محصول یکپارچه": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=?",
-        "نیازمند بازبینی": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND needs_review=1",
-        "has_suggest": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status='has_suggest'",
-        "no_suggest": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status='no_suggest'",
-        "در صف ساجست": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status IS NULL",
+    labels = {
+        "raw": "عنوان خام",
+        "relevant": "مرتبط",
+        "borderline": "مرزی (شیت C)",
+        "canonical": "محصول یکپارچه",
+        "needs_review": "نیازمند بازبینی",
+        "has_suggest": "has_suggest",
+        "no_suggest": "no_suggest",
+        "pending_suggest": "در صف ساجست",
+        "keywords": "کلمه‌ی کلیدی",
     }
-    for label, query in counts.items():
-        typer.echo(f"  {label}: {conn.execute(query, (rid,)).fetchone()['c']}")
+    counts = pipeline.counters(conn, rid)
+    for key, label in labels.items():
+        typer.echo(f"  {label}: {counts[key]}")
     context.close()
 
 
@@ -271,6 +226,51 @@ def runs_command(config: Optional[str] = typer.Option(None, "--config", "-c")) -
             f"  |  فاز {row['current_phase']}"
         )
     conn.close()
+
+
+@app.command("panel")
+def panel_command(
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="مسیر config.yaml"),
+    port: int = typer.Option(8000, "--port", "-p", help="پورت پنل"),
+    host: str = typer.Option("127.0.0.1", "--host", help="فقط لوکال؛ عوض کردنش ریسک دارد"),
+    open_browser: bool = typer.Option(True, "--browser/--no-browser", help="باز کردن مرورگر"),
+) -> None:
+    """بالا آوردن پنل مدیریت در مرورگر."""
+    import webbrowser
+
+    from .web import server as web_server
+
+    try:
+        configuration = load_config(config)
+    except ConfigError as exc:
+        _fail(str(exc))
+        return
+    db.connect(configuration.db_path).close()  # اطمینان از وجود دیتابیس و اسکیما
+
+    try:
+        httpd, state = web_server.build_server(configuration, config, host=host, port=port)
+    except OSError as exc:
+        _fail(f"پورت {port} در دسترس نیست ({exc}). با --port پورت دیگری بدهید.")
+        return
+
+    url = web_server.url_for(httpd, state.token)
+    typer.secho("پنل مدیریت بالا آمد:", fg=typer.colors.GREEN, bold=True)
+    typer.echo(f"  {url}")
+    typer.echo("  این لینک توکن نشست را دارد؛ همین را باز کنید. برای بستن: Ctrl+C")
+    if host != "127.0.0.1":
+        typer.secho(
+            "  ⚠ پنل روی شبکه باز است. هرکسی که به این پورت برسد می‌تواند کراول راه بیندازد.",
+            fg=typer.colors.YELLOW,
+        )
+    if open_browser:
+        webbrowser.open(url)
+
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        typer.secho("\nپنل بسته شد.", fg=typer.colors.YELLOW)
+    finally:
+        httpd.server_close()
 
 
 @app.command("normalize")

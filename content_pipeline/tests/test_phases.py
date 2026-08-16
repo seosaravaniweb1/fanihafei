@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from content_pipeline.core import db
+from content_pipeline.core import db, pipeline
 from content_pipeline.core.config import load_config
 from content_pipeline.core.suggest import SuggestBlocked
 from content_pipeline.output import exporter
@@ -224,3 +224,26 @@ def test_export_writes_a_local_file(env):
     assert stats.ready_rows == 1
     assert stats.archive_rows == 2
     assert stats.review_rows == 2
+
+
+# ---------------------------------------------------------------------------
+# اجرای مشترک CLI و پنل
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_run_phase_four_exports_and_completes_the_run(env):
+    conn, run_id, config = env
+    add_product(conn, run_id, "رمان شب سرد")
+
+    lines: list[str] = []
+    summary = pipeline.run_phase(conn, run_id, config, 4, log=lines.append)
+
+    assert "خروجی" in summary
+    assert db.get_run(conn, run_id)["status"] == db.COMPLETED
+    assert db.get_run(conn, run_id)["current_phase"] == 4
+
+
+def test_pipeline_run_phase_rejects_unknown_phase(env):
+    conn, run_id, config = env
+    with pytest.raises(ValueError):
+        pipeline.run_phase(conn, run_id, config, 9)

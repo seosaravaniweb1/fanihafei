@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>پنل خوراک محتوایی</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📊</text></svg>">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <strong>خوراک محتوایی</strong>
+    <span class="muted" id="topicLabel"></span>
+  </div>
+  <div class="head-actions">
+    <select id="runSelect" title="اجرای فعال"></select>
+    <button id="newRunBtn" class="primary">اجرای جدید</button>
+    <button id="deleteRunBtn" class="danger ghost" title="حذف کامل این اجرا">حذف</button>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="dashboard" class="active">داشبورد</button>
+  <button data-tab="run">اجرا</button>
+  <button data-tab="products">محصولات</button>
+  <button data-tab="review">بازبینی دستی</button>
+  <button data-tab="config">تنظیمات</button>
+  <button data-tab="tools">ابزار</button>
+</nav>
+
+<div id="toast" hidden></div>
+
+<main>
+  <!-- ------------------------------------------------------ داشبورد -->
+  <section id="tab-dashboard" class="tab active">
+    <div class="cards" id="counterCards"></div>
+    <div class="panel">
+      <h2>وضعیت اجرا</h2>
+      <table class="kv" id="runInfo"></table>
+    </div>
+    <div class="panel">
+      <h2>خروجی</h2>
+      <div id="outputInfo" class="muted">…</div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- اجرا -->
+  <section id="tab-run" class="tab">
+    <div class="panel">
+      <h2>اجرای فازها</h2>
+      <p class="muted">
+        فازها مستقل‌اند و از طریق دیتابیس با هم حرف می‌زنند. هر فاز بلافاصله می‌نویسد،
+        پس اگر وسط کار متوقف شود، از همان فاز می‌توانید ادامه بدهید.
+      </p>
+      <div id="phaseChecks" class="phase-list"></div>
+      <div class="row">
+        <button id="startBtn" class="primary">اجرا</button>
+        <button id="cancelBtn" class="danger" disabled>لغو</button>
+        <span id="jobStatus" class="muted"></span>
+      </div>
+      <div class="warn" id="suggestWarn" hidden>
+        فاز ۳ به endpoint غیررسمی گوگل می‌زند. بار اول با
+        <code>max_per_session: 10</code> امتحان کنید.
+      </div>
+    </div>
+    <div class="panel">
+      <h2>لاگ زنده</h2>
+      <pre id="log" dir="rtl"></pre>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------- محصولات -->
+  <section id="tab-products" class="tab">
+    <div class="panel">
+      <div class="row wrap">
+        <select id="prodFilter">
+          <option value="all">همه</option>
+          <option value="merged">ادغام‌شده (بیش از یک عنوان)</option>
+          <option value="needs_review">نیازمند بازبینی</option>
+          <option value="has_suggest">دارای ساجست</option>
+          <option value="no_suggest">بدون ساجست</option>
+          <option value="pending">در صف ساجست</option>
+        </select>
+        <input id="prodSearch" type="search" placeholder="جستجو در عنوان…">
+        <span class="muted" id="prodCount"></span>
+        <span class="spacer"></span>
+        <button id="prodPrev" class="ghost">قبلی</button>
+        <button id="prodNext" class="ghost">بعدی</button>
+      </div>
+      <div id="mergeBar" class="mergebar" hidden></div>
+      <table class="grid" id="prodTable">
+        <thead>
+          <tr>
+            <th style="width:2.2rem"></th>
+            <th>عنوان یکپارچه</th>
+            <th style="width:4rem">عنوان‌ها</th>
+            <th style="width:5rem">کلمات</th>
+            <th style="width:7rem">ساجست</th>
+            <th style="width:9rem">دامنه‌ها</th>
+            <th style="width:9rem"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel" id="detailPanel" hidden>
+      <h2 id="detailTitle"></h2>
+      <div id="detailBody"></div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------- بازبینی -->
+  <section id="tab-review" class="tab">
+    <div class="panel">
+      <h2>محصولات علامت‌خورده</h2>
+      <p class="muted">
+        قانون طلایی: در حالت شک، ادغام نکن. یک ادغام اشتباه برگشت‌پذیر نیست مگر با «جدا کردن».
+        نویسنده مهم‌ترین نشانه‌ی هویت است.
+      </p>
+      <div id="reviewList"></div>
+    </div>
+    <div class="panel">
+      <h2>عنوان‌های مرزی (شیت C)</h2>
+      <div id="borderlineList"></div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------- تنظیمات -->
+  <section id="tab-config" class="tab">
+    <div class="panel">
+      <h2>config.yaml</h2>
+      <div class="row">
+        <span class="muted" id="configPath"></span>
+        <span class="spacer"></span>
+        <button id="configReload" class="ghost">بازخوانی</button>
+        <button id="configSave" class="primary">ذخیره</button>
+      </div>
+      <p class="warn">
+        ذخیره، فایل را بازنویسی می‌کند و یک نسخه‌ی پشتیبان <code>.bak</code> می‌سازد.
+        توضیحات و ترتیب فعلی حفظ می‌شود چون متن را همان‌طور که هست ذخیره می‌کنیم.
+      </p>
+      <textarea id="configText" spellcheck="false" dir="ltr"></textarea>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------- ابزار -->
+  <section id="tab-tools" class="tab">
+    <div class="panel">
+      <h2>آزمایش نرمال‌سازی (فاز ۰)</h2>
+      <div class="row">
+        <input id="normInput" placeholder="مثلاً: دانلود جزوه ریاضی ۱۴۰۴ PDF">
+        <button id="normBtn" class="primary">تحلیل</button>
+      </div>
+      <table class="kv" id="normOut"></table>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
