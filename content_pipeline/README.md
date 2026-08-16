@@ -42,6 +42,14 @@ playwright install chromium        # فقط اگر سایت JS-heavy دارید
 cp content_pipeline/config.example.yaml config.yaml
 ```
 
+روی ویندوز:
+
+```cmd
+python -m venv .venv && .venv\Scripts\activate
+pip install -r content_pipeline\requirements.txt
+copy content_pipeline\config.example.yaml config.yaml
+```
+
 **حداقل وابستگی‌ها `typer` و `PyYAML` است.** بقیه اختیاری‌اند و پایپ‌لاین بدون
 آن‌ها هم اجرا می‌شود، ولی با کیفیت یا ریسک بیشتر:
 
@@ -97,6 +105,22 @@ python -m content_pipeline.run panel -c config.yaml
 python -m content_pipeline.run panel -c config.yaml
 # پنل روی http://127.0.0.1:8000 بالا می‌آید و مرورگر خودش باز می‌شود
 python -m content_pipeline.run panel -c config.yaml --port 8100 --no-browser
+```
+
+**نکته‌ی مهم درباره‌ی جای اجرا:** شکل `python -m content_pipeline.run` باید از
+**پوشه‌ی والدِ** `content_pipeline` اجرا شود، نه از داخل خودش — وگرنه پایتون
+می‌گوید `No module named 'content_pipeline'`. اگر داخل خود پوشه هستید، فایل را
+مستقیم صدا بزنید؛ همان کار را می‌کند:
+
+```cmd
+:: از پوشه‌ی والد
+cd C:\Users\<user>\Desktop\scrpts
+copy content_pipeline\config.example.yaml config.yaml
+python -m content_pipeline.run panel -c config.yaml
+
+:: یا از داخل خود پوشه
+cd content_pipeline
+python run.py panel -c ..\config.yaml
 ```
 
 پنل با همان کدی کار می‌کند که CLI اجرا می‌کند (`core/pipeline.py`)، پس رفتار این

@@ -13,6 +13,18 @@
 
 from __future__ import annotations
 
+# اجرای مستقیم از داخل خود پوشه (``python run.py panel -c config.yaml``) با
+# import های نسبی کار نمی‌کند. به‌جای خطای گیج‌کننده، پوشه‌ی والد را به مسیر
+# اضافه می‌کنیم و همان فایل را این بار به‌عنوان ماژول بسته اجرا می‌کنیم.
+if __name__ == "__main__" and not __package__:  # pragma: no cover
+    import pathlib
+    import runpy
+    import sys as _sys
+
+    _sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+    runpy.run_module("content_pipeline.run", run_name="__main__", alter_sys=True)
+    raise SystemExit(0)
+
 import sqlite3
 import sys
 from dataclasses import dataclass

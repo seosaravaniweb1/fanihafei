@@ -186,7 +186,12 @@ def load_config(path: str | Path | None = None) -> Config:
     if path:
         resolved = Path(path)
         if not resolved.exists():
-            raise ConfigError(f"فایل config پیدا نشد: {resolved}")
+            raise ConfigError(
+                f"فایل config پیدا نشد: {resolved}\n"
+                "یک نسخه از نمونه بسازید:\n"
+                "  Windows : copy content_pipeline\\config.example.yaml config.yaml\n"
+                "  Linux/Mac: cp content_pipeline/config.example.yaml config.yaml"
+            )
         if yaml is None:  # pragma: no cover
             raise ConfigError("برای خواندن config به PyYAML نیاز است: pip install pyyaml")
         data = yaml.safe_load(resolved.read_text(encoding="utf-8")) or {}
