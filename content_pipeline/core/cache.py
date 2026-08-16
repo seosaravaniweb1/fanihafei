@@ -1,7 +1,8 @@
-"""کش کال‌های خارجی.
+"""کش کوئری‌ها.
 
-اصل ۶ معماری: هر کال خارجی باید کش شود. کلید کش ``sha256`` از
-``provider + endpoint + params`` است تا اجرای دوباره پول و زمان هدر ندهد.
+اصل ۵ معماری: هر کوئری ساجست یک‌بار زده می‌شود و در ``api_cache`` می‌ماند، تا
+اجرای دوباره‌ی فاز ۳ هیچ درخواست تکراری به گوگل نزند (هم سریع‌تر، هم خطر بلاک
+شدن کمتر).
 """
 
 from __future__ import annotations
@@ -15,9 +16,9 @@ from typing import Any, Callable
 from . import db
 
 
-def cache_key(provider: str, endpoint: str, params: dict[str, Any]) -> str:
+def cache_key(namespace: str, params: dict[str, Any]) -> str:
     payload = json.dumps(
-        {"provider": provider, "endpoint": endpoint, "params": params},
+        {"ns": namespace, "params": params},
         sort_keys=True,
         ensure_ascii=False,
         separators=(",", ":"),
@@ -25,9 +26,7 @@ def cache_key(provider: str, endpoint: str, params: dict[str, Any]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def get(
-    conn: sqlite3.Connection, key: str, ttl_days: int | None = None
-) -> Any | None:
+def get(conn: sqlite3.Connection, key: str, ttl_days: int | None = None) -> Any | None:
     row = conn.execute("SELECT * FROM api_cache WHERE cache_key=?", (key,)).fetchone()
     if row is None:
         return None
@@ -47,70 +46,34 @@ def get(
         return None
 
 
-def put(conn: sqlite3.Connection, key: str, provider: str, value: Any) -> None:
+def put(conn: sqlite3.Connection, key: str, value: Any) -> None:
     with db.transaction(conn):
         conn.execute(
-            """INSERT OR REPLACE INTO api_cache (cache_key, provider, response, created_at)
-               VALUES (?,?,?,?)""",
-            (key, provider, json.dumps(value, ensure_ascii=False), db.utcnow()),
+            "INSERT OR REPLACE INTO api_cache (cache_key, response, created_at) VALUES (?,?,?)",
+            (key, json.dumps(value, ensure_ascii=False), db.utcnow()),
         )
 
 
-class CachedCaller:
-    """پوشش کش + لاگ هزینه دور یک کال خارجی.
+class QueryCache:
+    """پوشش کش دور یک کوئری خارجی، با شمارش hit/miss."""
 
-    اگر پاسخ در کش باشد هزینه‌ای ثبت نمی‌شود و ``cost_guard`` مصرف نمی‌شود.
-    """
-
-    def __init__(
-        self,
-        conn: sqlite3.Connection,
-        run_id: str,
-        ttl_days: int | None = 14,
-        cost_guard: Any | None = None,
-    ) -> None:
+    def __init__(self, conn: sqlite3.Connection, ttl_days: int | None = 30) -> None:
         self.conn = conn
-        self.run_id = run_id
         self.ttl_days = ttl_days
-        self.cost_guard = cost_guard
         self.hits = 0
         self.misses = 0
 
-    def call(
-        self,
-        provider: str,
-        endpoint: str,
-        params: dict[str, Any],
-        fn: Callable[[], Any],
-        cost_unit: float = 0.0,
-        cost_of: Callable[[Any], float] | None = None,
-    ) -> Any:
-        """اجرای کال با کش.
-
-        ``cost_unit`` تخمینی است که پیش از کال برای سقف هزینه رزرو می‌شود؛
-        ``cost_of`` (اگر داده شود) هزینه‌ی واقعی را از پاسخ محاسبه می‌کند —
-        برای LLM که هزینه‌اش به تعداد توکن بستگی دارد.
-        """
-        key = cache_key(provider, endpoint, params)
+    def call(self, namespace: str, params: dict[str, Any], fn: Callable[[], Any]) -> Any:
+        key = cache_key(namespace, params)
         cached = get(self.conn, key, self.ttl_days)
         if cached is not None:
             self.hits += 1
             return cached
         self.misses += 1
-        if self.cost_guard is not None:
-            self.cost_guard.reserve(cost_unit)
         value = fn()
-        put(self.conn, key, provider, value)
-        actual = cost_unit
-        if cost_of is not None:
-            try:
-                actual = float(cost_of(value))
-            except Exception:
-                actual = cost_unit
-        with db.transaction(self.conn):
-            db.record_usage(self.conn, self.run_id, provider, endpoint, actual)
+        put(self.conn, key, value)
         return value
 
-    def peek(self, provider: str, endpoint: str, params: dict[str, Any]) -> bool:
-        """آیا این کال از کش پاسخ می‌گیرد؟ (برای تخمین هزینه در dry-run)"""
-        return get(self.conn, cache_key(provider, endpoint, params), self.ttl_days) is not None
+    def peek(self, namespace: str, params: dict[str, Any]) -> bool:
+        """آیا این کوئری از کش پاسخ می‌گیرد؟ (برای تخمین تعداد درخواست‌ها)"""
+        return get(self.conn, cache_key(namespace, params), self.ttl_days) is not None

@@ -23,7 +23,6 @@ def insert(conn, run_id, url="https://a.ir/p/1", title="رمان الف"):
             source_url=url,
             raw_title=title,
             normalized_title="رمان الف",
-            display_title=title,
             topic_score=0.9,
             is_relevant=True,
         )
@@ -41,7 +40,6 @@ def test_schema_is_created(conn):
         "product_mapping",
         "lsi_keywords",
         "api_cache",
-        "api_usage",
     } <= tables
 
 
@@ -80,8 +78,8 @@ def test_keyword_unique_per_product(conn):
     run_id = db.create_run(conn, "رمان")
     with db.transaction(conn):
         canonical_id = db.insert_canonical(conn, run_id, "رمان الف", [], 1.0, False)
-        db.insert_keyword(conn, canonical_id, "رمان الف pdf", 1, 0.8)
-        db.insert_keyword(conn, canonical_id, "رمان الف pdf", 5, 0.8)
+        db.insert_keyword(conn, canonical_id, "رمان الف pdf", 1)
+        db.insert_keyword(conn, canonical_id, "رمان الف pdf", 5)
     assert len(db.keywords_for(conn, canonical_id)) == 1
 
 
@@ -117,18 +115,22 @@ def test_borderline_products_are_kept_with_null_relevance(conn):
     run_id = db.create_run(conn, "رمان")
     with db.transaction(conn):
         db.insert_raw_product(
-            conn, run_id, "a.ir", "https://a.ir/x", "عنوان مرزی", "عنوان مرزی", "عنوان مرزی",
+            conn, run_id, "a.ir", "https://a.ir/x", "عنوان مرزی", "عنوان مرزی",
             topic_score=0.55, is_relevant=None,
         )
     assert len(db.borderline_raw_products(conn, run_id)) == 1
     assert len(db.relevant_raw_products(conn, run_id)) == 0
 
 
-def test_usage_totals(conn):
+def test_source_domains_are_deduplicated(conn):
     run_id = db.create_run(conn, "رمان")
+    insert(conn, run_id, "https://a.ir/p/1")
+    insert(conn, run_id, "https://a.ir/p/2")
+    insert(conn, run_id, "https://b.ir/p/3")
+    rows = db.relevant_raw_products(conn, run_id)
     with db.transaction(conn):
-        db.record_usage(conn, run_id, "serp", "search", 0.01)
-        db.record_usage(conn, run_id, "serp", "search", 0.01)
-        db.record_usage(conn, run_id, "anthropic", "judge", 0.05)
-    assert round(db.total_cost(conn, run_id), 4) == 0.07
-    assert len(db.usage_breakdown(conn, run_id)) == 2
+        canonical_id = db.insert_canonical(conn, run_id, "رمان الف", [], 1.0, False)
+        for row in rows:
+            db.map_raw_to_canonical(conn, int(row["id"]), canonical_id)
+    assert db.source_domains_for(conn, canonical_id) == ["a.ir"]
+    assert len(db.source_urls_for(conn, canonical_id)) == 3

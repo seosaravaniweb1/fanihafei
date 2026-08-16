@@ -3,6 +3,8 @@
 اصل معماری: هیچ داده‌ای فقط در RAM نمی‌ماند. هر فاز نتیجه‌اش را بلافاصله
 می‌نویسد و با ``UNIQUE`` + ``INSERT OR IGNORE`` اجرای دوباره رکورد تکراری
 نمی‌سازد.
+
+اسکیما دقیقاً مطابق بخش ۵ داکیومنت است.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 RUNNING = "running"
 COMPLETED = "completed"
@@ -27,8 +29,7 @@ CREATE TABLE IF NOT EXISTS runs (
     target_topic  TEXT NOT NULL,
     created_at    TIMESTAMP,
     status        TEXT,
-    current_phase INTEGER,
-    config_json   TEXT
+    current_phase INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS raw_products (
@@ -38,11 +39,8 @@ CREATE TABLE IF NOT EXISTS raw_products (
     source_url       TEXT,
     raw_title        TEXT,
     normalized_title TEXT,
-    display_title    TEXT,
-    entity_tokens    TEXT,
     topic_score      REAL,
     is_relevant      BOOLEAN,
-    fetched_at       TIMESTAMP,
     UNIQUE(run_id, source_url)
 );
 
@@ -54,10 +52,6 @@ CREATE TABLE IF NOT EXISTS canonical_products (
     merge_confidence REAL,
     needs_review     BOOLEAN DEFAULT 0,
     suggest_status   TEXT,
-    benchmark_url    TEXT,
-    benchmark_score  REAL,
-    image_url        TEXT,
-    created_at       TIMESTAMP,
     UNIQUE(run_id, canonical_title)
 );
 
@@ -72,31 +66,19 @@ CREATE TABLE IF NOT EXISTS lsi_keywords (
     canonical_id INTEGER NOT NULL,
     keyword      TEXT,
     position     INTEGER,
-    similarity   REAL,
     UNIQUE(canonical_id, keyword)
 );
 
 CREATE TABLE IF NOT EXISTS api_cache (
-    cache_key   TEXT PRIMARY KEY,
-    provider    TEXT,
-    response    TEXT,
-    created_at  TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS api_usage (
-    id        INTEGER PRIMARY KEY,
-    run_id    TEXT,
-    provider  TEXT,
-    endpoint  TEXT,
-    cost_unit REAL,
-    called_at TIMESTAMP
+    cache_key  TEXT PRIMARY KEY,
+    response   TEXT,
+    created_at TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_raw_run       ON raw_products(run_id, is_relevant);
 CREATE INDEX IF NOT EXISTS idx_canon_run     ON canonical_products(run_id);
 CREATE INDEX IF NOT EXISTS idx_mapping_canon ON product_mapping(canonical_id);
 CREATE INDEX IF NOT EXISTS idx_lsi_canon     ON lsi_keywords(canonical_id);
-CREATE INDEX IF NOT EXISTS idx_usage_run     ON api_usage(run_id);
 """
 
 
@@ -144,16 +126,14 @@ def new_run_id() -> str:
     return f"{stamp}-{uuid.uuid4().hex[:6]}"
 
 
-def create_run(
-    conn: sqlite3.Connection, topic: str, run_id: str | None = None, config: dict | None = None
-) -> str:
+def create_run(conn: sqlite3.Connection, topic: str, run_id: str | None = None) -> str:
     run_id = run_id or new_run_id()
     with transaction(conn):
         conn.execute(
             """INSERT OR IGNORE INTO runs
-               (run_id, target_topic, created_at, status, current_phase, config_json)
-               VALUES (?,?,?,?,?,?)""",
-            (run_id, topic, utcnow(), RUNNING, 0, json.dumps(config or {}, ensure_ascii=False)),
+               (run_id, target_topic, created_at, status, current_phase)
+               VALUES (?,?,?,?,?)""",
+            (run_id, topic, utcnow(), RUNNING, 0),
         )
     return run_id
 
@@ -201,7 +181,6 @@ def insert_raw_product(
     source_url: str,
     raw_title: str,
     normalized_title: str,
-    display_title: str,
     topic_score: float | None = None,
     is_relevant: bool | None = None,
 ) -> None:
@@ -209,18 +188,16 @@ def insert_raw_product(
     conn.execute(
         """INSERT OR IGNORE INTO raw_products
            (run_id, source_domain, source_url, raw_title, normalized_title,
-            display_title, topic_score, is_relevant, fetched_at)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
+            topic_score, is_relevant)
+           VALUES (?,?,?,?,?,?,?)""",
         (
             run_id,
             source_domain,
             source_url,
             raw_title,
             normalized_title,
-            display_title,
             topic_score,
             None if is_relevant is None else int(is_relevant),
-            utcnow(),
         ),
     )
 
@@ -234,13 +211,6 @@ def update_raw_relevance(
     )
 
 
-def set_raw_entity_tokens(conn: sqlite3.Connection, raw_id: int, tokens: Sequence[str]) -> None:
-    conn.execute(
-        "UPDATE raw_products SET entity_tokens=? WHERE id=?",
-        (json.dumps(list(tokens), ensure_ascii=False), raw_id),
-    )
-
-
 def relevant_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM raw_products WHERE run_id=? AND is_relevant=1 ORDER BY id", (run_id,)
@@ -248,8 +218,10 @@ def relevant_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlite3
 
 
 def borderline_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
+    """عنوان‌های مرزی (``is_relevant IS NULL``) — مقصدشان شیت C است."""
     return conn.execute(
-        "SELECT * FROM raw_products WHERE run_id=? AND is_relevant IS NULL ORDER BY topic_score DESC",
+        "SELECT * FROM raw_products WHERE run_id=? AND is_relevant IS NULL"
+        " ORDER BY topic_score DESC",
         (run_id,),
     ).fetchall()
 
@@ -269,15 +241,14 @@ def insert_canonical(
 ) -> int:
     conn.execute(
         """INSERT OR IGNORE INTO canonical_products
-           (run_id, canonical_title, entity_tokens, merge_confidence, needs_review, created_at)
-           VALUES (?,?,?,?,?,?)""",
+           (run_id, canonical_title, entity_tokens, merge_confidence, needs_review)
+           VALUES (?,?,?,?,?)""",
         (
             run_id,
             canonical_title,
             json.dumps(list(entity_tokens), ensure_ascii=False),
             merge_confidence,
             int(needs_review),
-            utcnow(),
         ),
     )
     row = conn.execute(
@@ -308,14 +279,7 @@ def canonical_products(
 
 
 def update_canonical(conn: sqlite3.Connection, canonical_id: int, **fields: Any) -> None:
-    allowed = {
-        "suggest_status",
-        "benchmark_url",
-        "benchmark_score",
-        "image_url",
-        "needs_review",
-        "merge_confidence",
-    }
+    allowed = {"suggest_status", "needs_review", "merge_confidence"}
     sets, values = [], []
     for key, value in fields.items():
         if key not in allowed:
@@ -328,14 +292,27 @@ def update_canonical(conn: sqlite3.Connection, canonical_id: int, **fields: Any)
     conn.execute(f"UPDATE canonical_products SET {', '.join(sets)} WHERE id=?", values)
 
 
-def source_urls_for(conn: sqlite3.Connection, canonical_id: int) -> list[str]:
-    rows = conn.execute(
-        """SELECT r.source_url FROM product_mapping m
+def members_of(conn: sqlite3.Connection, canonical_id: int) -> list[sqlite3.Row]:
+    """عنوان‌های خامی که در این محصول ادغام شده‌اند."""
+    return conn.execute(
+        """SELECT r.* FROM product_mapping m
            JOIN raw_products r ON r.id = m.raw_id
            WHERE m.canonical_id=? ORDER BY r.id""",
         (canonical_id,),
     ).fetchall()
-    return [r["source_url"] for r in rows]
+
+
+def source_urls_for(conn: sqlite3.Connection, canonical_id: int) -> list[str]:
+    return [row["source_url"] for row in members_of(conn, canonical_id)]
+
+
+def source_domains_for(conn: sqlite3.Connection, canonical_id: int) -> list[str]:
+    seen: list[str] = []
+    for row in members_of(conn, canonical_id):
+        domain = row["source_domain"] or ""
+        if domain and domain not in seen:
+            seen.append(domain)
+    return seen
 
 
 # ---------------------------------------------------------------------------
@@ -344,16 +321,11 @@ def source_urls_for(conn: sqlite3.Connection, canonical_id: int) -> list[str]:
 
 
 def insert_keyword(
-    conn: sqlite3.Connection,
-    canonical_id: int,
-    keyword: str,
-    position: int,
-    similarity: float | None = None,
+    conn: sqlite3.Connection, canonical_id: int, keyword: str, position: int
 ) -> None:
     conn.execute(
-        """INSERT OR IGNORE INTO lsi_keywords (canonical_id, keyword, position, similarity)
-           VALUES (?,?,?,?)""",
-        (canonical_id, keyword, position, similarity),
+        "INSERT OR IGNORE INTO lsi_keywords (canonical_id, keyword, position) VALUES (?,?,?)",
+        (canonical_id, keyword, position),
     )
 
 
@@ -374,35 +346,5 @@ def all_keywords(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
         """SELECT k.* FROM lsi_keywords k
            JOIN canonical_products c ON c.id = k.canonical_id
            WHERE c.run_id=? ORDER BY k.canonical_id, k.position""",
-        (run_id,),
-    ).fetchall()
-
-
-# ---------------------------------------------------------------------------
-# api_usage
-# ---------------------------------------------------------------------------
-
-
-def record_usage(
-    conn: sqlite3.Connection, run_id: str, provider: str, endpoint: str, cost_unit: float
-) -> None:
-    conn.execute(
-        """INSERT INTO api_usage (run_id, provider, endpoint, cost_unit, called_at)
-           VALUES (?,?,?,?,?)""",
-        (run_id, provider, endpoint, cost_unit, utcnow()),
-    )
-
-
-def total_cost(conn: sqlite3.Connection, run_id: str) -> float:
-    row = conn.execute(
-        "SELECT COALESCE(SUM(cost_unit), 0) AS total FROM api_usage WHERE run_id=?", (run_id,)
-    ).fetchone()
-    return float(row["total"])
-
-
-def usage_breakdown(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
-    return conn.execute(
-        """SELECT provider, endpoint, COUNT(*) AS calls, SUM(cost_unit) AS cost
-           FROM api_usage WHERE run_id=? GROUP BY provider, endpoint ORDER BY cost DESC""",
         (run_id,),
     ).fetchall()

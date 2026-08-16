@@ -2,12 +2,13 @@
 
 نمونه‌ها::
 
-    python -m content_pipeline.run init-db --config config.yaml
-    python -m content_pipeline.run start --config config.yaml --topic "رمان"
-    python -m content_pipeline.run start --config config.yaml --resume-from 3
-    python -m content_pipeline.run start --config config.yaml --dry-run
-    python -m content_pipeline.run status --config config.yaml
-    python -m content_pipeline.run normalize "دانلود رمان تاوان خیانت آوا PDF ۱۴۰۴"
+    python -m content_pipeline.run init-db -c config.yaml
+    python -m content_pipeline.run start   -c config.yaml
+    python -m content_pipeline.run start   -c config.yaml --resume-from 3
+    python -m content_pipeline.run status  -c config.yaml
+    python -m content_pipeline.run normalize "دانلود جزوه ریاضی ۱۴۰۴ PDF"
+
+هزینه‌ی API این ابزار صفر است؛ هیچ سرویس پولی استفاده نمی‌شود.
 """
 
 from __future__ import annotations
@@ -15,34 +16,31 @@ from __future__ import annotations
 import sqlite3
 import sys
 from dataclasses import dataclass
-
 from typing import Optional
 
 import typer
 
-from .clients.llm_client import llm_from_config
-from .clients.serp_client import serp_from_config
 from .core import db, normalizer
-from .core.cache import CachedCaller
+from .core.cache import QueryCache
 from .core.config import Config, ConfigError, load_config
-from .core.cost_guard import CostGuard, CostLimitExceeded, DryRunAbort, PhaseEstimate
 from .core.embeddings import TopicMatcher, get_encoder
 from .core.http import fetcher_from_config
-from .phases import p1_crawl, p2_resolve, p3_suggest, p4_benchmark, p5_image, p6_export
+from .core.suggest import suggest_from_config
+from .output import exporter
+from .phases import p1_crawl, p2_resolve, p3_suggest
 
 app = typer.Typer(
     add_completion=False,
-    help="پایپ‌لاین موضوع‌محور استخراج و تحلیل خوراک محتوایی",
+    help="پایپ‌لاین موضوع‌محور استخراج و تحلیل خوراک محتوایی (بدون هزینه‌ی API)",
 )
 
 PHASE_NAMES = {
     1: "کراول و تشخیص موضوعی",
     2: "Entity Resolution",
     3: "گوگل ساجست",
-    4: "بنچمارک محتوا",
-    5: "تصویر تمیز",
-    6: "خروجی",
+    4: "خروجی",
 }
+LAST_PHASE = 4
 
 
 @dataclass
@@ -50,8 +48,6 @@ class Context:
     config: Config
     conn: sqlite3.Connection
     run_id: str
-    guard: CostGuard
-    caller: CachedCaller
 
     def close(self) -> None:
         self.conn.close()
@@ -66,9 +62,6 @@ def _open(
     config_path: Optional[str],
     topic: Optional[str] = None,
     run_id: Optional[str] = None,
-    max_cost: Optional[float] = None,
-    dry_run: bool = False,
-    assume_yes: bool = False,
     create: bool = True,
 ) -> Context:
     try:
@@ -80,42 +73,29 @@ def _open(
 
     target_topic = topic or config.target_topic
     if run_id:
-        # اجرای مشخص‌شده باید از قبل وجود داشته باشد
         if db.get_run(conn, run_id) is None:
             _fail(f"run_id پیدا نشد: {run_id}")
         resolved = run_id
     elif create:
-        # شروع تازه
         if not target_topic:
-            _fail("موضوع هدف مشخص نیست: --topic بدهید یا topic.target را در config پر کنید.")
-        resolved = db.create_run(conn, target_topic, config=config.raw.get("topic"))
+            _fail(
+                "موضوع هدف مشخص نیست: --topic بدهید یا run.target_topic را در config پر کنید."
+            )
+        resolved = db.create_run(conn, target_topic)
     else:
-        # ادامه‌ی آخرین اجرای همین موضوع (resume / status / export)
         row = db.latest_run(conn, target_topic or None)
         if row is None:
             _fail("هیچ اجرای قبلی پیدا نشد. اول `start` را اجرا کنید یا --run-id بدهید.")
         resolved = row["run_id"]
-
-    guard = CostGuard(
-        conn=conn,
-        run_id=resolved,
-        max_cost=max_cost if max_cost is not None else config.get("cost.max_cost"),
-        dry_run=dry_run,
-        assume_yes=assume_yes,
-    )
-    caller = CachedCaller(
-        conn, resolved, ttl_days=int(config.get("cache.ttl_days", 14)), cost_guard=guard
-    )
-    return Context(config=config, conn=conn, run_id=resolved, guard=guard, caller=caller)
+    return Context(config=config, conn=conn, run_id=resolved)
 
 
 def _topic_matcher(config: Config) -> TopicMatcher:
     encoder = get_encoder(config.get("embeddings.model"))
     typer.echo(f"  انکودر: {encoder.name}")
-    topic = config.target_topic
-    if not topic:
-        raise ValueError("topic.target در config خالی است.")
-    return TopicMatcher.build(encoder, topic, config.topic_examples)
+    if not config.target_topic:
+        raise ValueError("run.target_topic در config خالی است.")
+    return TopicMatcher.build(encoder, config.target_topic, config.topic_examples)
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +103,7 @@ def _topic_matcher(config: Config) -> TopicMatcher:
 # ---------------------------------------------------------------------------
 
 
-def _run_phase(context: Context, phase: int, interactive: bool = True) -> None:
+def _run_phase(context: Context, phase: int) -> None:
     config, conn, run_id = context.config, context.conn, context.run_id
     typer.secho(f"\n▶ فاز {phase} — {PHASE_NAMES[phase]}", fg=typer.colors.CYAN, bold=True)
 
@@ -131,75 +111,33 @@ def _run_phase(context: Context, phase: int, interactive: bool = True) -> None:
         matcher = _topic_matcher(config)
         with fetcher_from_config(config) as fetcher:
             typer.echo(f"  backend HTTP: {fetcher.backend}")
-            estimate = PhaseEstimate("۱", 0, 0.0, "کراول مستقیم است و هزینه‌ی API ندارد")
-            if not context.guard.confirm(estimate, interactive):
-                return
+            if fetcher.backend != "curl_cffi":
+                typer.secho(
+                    "  ⚠ curl_cffi نصب نیست؛ اثرانگشت TLS ممکن است شناسایی شود. "
+                    "نصب کنید: pip install curl_cffi",
+                    fg=typer.colors.YELLOW,
+                )
             stats = p1_crawl.run(conn, run_id, config, fetcher, matcher)
         typer.echo(stats.render())
 
     elif phase == 2:
-        llm = llm_from_config(config, context.caller)
-        pending = conn.execute(
-            "SELECT COUNT(*) AS c FROM raw_products WHERE run_id=? AND is_relevant=1", (run_id,)
-        ).fetchone()["c"]
-        estimate = PhaseEstimate(
-            "۲",
-            max(1, pending // 30) if llm.available else 0,
-            llm.estimate_cost(6000, 1500),
-            "فقط برای جفت‌های مبهم (یک طرف بدون توکن تمایزدهنده)",
-        )
-        if not context.guard.confirm(estimate, interactive):
-            return
-        stats = p2_resolve.run(conn, run_id, config, llm_client=llm)
+        stats = p2_resolve.run(conn, run_id, config)
         typer.echo(stats.render())
 
     elif phase == 3:
-        serp = serp_from_config(config, context.caller)
-        calls = p3_suggest.estimate_calls(conn, run_id, serp) if serp.available else 0
-        estimate = PhaseEstimate("۳", calls, serp.config.cost_per_autocomplete, "یک کوئری به ازای هر محصول")
-        if not context.guard.confirm(estimate, interactive):
-            return
-        stats = p3_suggest.run(conn, run_id, config, serp)
+        cache = QueryCache(conn, ttl_days=int(config.get("suggest.cache_ttl_days", 30)))
+        client = suggest_from_config(config, cache)
+        pending = len(p3_suggest.pending_products(conn, run_id))
+        typer.echo(
+            f"  {pending} محصول در صف؛ سقف این نشست: {client.config.max_per_session} کوئری، "
+            f"تأخیر {client.config.delay_min}–{client.config.delay_max} ثانیه"
+        )
+        stats = p3_suggest.run(conn, run_id, config, client)
         typer.echo(stats.render())
+        typer.echo(f"  کش: {cache.hits} hit / {cache.misses} miss")
 
     elif phase == 4:
-        serp = serp_from_config(config, context.caller)
-        llm = llm_from_config(config, context.caller)
-        count = len(p4_benchmark.targets(conn, run_id))
-        estimate = PhaseEstimate(
-            "۴",
-            count,
-            serp.config.cost_per_search + llm.estimate_cost(20000, 1500),
-            "یک سرچ + ارزیابی کیفی فقط روی سه کاندیدا",
-        )
-        if not context.guard.confirm(estimate, interactive):
-            return
-        with fetcher_from_config(config) as fetcher:
-            stats = p4_benchmark.run(conn, run_id, config, serp, fetcher, llm_client=llm)
-        typer.echo(stats.render())
-
-    elif phase == 5:
-        serp = serp_from_config(config, context.caller)
-        llm = llm_from_config(config, context.caller)
-        count = len(db.canonical_products(conn, run_id))
-        candidates = int(config.get("image.candidates", 5))
-        estimate = PhaseEstimate(
-            "۵",
-            count,
-            serp.config.cost_per_image_search + candidates * llm.estimate_cost(2500, 100),
-            f"یک جستجوی تصویر + حداکثر {candidates} بررسی Vision",
-        )
-        if not context.guard.confirm(estimate, interactive):
-            return
-        with fetcher_from_config(config) as fetcher:
-            stats = p5_image.run(conn, run_id, config, serp, fetcher, llm_client=llm)
-        typer.echo(stats.render())
-
-    elif phase == 6:
-        if context.guard.dry_run:
-            typer.echo("  [dry-run] خروجی نوشته نمی‌شود.")
-            return
-        stats = p6_export.run(conn, run_id, config)
+        stats = exporter.run(conn, run_id, config)
         typer.echo(stats.render())
 
     else:  # pragma: no cover
@@ -227,47 +165,27 @@ def start(
     config: Optional[str] = typer.Option(None, "--config", "-c", help="مسیر config.yaml"),
     topic: Optional[str] = typer.Option(None, "--topic", "-t", help="موضوع هدف"),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="ادامه‌ی یک اجرای موجود"),
-    resume_from: int = typer.Option(1, "--resume-from", min=1, max=6, help="شروع از این فاز"),
-    until: int = typer.Option(6, "--until", min=1, max=6, help="تا این فاز"),
-    phases: Optional[str] = typer.Option(None, "--phases", help="فهرست دلخواه، مثل 1,2,3"),
-    max_cost: Optional[float] = typer.Option(None, "--max-cost", help="سقف هزینه به دلار"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="فقط تخمین، بدون هیچ کالی"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="بدون پرسش تأیید"),
+    resume_from: int = typer.Option(1, "--resume-from", min=1, max=LAST_PHASE),
+    until: int = typer.Option(LAST_PHASE, "--until", min=1, max=LAST_PHASE),
+    phases: Optional[str] = typer.Option(None, "--phases", help="فهرست دلخواه، مثل 1,2"),
 ) -> None:
     """اجرای پایپ‌لاین. فازها مستقل‌اند و از طریق دیتابیس با هم حرف می‌زنند."""
     context = _open(
-        config,
-        topic=topic,
-        run_id=run_id,
-        max_cost=max_cost,
-        dry_run=dry_run,
-        assume_yes=yes,
-        create=resume_from == 1 and run_id is None,
+        config, topic=topic, run_id=run_id, create=resume_from == 1 and run_id is None
     )
     if phases:
         try:
             selected = [int(p) for p in phases.replace(" ", "").split(",") if p]
         except ValueError:
-            _fail("قالب --phases نامعتبر است. نمونه: --phases 1,2,3")
+            _fail("قالب --phases نامعتبر است. نمونه: --phases 1,2")
             return
     else:
         selected = list(range(resume_from, until + 1))
 
     typer.secho(f"run_id: {context.run_id}", fg=typer.colors.BRIGHT_BLACK)
-    if dry_run:
-        typer.secho("حالت dry-run: هیچ کال خارجی زده نمی‌شود.", fg=typer.colors.YELLOW)
-
     try:
         for phase in selected:
-            _run_phase(context, phase, interactive=not yes)
-    except DryRunAbort as exc:
-        typer.secho(f"\n{exc}", fg=typer.colors.YELLOW)
-    except CostLimitExceeded as exc:
-        db.set_run_status(context.conn, context.run_id, db.FAILED)
-        typer.secho(f"\n{exc}", fg=typer.colors.RED)
-        typer.echo(context.guard.report())
-        context.close()
-        raise typer.Exit(code=2)
+            _run_phase(context, phase)
     except Exception as exc:
         db.set_run_status(context.conn, context.run_id, db.FAILED)
         typer.secho(f"\nاجرا متوقف شد: {exc}", fg=typer.colors.RED, err=True)
@@ -275,31 +193,23 @@ def start(
         context.close()
         raise typer.Exit(code=1)
 
-    if not dry_run and 6 in selected:
-        db.set_run_status(context.conn, context.run_id, db.COMPLETED, 6)
-    typer.echo("\n" + context.guard.report())
-    typer.echo(f"کش: {context.caller.hits} hit / {context.caller.misses} miss")
+    if LAST_PHASE in selected:
+        db.set_run_status(context.conn, context.run_id, db.COMPLETED, LAST_PHASE)
     context.close()
 
 
 @app.command("phase")
 def phase_command(
-    number: int = typer.Argument(..., min=1, max=6),
+    number: int = typer.Argument(..., min=1, max=LAST_PHASE),
     config: Optional[str] = typer.Option(None, "--config", "-c"),
     run_id: Optional[str] = typer.Option(None, "--run-id"),
-    max_cost: Optional[float] = typer.Option(None, "--max-cost"),
-    dry_run: bool = typer.Option(False, "--dry-run"),
-    yes: bool = typer.Option(False, "--yes", "-y"),
 ) -> None:
-    """اجرای فقط یک فاز روی یک run موجود."""
-    context = _open(
-        config, run_id=run_id, max_cost=max_cost, dry_run=dry_run, assume_yes=yes, create=False
-    )
+    """اجرای فقط یک فاز روی یک اجرای موجود."""
+    context = _open(config, run_id=run_id, create=False)
     typer.secho(f"run_id: {context.run_id}", fg=typer.colors.BRIGHT_BLACK)
     try:
-        _run_phase(context, number, interactive=not yes)
+        _run_phase(context, number)
     finally:
-        typer.echo("\n" + context.guard.report())
         context.close()
 
 
@@ -309,9 +219,11 @@ def export_command(
     run_id: Optional[str] = typer.Option(None, "--run-id"),
     no_sheets: bool = typer.Option(False, "--no-sheets", help="فقط فایل محلی"),
 ) -> None:
-    """ساخت خروجی نهایی (شیت + فایل محلی)."""
+    """ساخت خروجی نهایی (سه شیت)."""
     context = _open(config, run_id=run_id, create=False)
-    stats = p6_export.run(context.conn, context.run_id, context.config, push_to_sheets=not no_sheets)
+    stats = exporter.run(
+        context.conn, context.run_id, context.config, push_to_sheets=not no_sheets
+    )
     typer.echo(stats.render())
     context.close()
 
@@ -326,22 +238,22 @@ def status_command(
     conn, rid = context.conn, context.run_id
     row = db.get_run(conn, rid)
     typer.secho(f"run_id: {rid}", bold=True)
-    typer.echo(f"موضوع: {row['target_topic']}  |  وضعیت: {row['status']}  |  فاز: {row['current_phase']}")
+    typer.echo(
+        f"موضوع: {row['target_topic']}  |  وضعیت: {row['status']}  |  فاز: {row['current_phase']}"
+    )
 
     counts = {
         "عنوان خام": "SELECT COUNT(*) c FROM raw_products WHERE run_id=?",
         "مرتبط": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant=1",
-        "مرزی": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant IS NULL",
+        "مرزی (شیت C)": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant IS NULL",
         "محصول یکپارچه": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=?",
         "نیازمند بازبینی": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND needs_review=1",
         "has_suggest": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status='has_suggest'",
         "no_suggest": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status='no_suggest'",
-        "دارای بنچمارک": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND benchmark_url IS NOT NULL",
-        "دارای تصویر": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND image_url IS NOT NULL",
+        "در صف ساجست": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status IS NULL",
     }
     for label, query in counts.items():
         typer.echo(f"  {label}: {conn.execute(query, (rid,)).fetchone()['c']}")
-    typer.echo(context.guard.report())
     context.close()
 
 
@@ -355,7 +267,8 @@ def runs_command(config: Optional[str] = typer.Option(None, "--config", "-c")) -
         typer.echo("هنوز هیچ اجرایی ثبت نشده است.")
     for row in rows:
         typer.echo(
-            f"{row['run_id']}  |  {row['target_topic']}  |  {row['status']}  |  فاز {row['current_phase']}"
+            f"{row['run_id']}  |  {row['target_topic']}  |  {row['status']}"
+            f"  |  فاز {row['current_phase']}"
         )
     conn.close()
 

@@ -143,15 +143,15 @@ def env(tmp_path):
     conn = db.connect(tmp_path / "runs.db")
     run_id = db.create_run(conn, "رمان", run_id="r1")
     config = load_config(None)
-    config.raw["topic"] = {
-        "target": "رمان",
-        "examples": ["رمان تاوان خیانت", "رمان عاشقانه"],
-        "threshold": 0.5,
+    config.raw["run"] = {
+        "target_topic": "رمان",
+        "topic_examples": ["رمان تاوان خیانت", "رمان عاشقانه"],
+        "relevance_threshold": 0.5,
         "review_threshold": 0.35,
     }
     config.raw["sites"] = [
         {
-            "base_url": "https://shop.ir",
+            "url": "https://shop.ir",
             "domain": "shop.ir",
             "product_url_include": ["/product/"],
         }
@@ -203,8 +203,8 @@ def test_phase1_is_idempotent(env):
 
 def test_borderline_titles_are_exported_for_manual_review(env, tmp_path):
     conn, run_id, config = env
-    config.raw["topic"]["threshold"] = 0.99
-    config.raw["topic"]["review_threshold"] = 0.01
+    config.raw["run"]["relevance_threshold"] = 0.99
+    config.raw["run"]["review_threshold"] = 0.01
     pages = {
         "https://shop.ir/sitemap.xml": SITEMAP,
         "https://shop.ir/product/alef": page("رمان تاوان خیانت آوا"),
@@ -215,3 +215,59 @@ def test_borderline_titles_are_exported_for_manual_review(env, tmp_path):
     path = p1_crawl.export_borderline(conn, run_id, config)
     assert path and "borderline" in path
     assert "رمان تاوان خیانت آوا" in open(path, encoding="utf-8-sig").read()
+
+
+# ---------------------------------------------------------------------------
+# حذف نام سایت از <title>
+# ---------------------------------------------------------------------------
+
+
+def test_site_name_is_stripped_using_the_domain_label():
+    html = "<html><head><title>رمان تاوان خیانت | ketabshop</title></head></html>"
+    assert extract.extract_title(html, None, "ketabshop.ir") == "رمان تاوان خیانت"
+
+
+def test_site_name_can_be_declared_in_config():
+    html = "<html><head><title>رمان تاوان خیانت | فروشگاه الف</title></head></html>"
+    assert (
+        extract.extract_title(html, None, "unrelated.ir", "فروشگاه الف")
+        == "رمان تاوان خیانت"
+    )
+
+
+def test_site_name_stripped_using_og_site_name():
+    html = (
+        '<html><head><meta property="og:site_name" content="کتابخانه ب">'
+        "<title>جزوه ریاضی - کتابخانه ب</title></head></html>"
+    )
+    assert extract.extract_title(html) == "جزوه ریاضی"
+
+
+def test_title_without_separator_is_left_alone():
+    html = "<html><head><title>رمان تاوان خیانت</title></head></html>"
+    assert extract.extract_title(html, None, "shop.ir") == "رمان تاوان خیانت"
+
+
+def test_unidentified_site_name_leaves_the_title_intact():
+    """محافظه‌کارانه: حذف کورکورانه می‌تواند توکن تمایزدهنده را نابود کند."""
+    title = "رمان تاوان خیانت - جلد دوم"
+    assert extract.strip_site_name(title, "", "unrelated.ir") == title
+
+
+def test_h1_wins_over_title_so_no_stripping_needed():
+    html = "<html><head><title>هرچیزی | سایت</title></head><body><h1>عنوان اصلی</h1></body></html>"
+    assert extract.extract_title(html, None, "site.ir") == "عنوان اصلی"
+
+
+# ---------------------------------------------------------------------------
+# قالب ساده‌ی sites در config
+# ---------------------------------------------------------------------------
+
+
+def test_plain_url_site_entry_is_supported():
+    from content_pipeline.core.config import Config, DEFAULTS
+
+    config = Config(raw={**DEFAULTS, "sites": ["https://example1.ir", "example2.ir"]})
+    sites = config.sites
+    assert [s.domain for s in sites] == ["example1.ir", "example2.ir"]
+    assert sites[1].base_url == "https://example2.ir"

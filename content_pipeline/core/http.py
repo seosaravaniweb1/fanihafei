@@ -2,10 +2,11 @@
 
 ترتیب تلاش طبق داکیومنت:
 1. ``curl_cffi`` با ``impersonate="chrome"`` (عبور از Cloudflare)
-2. اگر نصب نبود → ``requests`` → ``urllib`` (تا ابزار بدون وابستگی سنگین هم کار کند)
-3. اگر ۴۰۳ یا محتوای خالی → fallback به Playwright
+2. اگر ۴۰۳/۴۲۹/۵۰۳ یا صفحه‌ی پوسته‌ای → fallback به Playwright
 
-نکته: ``cloudscraper`` عمداً استفاده نشده (متروک است و کار نمی‌کند).
+نکته: ``cloudscraper`` (متروک) و ``requests`` خام (اثرانگشت TLS شناسایی‌شونده)
+عمداً استفاده نشده‌اند. اگر ``curl_cffi`` نصب نباشد، ``urllib`` کتابخانه‌ی
+استاندارد به‌عنوان آخرین چاره به کار می‌رود و CLI هشدار می‌دهد.
 """
 
 from __future__ import annotations
@@ -144,13 +145,7 @@ class Fetcher:
             self._session = curl_requests.Session()
             return "curl_cffi"
         except ImportError:
-            pass
-        try:
-            import requests  # type: ignore
-
-            self._session = requests.Session()
-            return "requests"
-        except ImportError:
+            # عمداً به requests برنمی‌گردیم — داکیومنت آن را رد کرده است.
             return "urllib"
 
     @property
@@ -198,11 +193,6 @@ class Fetcher:
                 return FetchResult(
                     url, response.status_code, response.text or "", str(response.url), "curl_cffi"
                 )
-            if self._backend == "requests":
-                response = self._session.get(url, headers=headers, timeout=self.timeout)
-                return FetchResult(
-                    url, response.status_code, response.text or "", response.url, "requests"
-                )
             request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = response.read()
@@ -220,11 +210,10 @@ class Fetcher:
         self.limiter.wait(domain_of(url))
         headers = {"User-Agent": self.user_agent}
         try:
-            if self._backend in {"curl_cffi", "requests"}:
-                kwargs: dict[str, Any] = {"headers": headers, "timeout": self.timeout}
-                if self._backend == "curl_cffi":
-                    kwargs["impersonate"] = "chrome"
-                response = self._session.get(url, **kwargs)
+            if self._backend == "curl_cffi":  # pragma: no cover - نیازمند curl_cffi
+                response = self._session.get(
+                    url, headers=headers, timeout=self.timeout, impersonate="chrome"
+                )
                 return response.status_code, response.content
             request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -287,9 +276,11 @@ class Fetcher:
 
 
 def fetcher_from_config(config: Any) -> Fetcher:
+    # داکیومنت: حداکثر ۱ درخواست در ثانیه به هر دامنه (crawl.delay_seconds)
+    delay = float(config.get("crawl.delay_seconds", 1.0))
     return Fetcher(
         user_agent=config.get("crawl.user_agent", DEFAULT_UA),
-        requests_per_second=float(config.get("crawl.requests_per_second", 1.0)),
+        requests_per_second=(1.0 / delay) if delay > 0 else 0.0,
         timeout=int(config.get("crawl.timeout", 20)),
         respect_robots=bool(config.get("crawl.respect_robots", True)),
         playwright_fallback=bool(config.get("crawl.playwright_fallback", True)),

@@ -150,7 +150,9 @@ def run(
             if not result.ok:
                 stats.failures += 1
                 continue
-            title = extract.extract_title(result.html, site.title_selector)
+            title = extract.extract_title(
+                result.html, site.title_selector, site.domain, site.site_name
+            )
             if not title.strip():
                 continue
             stats.titles_found += 1
@@ -163,7 +165,6 @@ def run(
                     source_url=result.final_url or url,
                     raw_title=title,
                     normalized_title=normalizer.normalize(title, norm_config),
-                    display_title=normalizer.normalize_display(title, norm_config),
                 )
         stats.per_site[site.domain] = found_here
 

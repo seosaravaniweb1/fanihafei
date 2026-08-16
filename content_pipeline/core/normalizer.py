@@ -99,6 +99,8 @@ CORE_STOPWORDS: frozenset[str] = frozenset(
         "فایل",
         "کامل",
         "جدید",
+        "نسخه",
+        "اورجینال",
     }
 )
 
@@ -111,7 +113,6 @@ EXTRA_STOPWORDS: frozenset[str] = frozenset(
         "لینک",
         "مستقیم",
         "آنلاین",
-        "اورجینال",
         "ورد",
         "word",
         "doc",

@@ -38,8 +38,20 @@ def strip_tags(fragment: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def extract_title(page_html: str, selector: str | None = None) -> str:
-    """عنوان محصول: selector سفارشی → h1 → og:title → <title>."""
+#: جداکننده‌های رایج بین عنوان صفحه و نام سایت
+_TITLE_SEPARATORS = re.compile(r"\s*[|–—»«\-–—:：]\s*|\s+[-–—]\s+")
+
+
+def extract_title(
+    page_html: str,
+    selector: str | None = None,
+    domain: str = "",
+    site_name: str = "",
+) -> str:
+    """عنوان محصول: selector سفارشی → ``<h1>`` → ``og:title`` → ``<title>``.
+
+    در حالت ``<title>`` نام سایت از انتهای/ابتدای عنوان حذف می‌شود.
+    """
     if not page_html:
         return ""
     if selector and SelectolaxParser is not None:  # pragma: no cover - نیازمند selectolax
@@ -52,14 +64,56 @@ def extract_title(page_html: str, selector: str | None = None) -> str:
         r"<h1[^>]*>(.*?)</h1>",
         r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\']',
         r'<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']og:title["\']',
-        r"<title[^>]*>(.*?)</title>",
     ):
         match = re.search(pattern, page_html, re.S | re.I)
         if match:
             text = strip_tags(match.group(1))
             if text:
                 return text
+
+    match = re.search(r"<title[^>]*>(.*?)</title>", page_html, re.S | re.I)
+    if match:
+        return strip_site_name(strip_tags(match.group(1)), page_html, domain, site_name)
     return ""
+
+
+def strip_site_name(
+    title: str, page_html: str = "", domain: str = "", site_name: str = ""
+) -> str:
+    """«رمان تاوان خیانت | فروشگاه الف» → «رمان تاوان خیانت».
+
+    فقط بخشی حذف می‌شود که **قابل اثبات** نام سایت باشد: ``og:site_name``،
+    نام دامنه، یا ``site_name`` که در config اعلام شده. اگر نام سایت شناسایی
+    نشد، عنوان دست‌نخورده برمی‌گردد — چون حذف کورکورانه‌ی یک بخش می‌تواند
+    توکن تمایزدهنده («جلد دوم») را نابود کند و فاز ۲ را خراب کند.
+    """
+    if not title:
+        return ""
+    names: list[str] = []
+    if site_name:
+        names.append(site_name.strip().lower())
+    match = re.search(
+        r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\'](.*?)["\']',
+        page_html,
+        re.I,
+    )
+    if match:
+        names.append(strip_tags(match.group(1)).lower())
+    if domain:
+        label = domain.lower().replace("www.", "").split(".")[0]
+        names.extend([domain.lower(), label])
+    names = [n for n in names if n]
+
+    parts = [p.strip() for p in _TITLE_SEPARATORS.split(title) if p and p.strip()]
+    if len(parts) < 2 or not names:
+        return title.strip()
+
+    kept = [part for part in parts if not any(name in part.lower() for name in names)]
+    if len(kept) == len(parts):
+        return title.strip()  # چیزی شناسایی نشد → دست نمی‌زنیم
+    if not kept:
+        return max(parts, key=len)
+    return " ".join(kept)
 
 
 # ---------------------------------------------------------------------------
