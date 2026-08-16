@@ -1,33 +1,26 @@
 @echo off
-chcp 65001 >nul
 setlocal
-rem از پوشه‌ی والد اجرا می‌کنیم تا مسیرهای داخل config (مثل
-rem content_pipeline/data/runs.db) همان‌طور که در README آمده حل شوند.
+rem Content feed pipeline - management panel launcher
+rem Runs from the parent folder so paths inside config.yaml resolve.
 cd /d "%~dp0.."
-title پنل مدیریت خوراک محتوایی
 
-echo.
-echo ==========================================
-echo    پنل مدیریت خوراک محتوایی
-echo ==========================================
-echo.
-
-where python >nul 2>nul
+set "PY=python"
+where python >nul 2>nul || set "PY=py"
+%PY% --version >nul 2>nul
 if errorlevel 1 (
-  echo [x] پایتون روی این سیستم پیدا نشد.
-  echo     از python.org نصبش کنید و موقع نصب گزینه‌ی
-  echo     "Add python.exe to PATH" را تیک بزنید.
+  echo Python was not found on this system.
+  echo Install it from python.org and tick "Add python.exe to PATH".
   echo.
   pause
   exit /b 1
 )
 
-python -c "import typer, yaml" >nul 2>nul
+%PY% -c "import typer, yaml" >nul 2>nul
 if errorlevel 1 (
-  echo [...] نصب وابستگی‌های لازم. یک بار انجام می‌شود و کمی طول می‌کشد.
-  python -m pip install --quiet --disable-pip-version-check typer pyyaml
+  echo Installing required packages, this runs only once...
+  %PY% -m pip install --quiet --disable-pip-version-check typer pyyaml
   if errorlevel 1 (
-    echo [x] نصب وابستگی‌ها شکست خورد. متن خطای بالا را نگاه کنید.
+    echo Package installation failed. See the error above.
     echo.
     pause
     exit /b 1
@@ -35,17 +28,14 @@ if errorlevel 1 (
 )
 
 if not exist "config.yaml" (
-  echo [+] ساخت config.yaml از روی نمونه.
+  echo Creating config.yaml from the example...
   copy /y "content_pipeline\config.example.yaml" "config.yaml" >nul
 )
 
-echo [+] تنظیمات: %CD%\config.yaml
-echo [+] پنل در حال بالا آمدن است؛ مرورگر خودش باز می‌شود.
-echo     برای بستن، در همین پنجره Ctrl+C بزنید.
+echo Starting the panel, your browser will open automatically.
+echo Press Ctrl+C in this window to stop it.
 echo.
-
-python -m content_pipeline.run panel -c config.yaml
+%PY% -m content_pipeline.run panel -c config.yaml
 
 echo.
-echo پنل بسته شد.
 pause
