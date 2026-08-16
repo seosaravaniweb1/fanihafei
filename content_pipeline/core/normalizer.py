@@ -134,6 +134,38 @@ EXTRA_STOPWORDS: frozenset[str] = frozenset(
     }
 )
 
+#: نشانگرهای صریح نویسنده — بعدشان تقریباً همیشه نام شخص می‌آید.
+AUTHOR_MARKERS: frozenset[str] = frozenset(
+    {
+        "از",
+        "نوشته",
+        "اثر",
+        "قلم",
+        "بقلم",
+        "ترجمه",
+        "مترجم",
+        "تالیف",
+        "تألیف",
+        "مولف",
+        "مؤلف",
+        "گردآورنده",
+        "نویسنده",
+        "شاعر",
+        "خواننده",
+    }
+)
+
+#: نشانگرهای نقشی — ضعیف‌ترند، چون خودشان می‌توانند بخشی از عنوان باشند
+#: («رمان استاد مغرور»). قاعده‌ی سخت‌گیرانه‌شان در :mod:`core.entities` است.
+ROLE_MARKERS: frozenset[str] = frozenset({"استاد", "دکتر", "مهندس", "پروفسور"})
+
+PERSON_MARKERS: frozenset[str] = AUTHOR_MARKERS | ROLE_MARKERS
+
+#: کلماتی که با عدد یک واحد معنایی می‌سازند («جلد ۲»، «پارت ۵»)
+VOLUME_MARKERS: frozenset[str] = frozenset(
+    {"جلد", "پارت", "قسمت", "فصل", "بخش", "سری", "شماره", "دوره", "ترم", "سال"}
+)
+
 #: عبارت‌های چندکلمه‌ای که به‌صورت دنباله حذف می‌شوند.
 PHRASE_STOPWORDS: tuple[tuple[str, ...], ...] = (
     ("پی", "دی", "اف"),
@@ -172,7 +204,9 @@ class NormalizerConfig:
         if self.use_core_stopwords:
             words |= CORE_STOPWORDS
         if self.use_extra_stopwords:
-            words |= EXTRA_STOPWORDS
+            # نشانگرها ساختاری‌اند نه محتوایی: «شب سرما نوشته الناز» و
+            # «شب سرما الناز» باید عنوان نرمال‌شده‌ی یکسان بدهند.
+            words |= EXTRA_STOPWORDS | PERSON_MARKERS | VOLUME_MARKERS
         words |= set(self.custom_stopwords)
         # کلمات ایستا هم باید نرمال شوند تا با توکن‌های نرمال‌شده تطبیق بخورند.
         return frozenset(_normalize_chars(w, self) for w in words)

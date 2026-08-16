@@ -141,9 +141,10 @@ DEFAULTS: dict[str, Any] = {
     "normalizer": {},
     "resolve": {
         "similarity_threshold": 0.80,
-        "blocking_top_tokens": 2,
-        # None یعنی رفتار دقیق داکیومنت؛ ۰.۹۵ محافظه‌کارانه‌تر است
-        "empty_token_threshold": None,
+        "blocking_top_tokens": 3,
+        # نردبان آستانه بر اساس شواهد هویتی — بخش «فاز ۲» در README
+        "strong_match_threshold": 0.88,
+        "no_entity_threshold": 0.95,
     },
     "suggest": {
         "hl": "fa",

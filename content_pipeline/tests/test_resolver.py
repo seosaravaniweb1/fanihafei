@@ -91,11 +91,11 @@ def test_number_entity_is_also_a_red_line(golden):
     assert classify_pair(golden[0], golden[4])[0] == "no_merge"
 
 
-def test_one_empty_side_is_flagged_for_review_not_merged(golden):
-    """طبق نسخه ۲: بدون LLM، این حالت مستقیم به بازبینی دستی می‌رود."""
-    verdict, _, _, reason = classify_pair(golden[0], golden[3])
-    assert verdict == "review"
-    assert "بازبینی" in reason
+def test_one_empty_side_is_never_merged_directly(golden):
+    """«از ناشناس» هیچ‌وقت مستقیم ادغام نمی‌شود؛ یا بازبینی می‌شود یا تصمیمش
+    به سطح خوشه می‌رود."""
+    verdict, _, _, _ = classify_pair(golden[0], golden[3])
+    assert verdict in {"review", "candidate"}
 
 
 def test_low_similarity_never_merges(extractor):
@@ -292,30 +292,109 @@ def test_same_professor_still_merges(extractor):
 
 
 # ---------------------------------------------------------------------------
-# شیر اطمینان: هر دو طرف بدون توکن تمایزدهنده
+# نویسنده، مهم‌ترین سیگنال هویت
 # ---------------------------------------------------------------------------
 
 
-def test_both_empty_tokens_merge_by_default(extractor):
-    """رفتار پیش‌فرض = دقیقاً قانون داکیومنت (توکن‌های یکسان → ادغام)."""
+def test_two_novels_with_no_author_are_not_merged(extractor):
+    """«رمان شب سرد» و «رمان شب گرم» دو رمان متفاوت‌اند، نه یکی."""
     a = make(extractor, 1, "رمان شب سرد")
     b = make(extractor, 2, "رمان شب گرم")
-    assert a.entity.is_empty and b.entity.is_empty
+    verdict, score, _, _ = classify_pair(a, b)
+    assert score >= 0.80  # شباهت متنی بالاست…
+    assert verdict == "review"  # …ولی هیچ شاهدی بر یکی بودنشان نیست
+
+
+def test_same_novel_with_noise_words_is_merged(extractor):
+    """«رمان شب سرد» و «رمان شب سرد کامل» یک رمان‌اند."""
+    a = make(extractor, 1, "رمان شب سرد")
+    b = make(extractor, 2, "رمان شب سرد کامل")
     assert classify_pair(a, b)[0] == "merge"
 
 
-def test_empty_token_threshold_sends_doubtful_pairs_to_review(extractor):
-    a = make(extractor, 1, "رمان شب سرد")
-    b = make(extractor, 2, "رمان شب گرم")
-    verdict, score, _, _ = classify_pair(a, b, empty_token_threshold=0.95)
-    assert score < 0.95
-    assert verdict == "review"
+def test_same_author_and_close_title_is_one_novel(extractor):
+    """«رمان شب سرد از الناز» و «رمان شب سرما از الناز» یک رمان‌اند."""
+    a = make(extractor, 1, "رمان شب سرد الناز")
+    b = make(extractor, 2, "رمان شب سرما الناز")
+    verdict, _, _, reason = classify_pair(a, b)
+    assert verdict == "merge"
+    assert "نویسنده یکسان" in reason
 
 
-def test_empty_token_threshold_still_merges_identical_titles(extractor):
-    a = make(extractor, 1, "دانلود رمان شب سرد pdf")
-    b = make(extractor, 2, "رمان شب سرد رایگان")
-    assert classify_pair(a, b, empty_token_threshold=0.95)[0] == "merge"
+def test_different_authors_are_a_red_line(extractor):
+    """«رمان شب هات از سحر» و «رمان شب گرم از الناز» دو رمان متفاوت‌اند."""
+    a = make(extractor, 1, "رمان شب هات سحر")
+    b = make(extractor, 2, "رمان شب گرم الناز")
+    verdict, _, _, reason = classify_pair(a, b)
+    assert verdict == "no_merge"
+    assert "نویسنده متفاوت" in reason
+
+
+def test_different_authors_beat_a_very_similar_title(extractor):
+    """حتی وقتی عنوان‌ها تقریباً یکی‌اند، نویسنده‌ی متفاوت خط قرمز است."""
+    a = make(extractor, 1, "رمان تاوان خیانت آوا")
+    b = make(extractor, 2, "رمان تاوان خیانت مهسا")
+    verdict, score, _, reason = classify_pair(a, b)
+    assert score >= 0.85
+    assert verdict == "no_merge"
+    assert "نویسنده متفاوت" in reason
+
+
+def test_two_novels_by_the_same_author_are_not_merged(extractor):
+    """یک نویسنده چند رمان می‌نویسد؛ «نویسنده‌ی یکسان» به‌تنهایی کافی نیست."""
+    for title_a, title_b in [
+        ("رمان شب سرد الناز", "رمان شب بخیر الناز"),
+        ("رمان تاوان خیانت الناز", "رمان شب سرد الناز"),
+        ("رمان استاد مغرور سحر", "رمان دختر شیطون سحر"),
+    ]:
+        a = make(extractor, 1, title_a)
+        b = make(extractor, 2, title_b)
+        assert classify_pair(a, b)[0] != "merge", (title_a, title_b)
+
+
+def test_surname_does_not_split_the_same_author(extractor):
+    """«الناز» و «الناز محمدی» یک نویسنده‌اند، نه دو نفر."""
+    a = make(extractor, 1, "رمان شب سرد الناز")
+    b = make(extractor, 2, "رمان شب سرد الناز محمدی")
+    assert a.entity.person_key & b.entity.person_key
+    assert classify_pair(a, b)[0] == "merge"
+
+
+def test_volume_is_still_a_red_line_for_the_same_author(extractor):
+    a = make(extractor, 1, "رمان شب سرد الناز")
+    b = make(extractor, 2, "رمان شب سرد الناز جلد ۲")
+    assert classify_pair(a, b)[0] == "no_merge"
+
+
+# ---------------------------------------------------------------------------
+# استنتاج در سطح خوشه: عنوان بدون نویسنده
+# ---------------------------------------------------------------------------
+
+
+def test_unnamed_title_joins_the_single_author_in_the_field(extractor):
+    """«رمان شب سرد» + «رمان شب سرد الناز» + «رمان شب سرد کامل» = یک رمان."""
+    items = [
+        make(extractor, 1, "رمان شب سرد"),
+        make(extractor, 2, "رمان شب سرد الناز"),
+        make(extractor, 3, "رمان شب سرد کامل"),
+    ]
+    groups, confidences, review, stats = resolve(items)
+    assert len(groups) == 1
+    # هر دو عنوان بی‌نویسنده به همان الناز چسبیده‌اند
+    assert stats.inferred_merges == 2
+    assert not review
+
+
+def test_unnamed_title_stays_apart_when_two_authors_compete(extractor):
+    """اگر دو نویسنده برای همان عنوان پایه باشند، معلوم نیست مال کدام است."""
+    items = [
+        make(extractor, 1, "رمان شب سرد"),
+        make(extractor, 2, "رمان شب سرد الناز"),
+        make(extractor, 3, "رمان شب سرد سحر"),
+    ]
+    groups, _, review, _ = resolve(items)
+    assert len(groups) == 3
+    assert 0 in review
 
 
 def test_canonical_title_prefers_the_clean_variant_on_a_tie(extractor):
@@ -328,3 +407,59 @@ def test_canonical_title_prefers_the_clean_variant_on_a_tie(extractor):
     assert pick_canonical_title(members, normalizer.DEFAULT_CONFIG) == (
         "جزوه ریاضی عمومی ۱ استاد کریمی"
     )
+
+
+def test_role_word_in_the_title_is_not_mistaken_for_an_author(extractor):
+    """در «رمان استاد مغرور الناز» نویسنده الناز است، نه «مغرور».
+
+    اگر «مغرور» نویسنده شمرده شود، «رمان استاد مغرور الناز» و «رمان استاد
+    مغرور سحر» توکن مشترک پیدا می‌کنند و اشتباهی ادغام می‌شوند.
+    """
+    assert extractor.extract("رمان استاد مغرور الناز").tokens == ["الناز"]
+    assert extractor.extract("رمان استاد مغرور سحر").tokens == ["سحر"]
+    a = make(extractor, 1, "رمان استاد مغرور الناز")
+    b = make(extractor, 2, "رمان استاد مغرور سحر")
+    verdict, _, _, reason = classify_pair(a, b)
+    assert verdict == "no_merge"
+    assert "نویسنده متفاوت" in reason
+
+
+def test_role_marker_still_captures_a_trailing_surname(extractor):
+    assert extractor.extract("جزوه ریاضی استاد کریمی").tokens == ["کریمی"]
+    assert extractor.extract("جزوه ریاضی ۱ دکتر محمدی").tokens == ["۱", "محمدی"]
+
+
+def test_author_marker_does_not_break_the_similarity(extractor):
+    """«شب سرما نوشته الناز» و «شب سرد الناز» باید مقایسه و ادغام شوند؛
+    اگر «نوشته» در عنوان نرمال‌شده بماند، شباهت زیر آستانه می‌افتد."""
+    a = make(extractor, 1, "دانلود رمان شب سرد الناز pdf")
+    b = make(extractor, 2, "رمان شب سرما نوشته الناز")
+    verdict, score, _, _ = classify_pair(a, b)
+    assert score >= 0.88
+    assert verdict == "merge"
+
+
+def test_marker_does_not_steal_a_blocking_key(extractor):
+    """نشانگر نباید کلید بلاک را بدزدد، وگرنه دو عنوان مشابه هرگز مقایسه
+    نمی‌شوند و ادغام بی‌سروصدا از دست می‌رود."""
+    items = [
+        make(extractor, 1, "دانلود رمان شب سرد الناز pdf"),
+        make(extractor, 2, "رمان شب سرما نوشته الناز"),
+        make(extractor, 3, "رمان تاوان خیانت آوا"),
+    ]
+    assert (0, 1) in candidate_pairs(items)
+    groups, _, _, _ = resolve(items)
+    assert sorted(len(g) for g in groups) == [1, 2]
+
+
+def test_canonical_title_follows_the_majority_of_the_cluster(extractor):
+    """اگر سه نسخه «شب سرد» و یک نسخه «شب سرما» در یک خوشه باشند، عنوان نهایی
+    باید «شب سرد» باشد، نه نسخه‌ی تک‌افتاده."""
+    members = [
+        make(extractor, 1, "رمان شب سرد"),
+        make(extractor, 2, "دانلود رمان شب سرد الناز pdf"),
+        make(extractor, 3, "رمان شب سرد کامل"),
+        make(extractor, 4, "رمان شب سرما نوشته الناز"),
+    ]
+    title = pick_canonical_title(members, normalizer.DEFAULT_CONFIG)
+    assert "سرد" in title and "سرما" not in title

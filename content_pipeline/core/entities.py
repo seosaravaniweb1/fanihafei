@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from . import normalizer as normalizer_markers
 from .normalizer import (
     DEFAULT_CONFIG,
     UNKNOWN_MARKERS,
@@ -29,37 +30,12 @@ from .normalizer import (
 
 _NAMES_FILE = Path(__file__).with_name("data") / "fa_given_names.txt"
 
-#: کلماتی که بعدشان نام شخص می‌آید — چه نویسنده، چه مدرس.
-#: نبودن «استاد/دکتر/مهندس» در این فهرست باعث می‌شد «جزوه ... استاد کریمی» و
-#: «جزوه ... استاد رضایی» توکن یکسان بگیرند و اشتباهی ادغام شوند.
-AUTHOR_MARKERS: frozenset[str] = frozenset(
-    {
-        "از",
-        "نوشته",
-        "اثر",
-        "قلم",
-        "بقلم",
-        "ترجمه",
-        "مترجم",
-        "تالیف",
-        "تألیف",
-        "مولف",
-        "مؤلف",
-        "گردآورنده",
-        "نویسنده",
-        "استاد",
-        "دکتر",
-        "مهندس",
-        "پروفسور",
-        "شاعر",
-        "خواننده",
-    }
-)
-
-#: کلماتی که با عدد یک واحد معنایی می‌سازند («جلد ۲»، «پارت ۵»)
-VOLUME_MARKERS: frozenset[str] = frozenset(
-    {"جلد", "پارت", "قسمت", "فصل", "بخش", "سری", "شماره", "دوره", "ترم", "سال"}
-)
+#: نشانگرهای شخص و جلد از :mod:`core.normalizer` می‌آیند تا یک منبع حقیقت
+#: داشته باشیم: همان‌جا هم به‌عنوان کلمه‌ی ایستا از عنوان نرمال‌شده حذف می‌شوند.
+AUTHOR_MARKERS = normalizer_markers.AUTHOR_MARKERS
+ROLE_MARKERS = normalizer_markers.ROLE_MARKERS
+PERSON_MARKERS = normalizer_markers.PERSON_MARKERS
+VOLUME_MARKERS = normalizer_markers.VOLUME_MARKERS
 
 _LATIN_RE = re.compile(r"^[a-z][a-z0-9.\-]{1,}$")
 _DIGIT_RE = re.compile(r"^[۰-۹0-9٠-٩]+$")
@@ -85,6 +61,10 @@ def _is_year(token: str) -> bool:
     return bool(_YEAR_RE.match(token.translate(_FA_TO_EN)))
 
 
+#: منبع‌هایی که یک «شخص» (نویسنده/مدرس) را نشان می‌دهند
+PERSON_SOURCES: frozenset[str] = frozenset({"name", "author"})
+
+
 @dataclass
 class EntityResult:
     """خروجی استخراج برای یک عنوان."""
@@ -98,6 +78,26 @@ class EntityResult:
     @property
     def key(self) -> frozenset[str]:
         return frozenset(self.tokens)
+
+    @property
+    def persons(self) -> list[str]:
+        """توکن‌های شخص — مهم‌ترین سیگنال هویت محصول."""
+        return [t for t in self.tokens if self.sources.get(t) in PERSON_SOURCES]
+
+    @property
+    def others(self) -> list[str]:
+        """بقیه‌ی توکن‌های تمایزدهنده: عدد، جلد/پارت، برند لاتین."""
+        return [t for t in self.tokens if self.sources.get(t) not in PERSON_SOURCES]
+
+    @property
+    def person_key(self) -> frozenset[str]:
+        """نام‌ها به کلمات تکی شکسته می‌شوند تا «الناز» و «الناز محمدی»
+        هم‌پوشانی داشته باشند و اشتباهاً دو نویسنده‌ی متفاوت شمرده نشوند."""
+        return frozenset(word for token in self.persons for word in token.split())
+
+    @property
+    def other_key(self) -> frozenset[str]:
+        return frozenset(self.others)
 
     @property
     def is_empty(self) -> bool:
@@ -129,6 +129,14 @@ class EntityExtractor:
     # -- کمکی‌ها -------------------------------------------------------------
     def _usable(self, token: str) -> bool:
         return bool(token) and token not in self._stopwords and token not in self.unknown
+
+    def _is_trailing(self, tokens: list[str], index: int) -> bool:
+        """آیا بعد از این توکن، کلمه‌ی محتوایی دیگری نمانده؟
+
+        نام شخص در عنوان‌های فارسی معمولاً آخر می‌آید؛ این تست جلوی
+        «استاد مغرور» را می‌گیرد که در آن «مغرور» بخشی از عنوان است.
+        """
+        return all(not self._usable(t) for t in tokens[index + 1 :])
 
     # -- API -----------------------------------------------------------------
     def extract(self, title: str) -> EntityResult:
@@ -168,10 +176,21 @@ class EntityExtractor:
                     index += 1
                 continue
 
-            # نشانگر نویسنده: توکن بعدی نام است مگر «ناشناس»/«نامشخص»
-            if token in AUTHOR_MARKERS and index + 1 < len(raw):
+            # نشانگر شخص: توکن بعدی نام است، مگر «ناشناس»/«نامشخص».
+            # برای نشانگرهای نقشی («استاد») سخت‌گیرتریم، چون خودشان می‌توانند
+            # بخشی از عنوان باشند: در «رمان استاد مغرور الناز» نویسنده الناز
+            # است، نه «مغرور».
+            if token in PERSON_MARKERS and index + 1 < len(raw):
                 candidate = raw[index + 1]
-                if self._usable(candidate) and not _DIGIT_RE.match(candidate):
+                if (
+                    self._usable(candidate)
+                    and not _DIGIT_RE.match(candidate)
+                    and (
+                        token in AUTHOR_MARKERS
+                        or candidate in self.names
+                        or self._is_trailing(raw, index + 1)
+                    )
+                ):
                     add(candidate, "author")
                 index += 2
                 continue
@@ -190,13 +209,18 @@ class EntityExtractor:
 
             index += 1
 
-        # عنوان پایه = عنوان بدون توکن‌های تمایزدهنده و بدون نشانگرهای «نامشخص»،
-        # تا «... از ناشناس» و «... آوا» دقیقاً یک عنوان پایه داشته باشند.
+        # عنوان پایه = عنوان بدون توکن‌های تمایزدهنده، بدون نشانگرهای «نامشخص»
+        # و بدون خودِ نشانگرها («از»، «نوشته»، «استاد»، «جلد»).
+        # نشانگرها ساختاری‌اند نه محتوایی؛ اگر بمانند، به‌عنوان کلمه‌ی «نادر»
+        # کلید بلاک را می‌دزدند و دو عنوانِ واقعاً مشابه هرگز مقایسه نمی‌شوند.
         entity_words = {word for token in found for word in token.split()}
         base = [
             t
             for t in meaningful_tokens(title, self.config)
-            if t not in entity_words and t not in self.unknown
+            if t not in entity_words
+            and t not in self.unknown
+            and t not in AUTHOR_MARKERS
+            and t not in VOLUME_MARKERS
         ]
         return EntityResult(tokens=found, sources=sources, base_tokens=base)
 

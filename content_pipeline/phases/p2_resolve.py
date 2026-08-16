@@ -9,12 +9,14 @@
 
   .. code-block:: text
 
-     اگر similarity(normalized_title) < 0.80  →  ادغام نکن
+     نویسنده‌ها متفاوت                →  ادغام نکن (خط قرمز)
+     جلد/شماره/برند متفاوت            →  ادغام نکن (خط قرمز)
 
-     اگر similarity >= 0.80:
-         توکن‌ها یکسان                  →  ادغام کن (confidence = high)
-         یکی از دو طرف توکن خالی دارد   →  needs_review = True، ادغام نکن
-         توکن‌ها متفاوت و هر دو پر      →  ادغام نکن (خط قرمز)
+     نویسنده‌ها یکسان                 →  ادغام اگر similarity >= 0.88
+     فقط یک طرف نویسنده دارد          →  اگر تنها یک نویسنده در میدان است ادغام،
+                                          وگرنه needs_review
+     هیچ‌کدام نویسنده ندارند           →  ادغام فقط اگر similarity >= 0.95،
+                                          وگرنه needs_review
 
 **قانون طلایی:** در حالت شک ادغام نکن. یک merge اشتباه، داده را برای همیشه
 خراب می‌کند و برگشت‌پذیر نیست.
@@ -35,7 +37,25 @@ from ..core.config import Config
 from ..core.entities import EntityExtractor, EntityResult
 
 HIGH_CONFIDENCE = 0.95
+#: ادغامی که از روی نویسنده‌ی خوشه استنتاج شده، نه از روی تطبیق مستقیم
+INFERRED_CONFIDENCE = 0.85
 REVIEW_CONFIDENCE = 0.50
+
+#: نردبان آستانه: هرچه شواهد هویتی کمتر، سخت‌گیری روی متن عنوان بیشتر.
+#:
+#: * نویسنده‌ی هر دو طرف معلوم و یکی است → :data:`STRONG_MATCH_THRESHOLD`
+#: * فقط یک طرف نویسنده دارد            → :data:`STRONG_MATCH_THRESHOLD` + یکتایی نویسنده
+#: * هیچ‌کدام نویسنده ندارند             → :data:`NO_ENTITY_THRESHOLD`
+#:
+#: نکته‌ی مهم: «نویسنده‌ی یکسان» آستانه را **پایین نمی‌آورد**، چون یک نویسنده
+#: چند رمان می‌نویسد. اندازه‌گیری روی نمونه‌های واقعی نشان داد دو رمان متفاوت از
+#: یک نویسنده تا شباهت ۰.۸۶ هم می‌روند («شب سرد الناز» / «شب بخیر الناز»)، پس
+#: مرز بالای آن باند گذاشته شده است.
+STRONG_MATCH_THRESHOLD = 0.88
+
+#: بدون هیچ نشانه‌ای از نویسنده، فقط عنوان‌های عملاً یکسان ادغام می‌شوند
+#: («شب سرد» = «شب سرد کامل»، ولی «شب سرد» ≠ «شب گرم» با شباهت ۰.۸۲).
+NO_ENTITY_THRESHOLD = 0.95
 
 
 @dataclass
@@ -78,6 +98,7 @@ class ResolveStats:
     raw_count: int = 0
     pairs_compared: int = 0
     merged_pairs: int = 0
+    inferred_merges: int = 0
     red_lines: int = 0
     review_pairs: int = 0
     canonical_count: int = 0
@@ -87,7 +108,8 @@ class ResolveStats:
     def render(self) -> str:
         return (
             f"فاز ۲ — ورودی: {self.raw_count}، مقایسه: {self.pairs_compared}، "
-            f"ادغام: {self.merged_pairs}، خط قرمز: {self.red_lines}، "
+            f"ادغام: {self.merged_pairs} (از روی نویسنده: {self.inferred_merges})، "
+            f"خط قرمز: {self.red_lines}، "
             f"مبهم (بازبینی): {self.review_pairs}، "
             f"محصول نهایی: {self.canonical_count} (بازبینی: {self.needs_review})"
         )
@@ -98,7 +120,7 @@ class ResolveStats:
 # ---------------------------------------------------------------------------
 
 
-def build_blocks(candidates: Sequence[Candidate], top_tokens: int = 2) -> dict[str, list[int]]:
+def build_blocks(candidates: Sequence[Candidate], top_tokens: int = 3) -> dict[str, list[int]]:
     """گروه‌بندی بر اساس نادرترین کلمات هر عنوان (کلید بلاک)."""
     document_freq: Counter[str] = Counter()
     for candidate in candidates:
@@ -121,7 +143,7 @@ def build_blocks(candidates: Sequence[Candidate], top_tokens: int = 2) -> dict[s
 
 
 def candidate_pairs(
-    candidates: Sequence[Candidate], top_tokens: int = 2, max_block_size: int = 400
+    candidates: Sequence[Candidate], top_tokens: int = 3, max_block_size: int = 400
 ) -> list[tuple[int, int]]:
     pairs: set[tuple[int, int]] = set()
     for members in build_blocks(candidates, top_tokens).values():
@@ -143,36 +165,66 @@ def classify_pair(
     a: Candidate,
     b: Candidate,
     threshold: float = 0.80,
-    empty_token_threshold: float | None = None,
+    strong_match_threshold: float = STRONG_MATCH_THRESHOLD,
+    no_entity_threshold: float = NO_ENTITY_THRESHOLD,
 ) -> tuple[str, float, float, str]:
     """خروجی: ``(verdict, score, confidence, reason)``.
 
-    ``verdict`` یکی از ``merge`` / ``no_merge`` / ``review`` است. هیچ کال
-    خارجی‌ای اینجا زده نمی‌شود — تصمیم کاملاً قانون‌محور و رایگان است.
+    ``verdict`` یکی از ``merge`` / ``no_merge`` / ``review`` / ``candidate`` است.
+    ``candidate`` یعنی تصمیم پایانی در سطح خوشه گرفته می‌شود
+    (:func:`infer_by_author`). هیچ کال خارجی‌ای اینجا زده نمی‌شود.
 
-    ``empty_token_threshold`` یک شیر اطمینان اختیاری است: وقتی **هیچ‌کدام** از دو
-    عنوان توکن تمایزدهنده ندارند، شواهد مثبتی برای یکی بودنشان وجود ندارد و
-    تنها تکیه‌گاه، شباهت متنی است. با بالا بردن این مقدار (مثلاً ۰.۹۵) جفت‌هایی
-    مثل «رمان شب سرد» و «رمان شب گرم» به‌جای ادغام، به بازبینی دستی می‌روند.
-    پیش‌فرض برابر ``threshold`` است، یعنی دقیقاً رفتار داکیومنت.
+    **نویسنده مهم‌ترین سیگنال هویت است:**
+
+    * نویسنده‌ی متفاوت → خط قرمز، حتی اگر عنوان‌ها خیلی شبیه باشند
+      («شب هات از سحر» ≠ «شب گرم از الناز»)
+    * نویسنده‌ی یکسان → همان رمان است، به شرطی که عنوان هم واقعاً نزدیک باشد
+      («شب سرد از الناز» = «شب سرما از الناز»، ولی ≠ «شب بخیر از الناز»)
+    * هیچ‌کدام نویسنده ندارند → فقط عنوان‌های عملاً یکسان ادغام می‌شوند
+      («شب سرد» = «شب سرد کامل»، ولی ≠ «شب گرم»)
     """
     score = similarity.title_similarity(a.normalized_title, b.normalized_title)
+    persons_a, persons_b = a.entity.person_key, b.entity.person_key
+    others_a, others_b = a.entity.other_key, b.entity.other_key
+    key_a, key_b = a.entity.key, b.entity.key
+
+    # ۱) خط قرمز نویسنده — بالاترین اولویت
+    if persons_a and persons_b and not (persons_a & persons_b):
+        return "no_merge", score, 0.0, "خط قرمز: نویسنده متفاوت"
+
+    # ۲) خط قرمز سایر توکن‌های تمایزدهنده (جلد ۱ در برابر جلد ۲، برند متفاوت)
+    if others_a and others_b and others_a != others_b:
+        return "no_merge", score, 0.0, "خط قرمز: توکن تمایزدهنده متفاوت"
+
     if score < threshold:
         return "no_merge", score, 0.0, "شباهت عنوان کمتر از آستانه"
 
-    key_a, key_b = a.entity.key, b.entity.key
-    if key_a == key_b:
-        if not key_a and score < (empty_token_threshold or threshold):
-            return (
-                "review",
-                score,
-                0.0,
-                "هیچ توکن تمایزدهنده‌ای پیدا نشد و شباهت به حد اطمینان نرسید",
-            )
-        return "merge", score, HIGH_CONFIDENCE, "توکن‌های تمایزدهنده یکسان"
-    if not key_a or not key_b:
-        return "review", score, 0.0, "یک طرف توکن تمایزدهنده ندارد — بازبینی دستی"
-    return "no_merge", score, 0.0, "خط قرمز: توکن‌های تمایزدهنده متفاوت"
+    strong = score >= strong_match_threshold
+
+    # ۳) عدم تقارن در توکن‌های غیرشخصی («شب سرد» در برابر «شب سرد جلد ۲»)
+    if others_a != others_b:
+        if key_a and key_b:
+            return "no_merge", score, 0.0, "خط قرمز: توکن تمایزدهنده متفاوت"
+        if strong:
+            return "candidate", score, 0.0, "یک طرف توکن تمایزدهنده ندارد"
+        return "review", score, 0.0, "توکن تمایزدهنده‌ی نامتقارن — بازبینی دستی"
+
+    # ۴) نویسنده‌ی یکسان
+    if persons_a & persons_b:
+        if strong:
+            return "merge", score, HIGH_CONFIDENCE, "نویسنده یکسان و عنوان نزدیک"
+        return "review", score, 0.0, "نویسنده یکسان ولی عنوان‌ها به‌اندازه‌ی کافی نزدیک نیستند"
+
+    # ۵) فقط یک طرف نویسنده دارد → تصمیم در سطح خوشه
+    if persons_a or persons_b:
+        if strong:
+            return "candidate", score, 0.0, "فقط یک طرف نویسنده دارد"
+        return "review", score, 0.0, "فقط یک طرف نویسنده دارد و عنوان‌ها دور هستند"
+
+    # ۶) هیچ نشانه‌ای از نویسنده نیست — فقط شباهت متن
+    if score >= no_entity_threshold:
+        return "merge", score, HIGH_CONFIDENCE, "عنوان‌ها عملاً یکسان‌اند"
+    return "review", score, 0.0, "بدون نویسنده و بدون شباهت کافی — بازبینی دستی"
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +268,63 @@ class SafeClusters:
 
 
 # ---------------------------------------------------------------------------
+# استنتاج در سطح خوشه: عنوانِ بدون نویسنده به کدام محصول تعلق دارد؟
+# ---------------------------------------------------------------------------
+
+
+def _uncertain_sides(candidates: Sequence[Candidate], a: int, b: int) -> set[int]:
+    """کدام طرفِ یک جفت مبهم واقعاً نیاز به بازبینی دارد؟
+
+    اگر فقط یکی از دو عنوان نویسنده داشته باشد، آن یکی هویت روشنی دارد و
+    ابهام مالِ طرف بی‌نویسنده است؛ در غیر این صورت هر دو مبهم‌اند.
+    """
+    has_a = bool(candidates[a].entity.person_key)
+    has_b = bool(candidates[b].entity.person_key)
+    if has_a and not has_b:
+        return {b}
+    if has_b and not has_a:
+        return {a}
+    return {a, b}
+
+
+def _split_named(
+    candidates: Sequence[Candidate], a: int, b: int
+) -> tuple[int, int]:
+    """کدام طرف «بدون نویسنده» است؟ خروجی ``(unnamed, named)``."""
+    if not candidates[a].entity.person_key:
+        return a, b
+    if not candidates[b].entity.person_key:
+        return b, a
+    return (a, b) if len(candidates[a].entity.key) <= len(candidates[b].entity.key) else (b, a)
+
+
+def infer_by_author(
+    candidates: Sequence[Candidate],
+    pending: dict[int, list[tuple[int, float]]],
+    accepted: list[tuple[int, int, float]],
+    review: set[int],
+    stats: ResolveStats,
+) -> None:
+    """عنوانی که نویسنده ندارد را فقط وقتی به یک محصول می‌چسبانیم که **تنها یک**
+    نویسنده برای آن عنوان پایه وجود داشته باشد.
+
+    * «رمان شب سرد» + «رمان شب سرد الناز» → یک رمان (فقط یک نویسنده در میدان)
+    * «رمان تاوان خیانت از ناشناس» + آوا و مهسا و ۴ برادر → معلوم نیست مال کدام
+      است، پس ادغام نمی‌شود و به شیت C می‌رود
+    """
+    for unnamed, partners in pending.items():
+        author_keys = {candidates[named].entity.person_key for named, _ in partners}
+        single_author = len(author_keys) == 1 and all(author_keys)
+        if single_author:
+            best = max(partners, key=lambda item: item[1])[0]
+            accepted.append((unnamed, best, INFERRED_CONFIDENCE))
+            stats.inferred_merges += 1
+        else:
+            stats.review_pairs += 1
+            review.add(unnamed)
+
+
+# ---------------------------------------------------------------------------
 # هسته‌ی فاز (بدون دیتابیس، تا مستقیم قابل تست باشد)
 # ---------------------------------------------------------------------------
 
@@ -223,8 +332,9 @@ class SafeClusters:
 def resolve(
     candidates: Sequence[Candidate],
     threshold: float = 0.80,
-    top_tokens: int = 2,
-    empty_token_threshold: float | None = None,
+    top_tokens: int = 3,
+    strong_match_threshold: float = STRONG_MATCH_THRESHOLD,
+    no_entity_threshold: float = NO_ENTITY_THRESHOLD,
 ) -> tuple[list[list[int]], dict[int, float], set[int], ResolveStats]:
     stats = ResolveStats(raw_count=len(candidates))
     clusters = SafeClusters(len(candidates))
@@ -233,21 +343,29 @@ def resolve(
 
     accepted: list[tuple[int, int, float]] = []
     review: set[int] = set()
+    #: عنوان بدون نویسنده → فهرست (عنوان نویسنده‌دار، شباهت)
+    pending: dict[int, list[tuple[int, float]]] = defaultdict(list)
 
     for a, b in pairs:
         verdict, score, confidence, reason = classify_pair(
-            candidates[a], candidates[b], threshold, empty_token_threshold
+            candidates[a], candidates[b], threshold, strong_match_threshold, no_entity_threshold
         )
         if verdict == "merge":
             accepted.append((a, b, confidence))
+        elif verdict == "candidate":
+            unnamed, named = _split_named(candidates, a, b)
+            pending[unnamed].append((named, score))
         elif verdict == "review":
-            # ادغام نمی‌شود، ولی هر دو طرف برای بازبینی دستی علامت می‌خورند.
+            # ادغام نمی‌شود. طرفی که نویسنده دارد هویت روشنی دارد و علامت
+            # نمی‌خورد؛ ابهام مالِ طرفی است که نویسنده‌اش معلوم نیست.
             stats.review_pairs += 1
-            review.update({a, b})
+            review.update(_uncertain_sides(candidates, a, b))
         elif reason.startswith("خط قرمز"):
             clusters.forbid(a, b)
             stats.red_lines += 1
         stats.decisions.append(Decision(a, b, score, verdict, confidence, reason))
+
+    infer_by_author(candidates, pending, accepted, review, stats)
 
     accepted.sort(key=lambda item: item[2], reverse=True)
     node_confidence: dict[int, float] = {}
@@ -270,12 +388,16 @@ def pick_canonical_title(
 ) -> str:
     """کامل‌ترین عنوان خوشه: بیشترین توکن معنادار، سپس بلندترین، سپس الفبایی."""
 
-    def sort_key(candidate: Candidate) -> tuple[int, int, str]:
+    # اگر خوشه چند نسخه از یک عنوان و یک نسخه‌ی کمی متفاوت داشته باشد، عنوان
+    # اکثریت نماینده‌ی بهتری است («شب سرد» ×۳ در برابر «شب سرما» ×۱).
+    votes = Counter(c.normalized_title for c in members)
+
+    def sort_key(candidate: Candidate) -> tuple[int, int, int, str]:
         meaningful = normalizer.meaningful_tokens(candidate.raw_title, norm_config)
         display = normalizer.normalize_display(candidate.raw_title, norm_config)
-        # بیشترین توکن معنادار؛ در تساوی، تمیزترین (کوتاه‌ترین) عنوان — تا
-        # «... pdf رایگان» به‌عنوان عنوان نهایی انتخاب نشود.
-        return (len(meaningful), -len(display), display)
+        # رأی اکثریت؛ سپس بیشترین توکن معنادار؛ در تساوی، تمیزترین (کوتاه‌ترین)
+        # عنوان — تا «... pdf رایگان» به‌عنوان عنوان نهایی انتخاب نشود.
+        return (votes[candidate.normalized_title], len(meaningful), -len(display), display)
 
     best = max(members, key=sort_key)
     return normalizer.normalize_display(best.raw_title, norm_config).strip() or best.raw_title
@@ -314,8 +436,13 @@ def run(
     groups, node_confidence, review, stats = resolve(
         candidates,
         threshold=float(config.get("resolve.similarity_threshold", 0.80)),
-        top_tokens=int(config.get("resolve.blocking_top_tokens", 2)),
-        empty_token_threshold=config.get("resolve.empty_token_threshold"),
+        top_tokens=int(config.get("resolve.blocking_top_tokens", 3)),
+        strong_match_threshold=float(
+            config.get("resolve.strong_match_threshold", STRONG_MATCH_THRESHOLD)
+        ),
+        no_entity_threshold=float(
+            config.get("resolve.no_entity_threshold", NO_ENTITY_THRESHOLD)
+        ),
     )
 
     used_titles: set[str] = set()
@@ -331,7 +458,9 @@ def run(
                     if token not in tokens:
                         tokens.append(token)
 
-            flagged = bool(review & set(group))
+            # خوشه‌ای که واقعاً ادغام شده، شواهد قوی داشته؛ ابهامِ قبلیِ اعضایش
+            # با همان ادغام رفع شده است و دیگر لازم نیست به شیت C برود.
+            flagged = bool(review & set(group)) and len(group) == 1
             if len(group) == 1:
                 confidence = REVIEW_CONFIDENCE if flagged else 1.0
             else:
