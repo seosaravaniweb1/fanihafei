@@ -107,6 +107,11 @@ python -m content_pipeline.run panel -c config.yaml
 python -m content_pipeline.run panel -c config.yaml --port 8100 --no-browser
 ```
 
+**ساده‌ترین راه — بدون تایپ هیچ دستوری:** فایل `start-panel.bat` (ویندوز) یا
+`start-panel.sh` (لینوکس/مک) داخل پوشه‌ی `content_pipeline` را اجرا کنید. خودش
+وابستگی‌های لازم را نصب می‌کند، اگر `config.yaml` نبود از روی نمونه می‌سازد، و
+پنل را بالا می‌آورد. اگر پورت ۸۰۰۰ اشغال بود، خودکار سراغ پورت بعدی می‌رود.
+
 **نکته‌ی مهم درباره‌ی جای اجرا:** شکل `python -m content_pipeline.run` باید از
 **پوشه‌ی والدِ** `content_pipeline` اجرا شود، نه از داخل خودش — وگرنه پایتون
 می‌گوید `No module named 'content_pipeline'`. اگر داخل خود پوشه هستید، فایل را

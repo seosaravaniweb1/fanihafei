@@ -243,7 +243,9 @@ def runs_command(config: Optional[str] = typer.Option(None, "--config", "-c")) -
 @app.command("panel")
 def panel_command(
     config: Optional[str] = typer.Option(None, "--config", "-c", help="مسیر config.yaml"),
-    port: int = typer.Option(8000, "--port", "-p", help="پورت پنل"),
+    port: Optional[int] = typer.Option(
+        None, "--port", "-p", help="پورت پنل (پیش‌فرض ۸۰۰۰؛ اگر اشغال بود، پورت بعدی)"
+    ),
     host: str = typer.Option("127.0.0.1", "--host", help="فقط لوکال؛ عوض کردنش ریسک دارد"),
     open_browser: bool = typer.Option(True, "--browser/--no-browser", help="باز کردن مرورگر"),
 ) -> None:
@@ -259,10 +261,27 @@ def panel_command(
         return
     db.connect(configuration.db_path).close()  # اطمینان از وجود دیتابیس و اسکیما
 
-    try:
-        httpd, state = web_server.build_server(configuration, config, host=host, port=port)
-    except OSError as exc:
-        _fail(f"پورت {port} در دسترس نیست ({exc}). با --port پورت دیگری بدهید.")
+    # پورت صریح یعنی همان پورت؛ بدون آن، اگر ۸۰۰۰ اشغال بود سراغ بعدی می‌رویم
+    # تا اجرای دو-کلیکی به خطای پورت نخورد.
+    candidates = [port] if port is not None else list(range(8000, 8010))
+    httpd = state = None
+    last_error: OSError | None = None
+    for candidate in candidates:
+        try:
+            httpd, state = web_server.build_server(
+                configuration, config, host=host, port=candidate
+            )
+            break
+        except OSError as exc:
+            last_error = exc
+    if httpd is None or state is None:
+        if port is not None:
+            _fail(f"پورت {port} در دسترس نیست ({last_error}). با --port پورت دیگری بدهید.")
+        else:
+            _fail(
+                f"پورت‌های ۸۰۰۰ تا ۸۰۰۹ همه اشغال‌اند ({last_error})."
+                " با --port پورت دیگری بدهید."
+            )
         return
 
     url = web_server.url_for(httpd, state.token)
