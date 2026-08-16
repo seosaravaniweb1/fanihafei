@@ -110,7 +110,7 @@ content_pipeline/
 │   └── p3_suggest.py
 ├── output/
 │   └── exporter.py         سه شیت (اکسل / گوگل‌شیت)
-├── tests/                  ۱۳۸ تست، بدون شبکه
+├── tests/                  ۱۵۱ تست، بدون شبکه
 └── data/                   runs.db و خروجی‌ها (در git نیست)
 ```
 
