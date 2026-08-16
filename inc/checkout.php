@@ -128,16 +128,91 @@ add_filter( 'woocommerce_default_address_fields', 'fs_default_address_fields', 2
 /**
  * حذف فیلدهای نشانی از قالب پیش‌فرض نشانی‌ها.
  *
+ * «کشور» و «استان» عمداً اینجا حذف نمی‌شوند: فقط از فرم تسویه‌حساب پنهان
+ * می‌شوند. تعریفشان باید سرجایش بماند چون ووکامرس، مالیات و بیشتر درگاه‌های
+ * پرداخت برای تشخیص «در دسترس بودن» به کشور صورتحساب تکیه می‌کنند.
+ *
  * @param array $fields فیلدها.
  * @return array
  */
 function fs_default_address_fields( $fields ) {
-	foreach ( array( 'company', 'address_1', 'address_2', 'city', 'postcode', 'country', 'state' ) as $key ) {
+	foreach ( array( 'company', 'address_1', 'address_2', 'city', 'postcode' ) as $key ) {
 		unset( $fields[ $key ] );
 	}
 
 	return $fields;
 }
+
+/**
+ * کشور و استان صورتحساب همیشه با محل فروشگاه پر می‌شود.
+ *
+ * فیلد کشور از فرم برداشته شده (این فروشگاه نشانی نمی‌خواهد)، ولی اگر مقدارش
+ * خالی بماند ووکامرس فکر می‌کند مکان مشتری نامشخص است و پیام «هیچ روش پرداختی
+ * در دسترس نیست» را نشان می‌دهد — حتی وقتی درگاه سالم و فعال است.
+ *
+ * @return string
+ */
+function fs_base_country() {
+	return WC()->countries ? WC()->countries->get_base_country() : 'IR';
+}
+
+/**
+ * مقدار پیش‌فرض کشور صورتحساب در تسویه‌حساب.
+ *
+ * @return string
+ */
+function fs_default_billing_country() {
+	return fs_base_country();
+}
+add_filter( 'default_checkout_billing_country', 'fs_default_billing_country', 20 );
+
+/**
+ * مقدار پیش‌فرض استان صورتحساب.
+ *
+ * @return string
+ */
+function fs_default_billing_state() {
+	return WC()->countries ? WC()->countries->get_base_state() : '';
+}
+add_filter( 'default_checkout_billing_state', 'fs_default_billing_state', 20 );
+
+/**
+ * پرکردن کشور و استان در داده‌های ارسالی تسویه‌حساب.
+ *
+ * @param array $data داده‌های ارسالی.
+ * @return array
+ */
+function fs_fill_billing_location( $data ) {
+	if ( empty( $data['billing_country'] ) ) {
+		$data['billing_country'] = fs_base_country();
+	}
+
+	if ( ! isset( $data['billing_state'] ) || '' === $data['billing_state'] ) {
+		$data['billing_state'] = WC()->countries ? WC()->countries->get_base_state() : '';
+	}
+
+	return $data;
+}
+add_filter( 'woocommerce_checkout_posted_data', 'fs_fill_billing_location', 5 );
+
+/**
+ * تا وقتی مشتری کشوری ندارد، همان کشور فروشگاه برایش در نظر گرفته شود.
+ *
+ * بدون این، در همان بارگذاری اول صفحه‌ی تسویه‌حساب فهرست درگاه‌ها خالی درمی‌آید.
+ *
+ * @return void
+ */
+function fs_set_customer_country() {
+	if ( ! fs_has_woo() || is_admin() || ! function_exists( 'WC' ) || ! WC()->customer ) {
+		return;
+	}
+
+	if ( ! WC()->customer->get_billing_country() ) {
+		WC()->customer->set_billing_country( fs_base_country() );
+	}
+}
+add_action( 'woocommerce_checkout_init', 'fs_set_customer_country', 5 );
+add_action( 'woocommerce_before_checkout_form', 'fs_set_customer_country', 5 );
 
 /**
  * ایمیل خودکار اگر کاربر ایمیلی وارد نکرده باشد.

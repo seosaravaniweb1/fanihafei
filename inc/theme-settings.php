@@ -350,6 +350,7 @@ function fs_theme_settings_tabs() {
 		'header'    => 'هدر',
 		'footer'    => 'فوتر',
 		'dashboard' => 'پیشخوان کاربری',
+		'health'    => 'عیب‌یابی',
 	);
 }
 
@@ -995,6 +996,10 @@ function fs_theme_settings_page() {
 					<button type="submit" class="button button-primary button-hero">ذخیره تنظیمات</button>
 				</p>
 			</form>
+
+		<?php elseif ( 'health' === $tab ) : ?>
+
+			<?php fs_diagnostics_tab(); ?>
 
 		<?php endif; ?>
 

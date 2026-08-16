@@ -34,6 +34,7 @@ require_once get_theme_file_path( 'inc/theme-data.php' );
 require_once get_theme_file_path( 'inc/data.php' );
 require_once get_theme_file_path( 'inc/theme-settings.php' );
 require_once get_theme_file_path( 'inc/trust-settings.php' );
+require_once get_theme_file_path( 'inc/diagnostics.php' );
 require_once get_theme_file_path( 'inc/woocommerce.php' );
 require_once get_theme_file_path( 'inc/auth.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
