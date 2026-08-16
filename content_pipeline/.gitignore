@@ -1,0 +1,12 @@
+# دیتابیس state و خروجی‌ها — نباید کامیت شوند
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/output*
+data/review/
+# تنظیمات واقعی (شامل کلیدهای API)
+config.yaml
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

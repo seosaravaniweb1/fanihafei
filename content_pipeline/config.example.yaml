@@ -1,0 +1,128 @@
+# نمونه‌ی تنظیمات پایپ‌لاین خوراک محتوایی.
+# کپی کنید به config.yaml و مقادیر را پر کنید:
+#     cp content_pipeline/config.example.yaml config.yaml
+# کلیدهای API را در فایل ننویسید؛ از متغیر محیطی استفاده کنید:
+#     export ANTHROPIC_API_KEY=...   SERP_API_KEY=...
+
+database:
+  path: content_pipeline/data/runs.db
+
+# ---------------------------------------------------------------------------
+# موضوع هدف (Topic-Agnostic — فقط این بخش را عوض کنید)
+# ---------------------------------------------------------------------------
+topic:
+  target: "رمان"
+  # ۵ تا ۱۰ نمونه‌عنوان دستی؛ بردار مرجع از همین‌ها ساخته می‌شود.
+  examples:
+    - "رمان تاوان خیانت"
+    - "رمان عاشقانه ایرانی"
+    - "رمان پلیسی جنایی"
+    - "دانلود رمان صیغه اجباری"
+    - "رمان استاد مغرور"
+  threshold: 0.65         # >= این مقدار → مرتبط
+  review_threshold: 0.50  # بین این دو → فایل بازبینی دستی
+
+# ---------------------------------------------------------------------------
+# فاز ۰ — نرمال‌سازی فارسی
+# ---------------------------------------------------------------------------
+normalizer:
+  digit_target: fa        # fa یا en — فقط یکی، ولی ثابت
+  use_core_stopwords: true
+  use_extra_stopwords: true
+  custom_stopwords: []    # کلمات ایستای خاص حوزه‌ی خودتان
+  strip_years: true
+  zwnj: strip             # strip | space | keep
+  extra_names: []         # نام‌های خاصی که در گازتیر نیستند
+
+# ---------------------------------------------------------------------------
+# فاز ۱ — کراول
+# ---------------------------------------------------------------------------
+crawl:
+  requests_per_second: 1.0        # حداکثر ۱ درخواست در ثانیه به هر دامنه
+  user_agent: "ContentFeedBot/1.0 (+https://example.com/bot)"
+  respect_robots: true
+  timeout: 20
+  playwright_fallback: true       # فقط برای سایت‌های JS-heavy
+
+sites:
+  - base_url: "https://example-competitor-1.ir"
+    product_url_include: ["/product/", "/p/"]
+    product_url_exclude: ["/tag/", "/category/", "\\?"]
+    title_selector: null          # null یعنی h1 → og:title → title
+    max_pages: 500
+    max_depth: 3
+  - base_url: "https://example-competitor-2.ir"
+    product_url_include: ["/downloads/"]
+    js: true                      # این سایت با Playwright گرفته شود
+    seed_urls:
+      - "https://example-competitor-2.ir/downloads/"
+
+# ---------------------------------------------------------------------------
+# فاز ۲ — Entity Resolution
+# ---------------------------------------------------------------------------
+resolve:
+  similarity_threshold: 0.80      # زیر این مقدار هرگز ادغام نمی‌شود
+  blocking_top_tokens: 2          # تعداد نادرترین توکن‌ها به‌عنوان کلید بلاک
+  llm_arbitration: true           # داوری LLM برای جفت‌های مبهم
+  max_llm_pairs: 200              # سقف جفت‌هایی که به LLM می‌روند
+
+# ---------------------------------------------------------------------------
+# SERP — ساجست، سرچ و تصویر
+# ---------------------------------------------------------------------------
+serp:
+  provider: none                  # serpapi | dataforseo | mock | none
+  api_key: "${SERP_API_KEY}"      # برای serpapi
+  login: ""                       # برای dataforseo
+  password: ""
+  gl: ir
+  hl: fa
+  location: "Iran"
+  cost_per_search: 0.01
+  cost_per_autocomplete: 0.01
+  cost_per_image_search: 0.01
+  mock_path: ""                   # وقتی provider=mock
+
+# ---------------------------------------------------------------------------
+# LLM (Anthropic)
+# ---------------------------------------------------------------------------
+llm:
+  model: claude-sonnet-5          # رده‌ی Sonnet طبق داکیومنت (نسل فعلی)
+  api_key: "${ANTHROPIC_API_KEY}"
+  max_tokens: 8000
+  effort: low                     # low | medium | high | xhigh | max
+  price_input_per_mtok: 3.0       # برای تخمین هزینه
+  price_output_per_mtok: 15.0
+
+# ---------------------------------------------------------------------------
+# فاز ۴ و ۵
+# ---------------------------------------------------------------------------
+benchmark:
+  serp_results: 10
+  llm_candidates: 3               # ارزیابی کیفی فقط روی سه کاندیدای برتر
+
+image:
+  min_size: 500
+  aspect_tolerance: 0.1           # نسبت قابل قبول: ۰.۹ تا ۱.۱
+  candidates: 5
+
+# ---------------------------------------------------------------------------
+# هزینه و کش
+# ---------------------------------------------------------------------------
+cost:
+  max_cost: 20                    # سقف دلاری هر اجرا (null = بدون سقف)
+  confirm_each_phase: true
+
+cache:
+  ttl_days: 14
+
+# ---------------------------------------------------------------------------
+# خروجی
+# ---------------------------------------------------------------------------
+output:
+  xlsx_path: "content_pipeline/data/output-{run_id}.xlsx"
+  sheet_id: ""                    # شناسه‌ی گوگل‌شیت
+  service_account_json: ""        # مسیر فایل service account
+  tabs:
+    main: "خوراک محتوایی"
+    archive: "آرشیو آینده"
+    review: "بازبینی دستی"
