@@ -20,6 +20,8 @@ import urllib.robotparser
 from dataclasses import dataclass
 from typing import Any
 
+from . import extract
+
 DEFAULT_UA = "ContentFeedBot/1.0 (+set-a-contact-url-in-config)"
 
 _EMPTY_THRESHOLD = 200  # کمتر از این تعداد کاراکتر HTML یعنی «محتوای خالی»
@@ -190,16 +192,16 @@ class Fetcher:
                     impersonate="chrome",
                     allow_redirects=True,
                 )
-                return FetchResult(
-                    url, response.status_code, response.text or "", str(response.url), "curl_cffi"
+                # خودمان رمزگشایی می‌کنیم تا صفحات فارسیِ بدون هدر charset
+                # (که اغلب windows-1256 هستند) سالم بخوانند
+                text = extract.decode_html(
+                    response.content or b"", response.headers.get("content-type")
                 )
+                return FetchResult(url, response.status_code, text, str(response.url), "curl_cffi")
             request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                body = response.read()
-                charset = response.headers.get_content_charset() or "utf-8"
-                return FetchResult(
-                    url, response.status, body.decode(charset, "replace"), response.geturl(), "urllib"
-                )
+                text = extract.decode_html(response.read(), response.headers.get("content-type"))
+                return FetchResult(url, response.status, text, response.geturl(), "urllib")
         except urllib.error.HTTPError as exc:  # pragma: no cover - وابسته به شبکه
             return FetchResult(url, exc.code, "", via="urllib", error=str(exc))
         except Exception as exc:  # pragma: no cover - وابسته به شبکه

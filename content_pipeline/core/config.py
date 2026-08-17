@@ -194,5 +194,7 @@ def load_config(path: str | Path | None = None) -> Config:
             )
         if yaml is None:  # pragma: no cover
             raise ConfigError("برای خواندن config به PyYAML نیاز است: pip install pyyaml")
-        data = yaml.safe_load(resolved.read_text(encoding="utf-8")) or {}
+        # utf-8-sig یعنی اگر Notepad ویندوز فایل را با BOM ذخیره کرده باشد
+        # هم درست خوانده شود؛ روی فایل بدون BOM هیچ فرقی نمی‌کند.
+        data = yaml.safe_load(resolved.read_text(encoding="utf-8-sig")) or {}
     return Config(raw=_deep_merge(DEFAULTS, data), path=resolved)

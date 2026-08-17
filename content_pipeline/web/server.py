@@ -187,7 +187,7 @@ def api_get_config(state: PanelState, query: dict) -> dict:
     path = state.config_path
     text = ""
     if path is not None and path.exists():
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
     return {"path": str(path) if path else "", "text": text, "editable": path is not None}
 
 
@@ -195,7 +195,7 @@ def api_save_config(state: PanelState, body: dict) -> dict:
     path = state.config_path
     if path is None:
         raise ApiError("پنل بدون فایل config اجرا شده؛ چیزی برای ذخیره نیست.")
-    text = body.get("text") or ""
+    text = (body.get("text") or "").lstrip("\ufeff")
     try:
         import yaml  # noqa: PLC0415 — اختیاری است
     except ImportError:  # pragma: no cover

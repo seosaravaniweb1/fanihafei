@@ -32,6 +32,15 @@ from typing import Optional
 
 import typer
 
+# روی ویندوز، وقتی خروجی به فایل یا لوله هدایت شود پایتون از کدگذاری محلی
+# (cp1252/cp437) استفاده می‌کند و چاپ متن فارسی با UnicodeEncodeError می‌افتد.
+# کنسول خودش مشکلی ندارد، ولی این خط هر دو حالت را امن می‌کند.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    except (AttributeError, ValueError):  # pragma: no cover — استریم غیرعادی
+        pass
+
 from .core import db, normalizer, pipeline
 from .core.config import Config, ConfigError, load_config
 from .output import exporter

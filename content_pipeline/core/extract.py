@@ -34,6 +34,64 @@ def strip_tags(fragment: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# رمزگشایی صفحه — بخش حساس برای متن فارسی
+# ---------------------------------------------------------------------------
+
+_META_CHARSET_RE = re.compile(rb"""<meta[^>]+charset\s*=\s*["']?\s*([\w\-]+)""", re.I)
+# سایت‌های قدیمی فارسی که هدر charset ندارند معمولاً windows-1256 هستند
+_FALLBACK_ENCODINGS = ("utf-8", "windows-1256", "cp1252")
+
+
+def _usable(name: str | None) -> str | None:
+    if not name:
+        return None
+    try:
+        "".encode(name)
+    except LookupError:
+        return None
+    return name
+
+
+def charset_from_content_type(content_type: str | None) -> str | None:
+    """``text/html; charset=utf-8`` → ``utf-8``."""
+    if not content_type or "charset=" not in content_type.lower():
+        return None
+    value = content_type.lower().split("charset=", 1)[1]
+    return _usable(value.split(";")[0].strip().strip("\"'")) or None
+
+
+def decode_html(body: bytes, content_type: str | None = None) -> str:
+    """بایت‌های صفحه → متن.
+
+    ترتیب: BOM، بعد charset هدر HTTP، بعد ``<meta charset>`` داخل خود صفحه،
+    و در آخر حدس. حدس با ``utf-8`` شروع می‌شود ولی **سخت‌گیرانه**؛ اگر نشد
+    ``windows-1256`` امتحان می‌شود، چون صفحات قدیمی فارسی با همان کدگذاری
+    ساخته شده‌اند و خواندنشان با utf-8 عنوان را به علامت سؤال تبدیل می‌کند.
+    """
+    if not body:
+        return ""
+    for bom, name in ((b"\xef\xbb\xbf", "utf-8-sig"), (b"\xff\xfe", "utf-16"), (b"\xfe\xff", "utf-16")):
+        if body.startswith(bom):
+            return body.decode(name, "replace")
+
+    header = charset_from_content_type(content_type)
+    if header:
+        return body.decode(header, "replace")
+
+    match = _META_CHARSET_RE.search(body[:4096])
+    meta = _usable(match.group(1).decode("ascii", "ignore")) if match else None
+    if meta:
+        return body.decode(meta, "replace")
+
+    for candidate in _FALLBACK_ENCODINGS:
+        try:
+            return body.decode(candidate)
+        except UnicodeDecodeError:
+            continue
+    return body.decode("utf-8", "replace")
+
+
+# ---------------------------------------------------------------------------
 # عنوان
 # ---------------------------------------------------------------------------
 
