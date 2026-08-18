@@ -34,6 +34,7 @@ class FakeSuggest:
         self.suggestions = suggestions or {}
         self.blow_up_after = blow_up_after
         self.queries_sent = 0
+        self.queries: list[str] = []
 
         class _Config:
             max_per_session = 300
@@ -43,6 +44,7 @@ class FakeSuggest:
         self.config = _Config()
 
     def suggest(self, query):
+        self.queries.append(query)
         if self.blow_up_after is not None and self.queries_sent >= self.blow_up_after:
             raise SuggestBlocked("سه پاسخ خالی پشت‌سرهم")
         self.queries_sent += 1
@@ -122,7 +124,8 @@ def test_blocked_run_stops_but_keeps_what_it_had(env):
     conn, run_id, config = env
     for index in range(4):
         add_product(conn, run_id, f"محصول {index}")
-    client = FakeSuggest({"محصول 0": ["الف"], "محصول 1": ["ب"]}, blow_up_after=2)
+    # کوئری با ارقام فارسی فرستاده می‌شود (نرمال‌سازی فاز ۰)
+    client = FakeSuggest({"محصول ۰": ["الف"], "محصول ۱": ["ب"]}, blow_up_after=2)
 
     stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
     assert stats.stopped_early
@@ -312,3 +315,35 @@ def test_category_column_follows_the_raw_titles(env):
     ready = exporter.build_sheets(conn, run_id, config)[0]
     assert db.category_of(conn, canonical) == "رمان"
     assert ready.rows[0][3] == "رمان"
+
+
+# ---------------------------------------------------------------------------
+# کوئری‌ای که واقعاً به گوگل می‌رود
+# ---------------------------------------------------------------------------
+
+
+def test_shop_noise_is_stripped_before_asking_google(env):
+    """عنوان فروشگاهی کوئری‌ای است که هیچ‌کس تایپ نمی‌کند.
+
+    اگر عنوان خام فرستاده شود، گوگل چیزی برنمی‌گرداند و همه‌ی محصولات
+    اشتباهاً «بدون ساجست» علامت می‌خورند — همان چیزی که روی یک سایت واقعی دیده شد.
+    """
+    conn, run_id, config = env
+    add_product(conn, run_id, "دانلود رمان بهار رضوانی از حدیثه نسخه کامل و اصلی pdf")
+    client = FakeSuggest({"رمان بهار رضوانی حدیثه": ["رمان بهار رضوانی کامل"]})
+
+    stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    assert client.queries == ["رمان بهار رضوانی حدیثه"]
+    assert stats.with_suggest == 1
+
+
+def test_query_length_is_capped(env):
+    conn, run_id, config = env
+    add_product(conn, run_id, "یک دو سه چهار پنج شش هفت هشت نه ده یازده")
+    config.raw.setdefault("suggest", {})["max_query_words"] = 4
+    client = FakeSuggest({})
+
+    p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    assert client.queries == ["یک دو سه چهار"]

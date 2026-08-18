@@ -10,7 +10,11 @@
 * تأخیر تصادفی ۲ تا ۴ ثانیه بین درخواست‌ها
 * حداکثر ۳۰۰ کوئری در هر نشست
 * هر نتیجه در ``api_cache`` ذخیره می‌شود (کوئری تکراری زده نمی‌شود)
-* سه پاسخ خالی یا خطای پشت‌سرهم → توقف با پیام به کاربر (احتمال بلاک)
+* سه **خطای** پشت‌سرهم (HTTP غیر ۲۰۰، پاسخ غیرقابل‌پارس، خطای شبکه) → توقف؛
+  این‌ها نشانه‌ی بلاک شدن‌اند
+* پاسخ ۲۰۰ با فهرست خالی یعنی «این عبارت ساجست ندارد» — یک نتیجه‌ی معتبر،
+  نه خطا. تعداد زیادی خالیِ پشت‌سرهم فقط هشدار می‌دهد، چون ممکن است واقعاً
+  عبارت‌ها ساجست نداشته باشند
 """
 
 from __future__ import annotations
@@ -50,7 +54,8 @@ class SuggestConfig:
     delay_min: float = 2.0
     delay_max: float = 4.0
     max_per_session: int = 300
-    max_consecutive_failures: int = 3
+    max_consecutive_failures: int = 3   # خطاهای واقعی (بلاک شدن)
+    max_consecutive_empty: int = 40     # پاسخ‌های خالیِ پشت‌سرهم (شاید واقعاً ساجست ندارند)
     timeout: int = 15
     user_agent: str = DEFAULT_UA
 
@@ -71,6 +76,8 @@ class SuggestClient:
         self._sleep = sleep
         self.queries_sent = 0
         self.consecutive_failures = 0
+        self.consecutive_empty = 0
+        self.empty_total = 0
         self._last_request: float | None = None
         self._session = self._build_session()
 
@@ -133,25 +140,46 @@ class SuggestClient:
         try:
             raw = self._fetch(query)
         except Exception as exc:
-            self._register_failure(f"خطای شبکه: {exc}")
+            self._register_failure(f"{exc}")
             raise _TransientFailure(str(exc)) from exc
 
         if _parse(raw):
             self.consecutive_failures = 0
+            self.consecutive_empty = 0
         else:
-            # خالی بودن یک نتیجه‌ی معتبر است (no_suggest) و کش می‌شود، ولی سه‌تای
-            # پشت‌سرهم نشانه‌ی بلاک شدن است.
-            self._register_failure("پاسخ خالی")
+            self._register_empty()
         return raw
 
     def _register_failure(self, reason: str) -> None:
+        """خطای واقعی: HTTP غیر ۲۰۰، پاسخ غیرقابل‌پارس، یا خطای شبکه.
+
+        بلاک شدن گوگل خودش را این‌طور نشان می‌دهد (۴۲۹ یا صفحه‌ی کپچا که
+        JSON نیست)، نه با پاسخ ۲۰۰ و فهرست خالی.
+        """
         self.consecutive_failures += 1
         if self.consecutive_failures >= self.config.max_consecutive_failures:
             raise SuggestBlocked(
-                f"{self.consecutive_failures} پاسخ خالی یا خطای پشت‌سرهم ({reason}). "
+                f"{self.consecutive_failures} خطای پشت‌سرهم ({reason}). "
                 "احتمال بلاک شدن توسط گوگل. فاز ۳ متوقف شد؛ چند ساعت بعد با "
-                "--resume-from 3 ادامه دهید (نتایج قبلی در کش هستند). اگر واقعاً "
-                "محصولاتتان ساجست ندارند، suggest.max_consecutive_failures را بالا ببرید."
+                "--resume-from 3 ادامه دهید (نتایج قبلی در کش هستند)."
+            )
+
+    def _register_empty(self) -> None:
+        """پاسخ سالم ولی بدون پیشنهاد — یعنی این عبارت ساجست ندارد.
+
+        این خطا نیست: خیلی از عنوان‌های خاص واقعاً در گوگل ساجست ندارند.
+        فقط اگر تعداد خیلی زیادی پشت‌سرهم خالی باشد متوقف می‌شویم، چون آن‌وقت
+        احتمالاً کوئری‌ها بد ساخته شده‌اند یا چیزی در مسیر پاسخ را خالی می‌کند.
+        """
+        self.consecutive_failures = 0
+        self.consecutive_empty += 1
+        self.empty_total += 1
+        if self.consecutive_empty >= self.config.max_consecutive_empty:
+            raise SuggestBlocked(
+                f"{self.consecutive_empty} پاسخ خالیِ پشت‌سرهم. پاسخ‌ها سالم بودند، "
+                "پس بلاک نشده‌اید؛ یا این عنوان‌ها واقعاً در گوگل ساجست ندارند یا "
+                "کوئری‌ها بیش از حد بلندند. با --resume-from 3 ادامه دهید یا "
+                "suggest.max_consecutive_empty را بالا ببرید."
             )
 
     def _fetch(self, query: str) -> Any:
@@ -191,6 +219,7 @@ def suggest_from_config(config: Any, cache: Any | None = None) -> SuggestClient:
             delay_max=float(config.get("suggest.delay_max", 4)),
             max_per_session=int(config.get("suggest.max_per_session", 300)),
             max_consecutive_failures=int(config.get("suggest.max_consecutive_failures", 3)),
+            max_consecutive_empty=int(config.get("suggest.max_consecutive_empty", 40)),
             timeout=int(config.get("suggest.timeout", 15)),
         ),
         cache=cache,

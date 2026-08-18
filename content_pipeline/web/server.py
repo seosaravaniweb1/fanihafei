@@ -138,6 +138,12 @@ def product_dict(conn: sqlite3.Connection, row: sqlite3.Row, detail: bool = Fals
     return data
 
 
+def suggest_query_of(state: "PanelState", title: str) -> str:
+    norm_config = normalizer.config_from_mapping(state.config.normalizer)
+    max_words = int(state.config.get("suggest.max_query_words", 8))
+    return normalizer.search_query(title, norm_config, max_words) or title
+
+
 # ---------------------------------------------------------------------------
 # API
 # ---------------------------------------------------------------------------
@@ -374,7 +380,9 @@ def api_product(state: PanelState, query: dict) -> dict:
     ).fetchone()
     if row is None:
         raise ApiError("محصول پیدا نشد.", HTTPStatus.NOT_FOUND)
-    return product_dict(conn, row, detail=True)
+    data = product_dict(conn, row, detail=True)
+    data["suggest_query"] = suggest_query_of(state, row["canonical_title"] or "")
+    return data
 
 
 def _guard_idle(state: PanelState) -> None:

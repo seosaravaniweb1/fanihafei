@@ -65,12 +65,18 @@ def run(
     products = pending_products(conn, run_id)
     stats.products = len(products)
 
-    for row in products:
+    max_words = int(config.get("suggest.max_query_words", 8))
+    for index, row in enumerate(products):
         canonical_id = int(row["id"])
         title = row["canonical_title"] or ""
+        # عنوان فروشگاهی («دانلود رمان ... نسخه کامل pdf») کوئری‌ای است که کسی
+        # تایپ نمی‌کند؛ گوگل برایش پیشنهادی ندارد و همه‌چیز «بدون ساجست» می‌شود.
+        query = normalizer.search_query(title, norm_config, max_words) or title
+        if verbose and index < 3:
+            print(f"  کوئری: {query}")
         before = client.queries_sent
         try:
-            suggestions = client.suggest(title)
+            suggestions = client.suggest(query)
         except (SuggestBlocked, SessionLimitReached) as exc:
             # داده‌ی تا اینجا در دیتابیس محفوظ است؛ با --resume-from 3 ادامه می‌دهید.
             stats.stopped_early = str(exc)

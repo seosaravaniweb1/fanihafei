@@ -370,3 +370,50 @@ __all__ = [
     "remove_stopwords",
     "tokenize",
 ]
+
+
+def collapse_repeated_prefix(text: str) -> str:
+    """«دانلود رمان دانلود رمان شب سرد» → «دانلود رمان شب سرد».
+
+    خیلی از فروشگاه‌ها نام سایت را به ابتدای ``<title>`` می‌چسبانند در حالی که
+    خود عنوان محصول هم با همان عبارت شروع می‌شود. تکرارِ چسبیده همیشه خطای
+    قالب سایت است، پس حذفش امن است — برخلاف حدس زدن نام سایت.
+    """
+    words = text.split()
+    for size in range(len(words) // 2, 0, -1):
+        if words[:size] == words[size : 2 * size]:
+            return " ".join(words[size:])
+    return text
+
+
+#: کلماتی که در تطبیق معنا دارند ولی در کوئری جستجو فقط نتیجه را خالی می‌کنند.
+#: «آیین‌نامه اصلی» با «آیین‌نامه فرعی» فرق دارد، پس «اصلی» کلمه‌ی ایستا نیست؛
+#: ولی «نسخه اصلی» ته یک عنوان فروشگاهی، چیزی نیست که کسی سرچ کند.
+QUERY_NOISE: frozenset[str] = frozenset({"اصلی", "اورجینال", "اورژینال", "ارجینال"})
+
+
+def search_query(
+    text: str, config: NormalizerConfig = DEFAULT_CONFIG, max_words: int = 8
+) -> str:
+    """عنوان محصول → کوئری کوتاه و طبیعی برای جستجو در گوگل.
+
+    عنوان خام فروشگاهی («دانلود رمان ... نسخه کامل و اصلی pdf») کوئری‌ای است
+    که هیچ‌کس تایپ نمی‌کند و گوگل هم برایش پیشنهادی ندارد — نتیجه‌اش این است
+    که همه‌ی محصولات «بدون ساجست» علامت می‌خورند. اینجا کلمات ایستای تجاری و
+    سال‌ها حذف و طول کوئری محدود می‌شود.
+
+    برخلاف :func:`normalize`، نیم‌فاصله حفظ می‌شود: «پیش‌دانشگاهی» به
+    «پیشدانشگاهی» تبدیل شود دیگر کلمه‌ی قابل جستجویی نیست.
+    """
+    display = collapse_repeated_prefix(normalize_display(text, config))
+    kept: list[str] = []
+    for token in display.split():
+        probe = normalize(token, config)
+        if not probe or probe in QUERY_NOISE:  # ایستا، سال، نشانگر یا نویز جستجو
+            continue
+        if token in kept:  # کلمه‌ی تکراری به کوئری چیزی اضافه نمی‌کند
+            continue
+        kept.append(token)
+        if len(kept) >= max_words:
+            break
+    return " ".join(kept) or display

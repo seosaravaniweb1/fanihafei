@@ -113,12 +113,26 @@ def test_cache_key_is_query_specific():
 # ---------------------------------------------------------------------------
 
 
-def test_three_consecutive_empty_responses_stop_the_phase():
-    client = build({"*": ["q", []]}, max_consecutive_failures=3)
+def test_empty_responses_are_answers_not_failures():
+    """پاسخ ۲۰۰ با فهرست خالی یعنی «این عبارت ساجست ندارد».
+
+    اگر این را خطا بشماریم، هر سایتی که عنوان‌های خاص دارد بعد از سه محصول
+    متوقف می‌شود و همه‌چیز اشتباهاً «بلاک شدیم» گزارش می‌شود.
+    """
+    client = build({"*": ["q", []]}, max_consecutive_failures=3, max_consecutive_empty=40)
+    for index in range(10):
+        assert client.suggest(f"عبارت {index}") == []
+    assert client.consecutive_failures == 0
+    assert client.consecutive_empty == 10
+
+
+def test_too_many_empty_responses_in_a_row_stop_with_a_different_message():
+    client = build({"*": ["q", []]}, max_consecutive_failures=3, max_consecutive_empty=3)
     client.suggest("الف")
     client.suggest("ب")
-    with pytest.raises(SuggestBlocked):
+    with pytest.raises(SuggestBlocked) as error:
         client.suggest("ج")
+    assert "بلاک نشده‌اید" in str(error.value)
 
 
 def test_three_consecutive_errors_stop_the_phase():
@@ -129,9 +143,9 @@ def test_three_consecutive_errors_stop_the_phase():
         client.suggest("ج")
 
 
-def test_a_successful_response_resets_the_failure_counter():
+def test_a_successful_response_resets_the_error_counter():
     client = build(
-        {"الف": ["الف", []], "ب": ["ب", ["ب ۱"]], "*": ["x", []]},
+        {"الف": RuntimeError("HTTP 500"), "ب": ["ب", ["ب ۱"]], "*": RuntimeError("HTTP 500")},
         max_consecutive_failures=3,
     )
     client.suggest("الف")
@@ -139,6 +153,19 @@ def test_a_successful_response_resets_the_failure_counter():
     client.suggest("ج")
     client.suggest("د")
     assert client.consecutive_failures == 2  # هنوز به سقف نرسیده
+
+
+def test_a_successful_response_resets_the_empty_counter():
+    client = build(
+        {"ب": ["ب", ["ب ۱"]], "*": ["x", []]},
+        max_consecutive_failures=3,
+        max_consecutive_empty=3,
+    )
+    client.suggest("الف")
+    client.suggest("ب")  # یک پاسخ واقعی
+    client.suggest("ج")
+    assert client.consecutive_empty == 1
+    assert client.empty_total == 2
 
 
 def test_session_query_limit_is_enforced():

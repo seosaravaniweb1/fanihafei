@@ -501,6 +501,8 @@ async function showDetail(id) {
     body.replaceChildren();
 
     const meta = el("div", { className: "muted" }, [
+      `کوئری ساجست: «${product.suggest_query}»`,
+      el("br"),
       `اطمینان ادغام: ${product.merge_confidence ?? "—"}`,
       product.entity_tokens.length ? ` | توکن‌های تمایزدهنده: ${product.entity_tokens.join("، ")}` : "",
     ]);
