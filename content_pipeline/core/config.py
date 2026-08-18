@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -176,12 +178,18 @@ DEFAULTS: dict[str, Any] = {
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
-    out = dict(base)
+    """ادغام عمیق با **کپی کامل**.
+
+    بدون کپی، دیکشنری‌های تودرتوی ``DEFAULTS`` بین همه‌ی Configها مشترک
+    می‌مانند و یک تغییر (مثلاً انتخاب شیت‌ها در پنل) روی همه‌ی اجراهای بعدی
+    همان پروسه اثر می‌گذارد.
+    """
+    out = copy.deepcopy(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(out.get(key), dict):
             out[key] = _deep_merge(out[key], value)
         else:
-            out[key] = value
+            out[key] = copy.deepcopy(value)
     return out
 
 

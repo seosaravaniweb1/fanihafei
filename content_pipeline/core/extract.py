@@ -186,6 +186,96 @@ def strip_site_name(
     return " ".join(kept)
 
 
+
+
+# ---------------------------------------------------------------------------
+# تشخیص صفحه‌ی محصول
+# ---------------------------------------------------------------------------
+
+#: نشانه‌های قطعی — یکی از این‌ها کافی است
+_STRONG_PRODUCT = (
+    re.compile(r'"@type"\s*:\s*"(?:Product|Offer|AggregateOffer)"', re.I),
+    re.compile(r'itemtype=["\']https?://schema\.org/Product', re.I),
+    re.compile(r'property=["\']og:type["\'][^>]+content=["\']product', re.I),
+    re.compile(r'content=["\']product["\'][^>]+property=["\']og:type', re.I),
+    re.compile(r'name=["\']product:price:amount', re.I),
+    re.compile(r'class=["\'][^"\']*\b(?:single-product|product-page|woocommerce-product)\b', re.I),
+    re.compile(r'(?:add[-_]to[-_]cart|add-to-basket|data-product[-_]id|product_id=)', re.I),
+)
+
+#: نشانه‌های ضعیف — دوتا با هم لازم است
+_WEAK_PRODUCT = (
+    ("افزودن به سبد", re.compile(r"افزودن\s+به\s+سبد|به\s+سبد\s+خرید|اضافه\s+به\s+سبد")),
+    ("قیمت", re.compile(r"قیمت\s*[:：]|\bقیمت\b")),
+    ("واحد پول", re.compile(r"[\d۰-۹][\d۰-۹,،٬\s]*\s*(?:تومان|ريال|ریال)")),
+    ("خرید", re.compile(r"خرید\s+(?:محصول|فایل|اشتراک)|همین\s+حالا\s+بخرید|ثبت\s+سفارش")),
+    ("دانلود فایل", re.compile(r"دانلود\s+(?:فایل|محصول)|لینک\s+دانلود")),
+    ("موجودی", re.compile(r"موجود\s+در\s+انبار|ناموجود|اتمام\s+موجودی")),
+)
+
+#: نشانه‌های «این صفحه محصول نیست»
+_NOT_PRODUCT = (
+    ("نوع محتوا مقاله است", re.compile(r'"@type"\s*:\s*"(?:Article|BlogPosting|NewsArticle|WebPage|AboutPage|ContactPage|CollectionPage|SearchResultsPage)"', re.I)),
+    ("صفحه‌ی اطلاعات سایت", re.compile(r"درباره\s*(?:ی)?\s*ما|تماس\s+با\s+ما|قوانین\s+و\s+مقررات|حریم\s+خصوصی|سوالات\s+متداول")),
+)
+
+#: مسیرهایی که تقریباً هیچ‌وقت صفحه‌ی محصول نیستند
+_NOT_PRODUCT_PATH = re.compile(
+    r"/(?:blog|news|article|articles|post|posts|tag|tags|category|categories|"
+    r"about|about-us|contact|contact-us|privacy|terms|faq|cart|checkout|"
+    r"my-account|login|register|search|author|page)(?:/|$|\?)",
+    re.I,
+)
+
+
+@dataclass
+class ProductSignals:
+    """چرا این صفحه محصول شمرده شد یا نشد — برای اینکه تصمیم قابل بازبینی باشد."""
+
+    is_product: bool
+    reasons: list[str] = field(default_factory=list)
+    blockers: list[str] = field(default_factory=list)
+
+    @property
+    def why(self) -> str:
+        if self.is_product:
+            return "، ".join(self.reasons) or "نشانه‌ی محصول"
+        return "، ".join(self.blockers or ["هیچ نشانه‌ی محصولی پیدا نشد"])
+
+
+def is_product_page(page_html: str, url: str = "") -> ProductSignals:
+    """آیا این صفحه یک محصول قابل خرید است یا یک برگه/پست معمولی؟
+
+    بدون این فیلتر، «درباره ما» و «راهنمای خرید» و پست‌های بلاگ هم به‌عنوان
+    محصول وارد خروجی می‌شوند. ملاک، چیزی است که یک صفحه‌ی فروش دارد و یک
+    برگه ندارد: داده‌ی ساخت‌یافته‌ی Product، دکمه‌ی افزودن به سبد، یا قیمت.
+    """
+    if not page_html:
+        return ProductSignals(False, blockers=["صفحه خالی است"])
+
+    path_blocked = bool(url) and bool(_NOT_PRODUCT_PATH.search(urllib.parse.urlsplit(url).path))
+    text = _SCRIPT_RE.sub(" ", page_html)
+
+    reasons: list[str] = []
+    for pattern in _STRONG_PRODUCT:
+        if pattern.search(page_html):
+            reasons.append("داده‌ی ساخت‌یافته‌ی محصول")
+            break
+
+    weak = [label for label, pattern in _WEAK_PRODUCT if pattern.search(text)]
+    blockers = [label for label, pattern in _NOT_PRODUCT if pattern.search(page_html)]
+
+    strong = bool(reasons)
+    if strong:
+        # نشانه‌ی قطعی بر مسیر و بر نشانه‌های منفی می‌چربد
+        return ProductSignals(True, reasons=reasons + weak)
+    if path_blocked:
+        blockers.append("مسیر URL صفحه‌ی محصول نیست")
+    if len(weak) >= 2 and not blockers:
+        return ProductSignals(True, reasons=weak)
+    return ProductSignals(False, reasons=weak, blockers=blockers)
+
+
 # ---------------------------------------------------------------------------
 # لینک‌ها
 # ---------------------------------------------------------------------------

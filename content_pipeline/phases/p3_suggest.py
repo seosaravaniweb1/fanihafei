@@ -59,6 +59,7 @@ def run(
     config: Config,
     client: SuggestClient,
     verbose: bool = True,
+    should_stop=None,
 ) -> SuggestStats:
     norm_config = normalizer.config_from_mapping(config.normalizer)
     stats = SuggestStats()
@@ -66,7 +67,13 @@ def run(
     stats.products = len(products)
 
     max_words = int(config.get("suggest.max_query_words", 8))
+    stop = should_stop or (lambda: False)
     for index, row in enumerate(products):
+        if stop():
+            stats.stopped_early = "به درخواست شما متوقف شد؛ بقیه در صف می‌مانند."
+            if verbose:
+                print(f"  {stats.stopped_early}")
+            break
         canonical_id = int(row["id"])
         title = row["canonical_title"] or ""
         # عنوان فروشگاهی («دانلود رمان ... نسخه کامل pdf») کوئری‌ای است که کسی

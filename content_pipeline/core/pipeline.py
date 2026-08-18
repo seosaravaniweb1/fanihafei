@@ -69,8 +69,13 @@ def run_phase(
     config: Config,
     phase: int,
     log: LogFn = print,
+    should_stop: Callable[[], bool] | None = None,
 ) -> str:
-    """اجرای یک فاز. خروجی، خط خلاصه‌ی همان فاز است."""
+    """اجرای یک فاز. خروجی، خط خلاصه‌ی همان فاز است.
+
+    ``should_stop`` بین واحدهای کار (هر صفحه، هر کوئری) پرسیده می‌شود تا لغو
+    وسط فاز هم کار کند، نه فقط بین دو فاز. داده‌ی تا آن لحظه نوشته شده است.
+    """
     if phase == 1:
         matcher = topic_matcher(config, log, db.run_categories(conn, run_id))
         with fetcher_from_config(config) as fetcher:
@@ -80,7 +85,9 @@ def run_phase(
                     "⚠ curl_cffi نصب نیست؛ اثرانگشت TLS ممکن است شناسایی شود. "
                     "نصب کنید: pip install curl_cffi"
                 )
-            summary = p1_crawl.run(conn, run_id, config, fetcher, matcher).render()
+            summary = p1_crawl.run(
+                conn, run_id, config, fetcher, matcher, should_stop=should_stop
+            ).render()
 
     elif phase == 2:
         summary = p2_resolve.run(conn, run_id, config).render()
@@ -93,7 +100,9 @@ def run_phase(
             f"{pending} محصول در صف؛ سقف این نشست: {client.config.max_per_session} کوئری، "
             f"تأخیر {client.config.delay_min}–{client.config.delay_max} ثانیه"
         )
-        summary = p3_suggest.run(conn, run_id, config, client).render()
+        summary = p3_suggest.run(
+            conn, run_id, config, client, should_stop=should_stop
+        ).render()
         log(f"کش: {cache.hits} hit / {cache.misses} miss")
 
     elif phase == 4:

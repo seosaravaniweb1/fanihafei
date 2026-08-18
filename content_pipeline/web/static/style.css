@@ -223,3 +223,12 @@ textarea#sitesText {
   white-space: pre;
   overflow: auto;
 }
+
+.scrollbox { max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.scrollbox table.grid { margin: 0; }
+.scrollbox thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+
+.dl { display: flex; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.dl:last-child { border-bottom: 0; }
+.dl b { min-width: 11rem; }
+.dl .muted { flex: 1; }

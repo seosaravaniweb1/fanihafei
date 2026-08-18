@@ -36,22 +36,98 @@ class CrawlStats:
     relevant: int = 0
     borderline: int = 0
     failures: int = 0
+    not_product: int = 0
+    stopped: bool = False
     per_site: dict[str, int] = field(default_factory=dict)
 
     def render(self) -> str:
-        return (
-            f"فاز ۱ — صفحات: {self.pages_fetched}، عنوان: {self.titles_found}، "
-            f"ذخیره‌شده: {self.inserted}، مرتبط: {self.relevant}، "
-            f"مرزی: {self.borderline}، خطا: {self.failures}"
-        )
+        parts = [
+            f"فاز ۱ — صفحات: {self.pages_fetched}، صفحه‌ی محصول: {self.titles_found}، "
+            f"غیرمحصول (رد شد): {self.not_product}، ذخیره‌شده: {self.inserted}، "
+            f"مرتبط: {self.relevant}، مرزی: {self.borderline}، خطا: {self.failures}"
+        ]
+        if self.stopped:
+            parts.append("  ⏹ به درخواست شما متوقف شد؛ آنچه تا اینجا پیدا شد ذخیره است.")
+        return "\n".join(parts)
 
 
-def collect_urls(site: SiteConfig, fetcher: Fetcher, max_urls: int) -> list[str]:
-    """URLهای کاندیدای یک دامنه: اول sitemap، در نبودش کراول محدود."""
-    urls = _from_sitemaps(site, fetcher, max_urls)
-    if not urls:
-        urls = _from_crawl(site, fetcher, max_urls)
+def is_listing_seed(url: str) -> bool:
+    """آدرسی که کاربر داده، صفحه‌ی نتایج است یا ریشه‌ی سایت؟
+
+    اگر مسیر یا کوئری داشته باشد (``/category/roman/`` یا ``/?s=رمان``) یعنی
+    خودِ کاربر رفته و فهرست محصولات را ساخته؛ همان فهرست را دنبال می‌کنیم و
+    سراغ sitemap کل سایت نمی‌رویم.
+    """
+    parts = urllib.parse.urlsplit(url)
+    return bool(parts.query) or parts.path.strip("/") != ""
+
+
+def collect_urls(
+    site: SiteConfig, fetcher: Fetcher, max_urls: int, log=print
+) -> list[str]:
+    """URLهای کاندیدای یک منبع.
+
+    * آدرس فهرست/جستجو → لینک‌های همان فهرست + صفحه‌های بعدی‌اش
+    * ریشه‌ی دامنه → sitemap، و در نبودش کراول محدود
+    """
+    if is_listing_seed(site.base_url):
+        log(f"  [{site.domain}] صفحه‌ی فهرست — لینک‌های همین فهرست دنبال می‌شوند")
+        urls = _from_listing(site, fetcher, max_urls, log)
+    else:
+        urls = _from_sitemaps(site, fetcher, max_urls)
+        if not urls:
+            urls = _from_crawl(site, fetcher, max_urls)
     return _filter_urls(urls, site)[:max_urls]
+
+
+#: لینک «صفحه‌ی بعد» در فروشگاه‌های فارسی
+_NEXT_PAGE = re.compile(
+    r'<a[^>]+rel=["\']next["\'][^>]*href=["\']([^"\']+)'
+    r'|<a[^>]+href=["\']([^"\']+)["\'][^>]*rel=["\']next'
+    r'|<a[^>]+class=["\'][^"\']*\bnext\b[^"\']*["\'][^>]*href=["\']([^"\']+)',
+    re.I,
+)
+
+
+def _next_page(page_html: str, base_url: str) -> str:
+    match = _NEXT_PAGE.search(page_html)
+    if match:
+        href = next((g for g in match.groups() if g), "")
+        if href:
+            return urllib.parse.urljoin(base_url, href)
+    return ""
+
+
+def _from_listing(site: SiteConfig, fetcher: Fetcher, max_urls: int, log=print) -> list[str]:
+    """لینک‌های یک صفحه‌ی فهرست/جستجو و صفحه‌های بعدی‌اش."""
+    collected: list[str] = []
+    seen: set[str] = set()
+    # صفحه‌های فهرست جدا از لینک‌های جمع‌شده شمرده می‌شوند؛ وگرنه لینک «بعدی»
+    # که خودش داخل همان صفحه است، تکراری شمرده می‌شود و صفحه‌بندی نمی‌چرخد.
+    visited: set[str] = set()
+    url = site.base_url
+    pages = 0
+    max_pages = max(1, site.max_depth * 10)
+    while url and pages < max_pages and len(collected) < max_urls * 4:
+        if url in visited:
+            break
+        visited.add(url)
+        result = fetcher.fetch(url, force_browser=site.js)
+        pages += 1
+        if not result.ok:
+            log(f"  [{site.domain}] صفحه‌ی فهرست باز نشد: {url}")
+            break
+        for link in extract.extract_links(result.html, result.final_url or url):
+            if link in seen or not extract.same_domain(link, site.domain):
+                continue
+            seen.add(link)
+            collected.append(link)
+        following = _next_page(result.html, result.final_url or url)
+        url = following if following and following not in visited else ""
+    # خودِ صفحه‌های فهرست کاندیدای محصول نیستند؛ دوباره دانلودشان نمی‌کنیم
+    collected = [url for url in collected if url not in visited]
+    log(f"  [{site.domain}] {pages} صفحه‌ی فهرست، {len(collected)} لینک")
+    return collected
 
 
 def _from_sitemaps(site: SiteConfig, fetcher: Fetcher, max_urls: int) -> list[str]:
@@ -144,8 +220,10 @@ def run(
     matcher: TopicMatcher,
     limit: int | None = None,
     verbose: bool = True,
+    should_stop=None,
 ) -> CrawlStats:
     norm_config = normalizer.config_from_mapping(config.normalizer)
+    stop = should_stop or (lambda: False)
     stats = CrawlStats()
     sites = sites_for_run(conn, run_id, config)
     if not sites:
@@ -154,21 +232,58 @@ def run(
             " را وارد کنید یا کلید sites را در config پر کنید."
         )
 
+    # سقف محصول برای هر منبع — «فعلاً ۱۰ تا بگیر تا ببینم درست کار می‌کند»
+    options = db.run_options(conn, run_id)
+    per_site_cap = (
+        limit
+        or int(options.get("max_products_per_site") or 0)
+        or int(config.get("crawl.max_products_per_site", 0))
+        or None
+    )
+    require_product = bool(
+        options.get("require_product_signals", config.get("crawl.require_product_signals", True))
+    )
+    force_js = bool(options.get("js"))
+    if verbose and per_site_cap:
+        print(f"  سقف این اجرا: {per_site_cap} محصول از هر منبع")
+    if verbose and not require_product:
+        print("  فیلتر «فقط صفحه‌ی محصول» خاموش است — برگه و پست هم وارد می‌شوند")
+
     for site in sites:
-        max_urls = min(site.max_pages, limit or site.max_pages)
+        if stop():
+            stats.stopped = True
+            break
+        max_urls = min(site.max_pages, per_site_cap * 6 if per_site_cap else site.max_pages)
         if verbose:
             print(f"  [{site.domain}] جمع‌آوری URL...")
-        urls = collect_urls(site, fetcher, max_urls)
+        if force_js:
+            site.js = True
+        urls = collect_urls(site, fetcher, max_urls, print if verbose else (lambda *_: None))
         if verbose:
             print(f"  [{site.domain}] {len(urls)} آدرس کاندیدا")
 
         found_here = 0
         for url in urls:
-            result = fetcher.fetch(url, force_browser=site.js)
+            if stop():
+                stats.stopped = True
+                break
+            if per_site_cap and found_here >= per_site_cap:
+                if verbose:
+                    print(f"  [{site.domain}] به سقف {per_site_cap} محصول رسید")
+                break
+            result = fetcher.fetch(url, force_browser=site.js or force_js)
             stats.pages_fetched += 1
             if not result.ok:
                 stats.failures += 1
                 continue
+
+            # فقط صفحه‌ی محصول — نه «درباره ما»، نه پست بلاگ، نه صفحه‌ی دسته
+            if require_product:
+                signals = extract.is_product_page(result.html, result.final_url or url)
+                if not signals.is_product:
+                    stats.not_product += 1
+                    continue
+
             title = extract.extract_title(
                 result.html, site.title_selector, site.domain, site.site_name
             )
@@ -186,6 +301,10 @@ def run(
                     normalized_title=normalizer.normalize(title, norm_config),
                 )
         stats.per_site[site.domain] = found_here
+        if verbose:
+            print(f"  [{site.domain}] {found_here} محصول ذخیره شد")
+        if stats.stopped:
+            break
 
     stats.inserted = conn.execute(
         "SELECT COUNT(*) AS c FROM raw_products WHERE run_id=?", (run_id,)

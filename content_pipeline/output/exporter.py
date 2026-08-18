@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -111,6 +112,21 @@ def selected_sheets(config: Config) -> list[str]:
         raw = [part.strip() for part in raw.split(",")]
     chosen = [key for key in SHEET_KEYS if key in {str(item).strip() for item in raw}]
     return chosen or DEFAULT_SHEETS
+
+
+def build_one(conn: sqlite3.Connection, run_id: str, config: Config, key: str) -> Sheet:
+    """فقط یک شیت — برای دانلود جداگانه‌ی «با ساجست» یا «بدون ساجست»."""
+    if key not in SHEET_KEYS:
+        raise ValueError(f"نام خروجی نامعتبر: {key}")
+    saved = config.get("output.sheets")
+    config.raw.setdefault("output", {})["sheets"] = [key]
+    try:
+        return build_sheets(conn, run_id, config)[0]
+    finally:
+        if saved is None:
+            config.raw["output"].pop("sheets", None)
+        else:
+            config.raw["output"]["sheets"] = saved
 
 
 def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[Sheet]:
@@ -251,6 +267,40 @@ def write_xlsx(path: str | Path, sheets: Sequence[Sheet]) -> str:
             ].width = max(18, min(60, len(str(column)) + 12))
     workbook.save(path)
     return str(path)
+
+
+def sheet_to_csv(sheet: Sheet) -> bytes:
+    """یک شیت → بایت‌های CSV با BOM، تا اکسل فارسی را درست باز کند."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(sheet.header)
+    for row in sheet.rows:
+        writer.writerow([_cell(value) for value in row])
+    return buffer.getvalue().encode("utf-8-sig")
+
+
+def sheets_to_xlsx(sheets: Sequence[Sheet]) -> bytes | None:
+    """یک یا چند شیت → بایت‌های xlsx. بدون ``openpyxl`` خروجی ``None`` است."""
+    try:
+        from openpyxl import Workbook  # type: ignore
+    except ImportError:
+        return None
+    buffer = io.BytesIO()
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    for sheet in sheets:
+        worksheet = workbook.create_sheet(title=sheet.title[:31])
+        worksheet.sheet_view.rightToLeft = True
+        worksheet.append(sheet.header)
+        worksheet.freeze_panes = "A2"
+        for row in sheet.rows:
+            worksheet.append([_cell(value) for value in row])
+        for index, column in enumerate(sheet.header, start=1):
+            worksheet.column_dimensions[
+                worksheet.cell(row=1, column=index).column_letter
+            ].width = max(18, min(60, len(str(column)) + 12))
+    workbook.save(buffer)
+    return buffer.getvalue()
 
 
 def _write_csv_bundle(path: Path, sheets: Sequence[Sheet]) -> str:

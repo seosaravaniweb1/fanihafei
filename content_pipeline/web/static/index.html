@@ -51,10 +51,16 @@
     <div class="panel">
       <h2>۲. سایت‌های رقیب</h2>
       <p class="muted">
-        هر خط یک آدرس. از اکسل یا مرورگر کپی کنید؛ آدرس بدون <code>https://</code>
-        هم قبول است. تکراری‌ها خودشان حذف می‌شوند.
-        <span id="siteLimit"></span>
+        هر خط یک آدرس. تکراری‌ها خودشان حذف می‌شوند. <span id="siteLimit"></span>
       </p>
+      <div class="warn">
+        <b>دو شکل آدرس، دو رفتار متفاوت:</b><br>
+        <code dir="ltr">https://shop.ir</code> — کل سایت از روی sitemap گشته می‌شود.<br>
+        <code dir="ltr">https://shop.ir/?s=رمان</code> یا <code dir="ltr">https://shop.ir/category/roman/</code>
+        — فقط لینک‌های همان فهرست و صفحه‌های بعدی‌اش.
+        <b>وقتی سایت دسته‌بندی درست‌وحسابی ندارد، خودتان داخلش سرچ کنید و آدرس
+        نتایج را اینجا بگذارید.</b>
+      </div>
       <textarea id="sitesText" dir="ltr" spellcheck="false"
                 placeholder="https://example1.ir&#10;https://example2.ir&#10;example3.com"></textarea>
       <div class="row">
@@ -65,7 +71,26 @@
     </div>
 
     <div class="panel">
-      <h2>۳. کدام خروجی را می‌خواهید؟</h2>
+      <h2>۳. تنظیمات این اجرا</h2>
+      <div class="row wrap">
+        <label>حداکثر محصول از هر منبع:
+          <input id="maxProducts" type="number" min="0" step="1" value="0" style="width:6rem">
+        </label>
+        <span class="muted">۰ یعنی بدون سقف. برای امتحان اول، ۱۰ بگذارید.</span>
+      </div>
+      <div class="row wrap">
+        <label><input id="requireProduct" type="checkbox" checked>
+          فقط صفحه‌هایی که واقعاً محصول‌اند (قیمت / افزودن به سبد)</label>
+      </div>
+      <div class="row wrap">
+        <label><input id="forceJs" type="checkbox">
+          این سایت‌ها با جاوااسکریپت رندر می‌شوند (React / Vue / Angular)</label>
+        <span class="muted">نیازمند Playwright</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>۴. کدام خروجی را می‌خواهید؟</h2>
       <p class="muted">
         در شیت «همه محصولات» ستونی هست که می‌گوید هر محصول ساجست دارد یا نه —
         پس حتی اگر همه را یکجا بخواهید، تفکیک از دست نمی‌رود.
@@ -92,8 +117,13 @@
       <table class="kv" id="runInfo"></table>
     </div>
     <div class="panel">
-      <h2>خروجی</h2>
-      <div id="outputInfo" class="muted">…</div>
+      <h2>دانلود خروجی</h2>
+      <p class="muted">
+        هر فهرست را جداگانه یا همه را در یک فایل بگیرید. خروجی همین لحظه از
+        دیتابیس ساخته می‌شود، پس ادغام‌های دستی شما هم در آن هست.
+      </p>
+      <div id="downloadList"></div>
+      <div id="outputInfo" class="muted"></div>
     </div>
   </section>
 
@@ -141,6 +171,7 @@
         <button id="prodNext" class="ghost">بعدی</button>
       </div>
       <div id="mergeBar" class="mergebar" hidden></div>
+      <div class="scrollbox">
       <table class="grid" id="prodTable">
         <thead>
           <tr>
@@ -155,6 +186,13 @@
         </thead>
         <tbody></tbody>
       </table>
+      </div>
+      <div class="row wrap" id="pager"></div>
+      <p class="muted">
+        ستون «ساجست»: <b>دارد</b> یعنی گوگل برایش پیشنهاد داشت،
+        <b>ندارد</b> یعنی پرسیدیم و پیشنهادی نبود،
+        <b>در صف</b> یعنی هنوز از گوگل پرسیده نشده — فاز ۳ را اجرا کنید.
+      </p>
     </div>
     <div class="panel" id="detailPanel" hidden>
       <h2 id="detailTitle"></h2>
@@ -173,7 +211,11 @@
       <div id="reviewList"></div>
     </div>
     <div class="panel">
-      <h2>عنوان‌های مرزی (شیت C)</h2>
+      <h2>عنوان‌های مرزی</h2>
+      <p class="muted">
+        عنوان‌هایی که امتیاز موضوعی‌شان بین آستانه‌ی رد و پذیرش بود — ابزار
+        مطمئن نبود جزو دسته‌ی شما هستند یا نه، پس نه ردشان کرد نه وارد محصولات کرد.
+      </p>
       <div id="borderlineList"></div>
     </div>
   </section>
@@ -200,6 +242,11 @@
   <section id="tab-tools" class="tab">
     <div class="panel">
       <h2>آزمایش نرمال‌سازی (فاز ۰)</h2>
+      <p class="muted">
+        اینجا می‌بینید یک عنوان قبل از مقایسه چطور تمیز می‌شود. «تطبیق» همان چیزی
+        است که برای تشخیص تکراری‌ها استفاده می‌شود و «توکن‌ها» کلمات معنادار
+        باقی‌مانده‌اند. اگر ادغامی اشتباه شد، اول اینجا را نگاه کنید.
+      </p>
       <div class="row">
         <input id="normInput" placeholder="مثلاً: دانلود جزوه ریاضی ۱۴۰۴ PDF">
         <button id="normBtn" class="primary">تحلیل</button>

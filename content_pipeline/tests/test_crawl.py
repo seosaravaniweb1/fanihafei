@@ -23,8 +23,13 @@ SITEMAP_INDEX = """<?xml version="1.0" encoding="UTF-8"?>
 </sitemapindex>"""
 
 
-def page(title: str) -> str:
-    return f"<html><head><title>سایت</title></head><body><h1>{title}</h1></body></html>"
+def page(title: str, product: bool = True) -> str:
+    """صفحه‌ی نمونه. پیش‌فرض یک صفحه‌ی محصول واقعی است (قیمت + سبد خرید)،
+    چون فاز ۱ عمداً هر چیزی جز صفحه‌ی محصول را رد می‌کند."""
+    body = f"<h1>{title}</h1>"
+    if product:
+        body += '<span class="price">۸۵,۰۰۰ تومان</span><button class="add-to-cart">افزودن به سبد خرید</button>'
+    return f"<html><head><title>سایت</title></head><body>{body}</body></html>"
 
 
 # ---------------------------------------------------------------------------
@@ -271,3 +276,174 @@ def test_plain_url_site_entry_is_supported():
     sites = config.sites
     assert [s.domain for s in sites] == ["example1.ir", "example2.ir"]
     assert sites[1].base_url == "https://example2.ir"
+
+
+# ---------------------------------------------------------------------------
+# فقط صفحه‌ی محصول
+# ---------------------------------------------------------------------------
+
+WOO = ('<html><body class="single-product"><h1>رمان شب سرد</h1>'
+       '<span class="price">۸۵,۰۰۰ تومان</span>'
+       '<button class="add-to-cart">افزودن به سبد خرید</button></body></html>')
+JSONLD = '<script type="application/ld+json">{"@type":"Product","name":"رمان"}</script><h1>رمان</h1>'
+ABOUT = "<html><body><h1>درباره ما</h1><p>ما بهترین قیمت را داریم</p></body></html>"
+BLOG = ('<script type="application/ld+json">{"@type":"BlogPosting"}</script>'
+        "<h1>راهنمای خرید رمان</h1><p>قیمت رمان از ۵۰۰۰۰ تومان</p>")
+
+
+def test_woocommerce_product_is_recognised():
+    assert extract.is_product_page(WOO, "https://shop.ir/product/1").is_product
+
+
+def test_structured_data_alone_is_enough():
+    signals = extract.is_product_page(JSONLD, "https://shop.ir/x/1")
+    assert signals.is_product and "ساخت‌یافته" in signals.why
+
+
+def test_about_page_is_not_a_product():
+    signals = extract.is_product_page(ABOUT, "https://shop.ir/about-us")
+    assert not signals.is_product
+
+
+def test_blog_post_is_not_a_product_even_with_a_price_in_the_text():
+    """پست بلاگ درباره‌ی قیمت‌ها، محصول نیست."""
+    assert not extract.is_product_page(BLOG, "https://shop.ir/blog/guide").is_product
+
+
+def test_price_plus_cart_is_enough_without_structured_data():
+    html = "<h1>رمان</h1><p>قیمت: ۵۰۰۰۰ تومان</p><a>افزودن به سبد خرید</a>"
+    assert extract.is_product_page(html, "https://shop.ir/p/9").is_product
+
+
+def test_phase1_skips_pages_that_are_not_products(env):
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    fetcher = FakeFetcher(
+        {
+            "https://shop.ir/sitemap.xml": (
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                "<url><loc>https://shop.ir/product/1</loc></url>"
+                "<url><loc>https://shop.ir/about-us</loc></url>"
+                "<url><loc>https://shop.ir/blog/guide</loc></url></urlset>"
+            ),
+            "https://shop.ir/product/1": WOO,
+            "https://shop.ir/about-us": ABOUT,
+            "https://shop.ir/blog/guide": BLOG,
+        }
+    )
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    stats = p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=False)
+
+    assert stats.titles_found == 1
+    assert stats.not_product == 2
+    titles = [r["raw_title"] for r in conn.execute("SELECT raw_title FROM raw_products")]
+    assert titles == ["رمان شب سرد"]
+
+
+def test_the_filter_can_be_turned_off(env):
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    config.raw["crawl"]["require_product_signals"] = False
+    fetcher = FakeFetcher(
+        {
+            "https://shop.ir/sitemap.xml": (
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                "<url><loc>https://shop.ir/about-us</loc></url></urlset>"
+            ),
+            "https://shop.ir/about-us": ABOUT,
+        }
+    )
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    stats = p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=False)
+    assert stats.titles_found == 1
+
+
+# ---------------------------------------------------------------------------
+# آدرس صفحه‌ی نتایج به‌جای کل سایت
+# ---------------------------------------------------------------------------
+
+
+def test_a_search_url_is_treated_as_a_listing():
+    assert not p1_crawl.is_listing_seed("https://shop.ir")
+    assert not p1_crawl.is_listing_seed("https://shop.ir/")
+    assert p1_crawl.is_listing_seed("https://shop.ir/?s=رمان")
+    assert p1_crawl.is_listing_seed("https://shop.ir/category/roman/")
+
+
+def test_listing_seed_follows_pagination_and_ignores_the_sitemap(env):
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir/?s=رمان", "domain": "shop.ir"}]
+    fetcher = FakeFetcher(
+        {
+            "https://shop.ir/?s=رمان": (
+                '<a href="/product/1">۱</a><a href="/about-us">درباره</a>'
+                '<a class="next" href="/?s=رمان&page=2">بعدی</a>'
+            ),
+            "https://shop.ir/?s=رمان&page=2": '<a href="/product/2">۲</a>',
+            "https://shop.ir/product/1": WOO,
+            "https://shop.ir/product/2": WOO.replace("شب سرد", "شب گرم"),
+            "https://shop.ir/about-us": ABOUT,
+        }
+    )
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    stats = p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=False)
+
+    assert "https://shop.ir/sitemap.xml" not in fetcher.requested
+    assert stats.titles_found == 2       # هر دو صفحه‌ی فهرست دیده شدند
+    assert stats.not_product == 1        # «درباره ما» رد شد
+
+
+# ---------------------------------------------------------------------------
+# سقف و لغو
+# ---------------------------------------------------------------------------
+
+
+def _many_products(count):
+    pages = {
+        "https://shop.ir/sitemap.xml": (
+            '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            + "".join(f"<url><loc>https://shop.ir/product/{i}</loc></url>" for i in range(count))
+            + "</urlset>"
+        )
+    }
+    for index in range(count):
+        pages[f"https://shop.ir/product/{index}"] = WOO.replace("شب سرد", f"شماره {index}")
+    return pages
+
+
+def test_per_site_cap_stops_after_the_requested_count(env):
+    """«فعلاً ده تا بگیر تا ببینم درست کار می‌کند»."""
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    db.set_run_plan(conn, run_id, options={"max_products_per_site": 3})
+    fetcher = FakeFetcher(_many_products(20))
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    stats = p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=False)
+
+    assert stats.titles_found == 3
+    assert stats.pages_fetched < 20  # بقیه اصلاً دانلود نشدند
+
+
+def test_cancel_stops_the_crawl_in_the_middle(env):
+    """لغو باید وسط فاز اثر کند، نه بعد از تمام شدنش."""
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    fetcher = FakeFetcher(_many_products(30))
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+    seen = {"count": 0}
+
+    def should_stop():
+        seen["count"] += 1
+        return seen["count"] > 5
+
+    stats = p1_crawl.run(
+        conn, run_id, config, fetcher, matcher, verbose=False, should_stop=should_stop
+    )
+
+    assert stats.stopped
+    assert stats.titles_found < 30
+    assert "متوقف" in stats.render()

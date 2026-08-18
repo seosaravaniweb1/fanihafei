@@ -91,6 +91,9 @@ async function loadSetup() {
     if (state.runId) {
       const plan = await api("/api/plan", { params: { run_id: state.runId } });
       state.categories = new Set(plan.categories);
+      $("#maxProducts").value = plan.options.max_products_per_site ?? 0;
+      $("#requireProduct").checked = plan.options.require_product_signals !== false;
+      $("#forceJs").checked = Boolean(plan.options.js);
       $("#sitesText").value = (plan.sites.length ? plan.sites : plan.config_sites).join("\n");
       $("#planSource").textContent = plan.sites.length
         ? "سایت‌های همین اجرا"
@@ -160,10 +163,21 @@ function renderSummary() {
   parts.push(state.categories.size ? `دسته‌ها: ${[...state.categories].join("، ")}` : "هیچ دسته‌ای انتخاب نشده");
   parts.push(`${siteLines().length} سایت`);
   parts.push(`خروجی: ${state.sheets.size} شیت`);
+  const cap = Number($("#maxProducts").value) || 0;
+  parts.push(cap ? `سقف ${cap} محصول از هر منبع` : "بدون سقف");
   $("#setupSummary").textContent = parts.join("  |  ");
 }
 
+function planOptions() {
+  return {
+    max_products_per_site: Math.max(0, Number($("#maxProducts").value) || 0),
+    require_product_signals: $("#requireProduct").checked,
+    js: $("#forceJs").checked,
+  };
+}
+
 $("#sitesText").addEventListener("input", updateSiteCount);
+$("#maxProducts").addEventListener("input", renderSummary);
 
 $("#addCategory").addEventListener("click", () => {
   const value = $("#customCategory").value.trim();
@@ -182,7 +196,11 @@ $("#createRunBtn").addEventListener("click", async () => {
   try {
     const created = await api("/api/runs", {
       method: "POST",
-      body: { categories: [...state.categories], sites: $("#sitesText").value },
+      body: {
+        categories: [...state.categories],
+        sites: $("#sitesText").value,
+        options: planOptions(),
+      },
     });
     state.runId = created.run_id;
     sessionStorage.setItem("runId", state.runId);
@@ -201,6 +219,7 @@ $("#savePlanBtn").addEventListener("click", async () => {
         run_id: state.runId,
         categories: [...state.categories],
         sites: $("#sitesText").value,
+        options: planOptions(),
       },
     });
     $("#sitesText").value = plan.sites.join("\n");
@@ -284,24 +303,36 @@ async function refreshState() {
 }
 
 async function loadOutputInfo() {
-  const box = $("#outputInfo");
-  if (!state.runId) { box.textContent = "—"; return; }
+  const box = $("#downloadList");
+  const note = $("#outputInfo");
+  if (!state.runId) { box.replaceChildren(); note.textContent = "—"; return; }
   try {
     const info = await api("/api/output", { params: { run_id: state.runId } });
-    if (info.files.length) {
-      box.replaceChildren(...info.files.map((file) =>
-        el("div", {}, [
-          el("a", {
-            href: `/download?run_id=${encodeURIComponent(state.runId)}`
-              + `&name=${encodeURIComponent(file.name)}&t=${encodeURIComponent(token)}`,
-            textContent: `دانلود ${file.name} (${Math.max(1, Math.round(file.size / 1024))} کیلوبایت)`,
-          }),
-        ])));
-    } else {
-      box.textContent = "فایل خروجی هنوز ساخته نشده است — فاز ۴ را اجرا کنید.";
+    const link = (key, format) =>
+      `/download?run_id=${encodeURIComponent(state.runId)}&key=${key}`
+      + `&format=${format}&t=${encodeURIComponent(token)}`;
+
+    const rows = info.downloads.map((item) => el("div", { className: "dl" }, [
+      el("b", { textContent: item.title }),
+      el("span", { className: "muted", textContent: `${item.rows} ردیف — ${item.hint}` }),
+      ...(info.xlsx ? [el("a", { href: link(item.key, "xlsx"), textContent: "اکسل" })] : []),
+      el("a", { href: link(item.key, "csv"), textContent: "CSV" }),
+    ]));
+
+    if (info.xlsx) {
+      rows.push(el("div", { className: "dl" }, [
+        el("b", { textContent: "همه در یک فایل" }),
+        el("span", { className: "muted", textContent: "هر فهرست یک شیت جدا" }),
+        el("a", { href: link("workbook", "xlsx"), textContent: "اکسل" }),
+      ]));
     }
+    box.replaceChildren(...rows);
+    note.textContent = info.xlsx
+      ? ""
+      : "openpyxl نصب نیست، پس فقط CSV در دسترس است: pip install openpyxl";
   } catch (error) {
-    box.textContent = error.message;
+    box.replaceChildren();
+    note.textContent = error.message;
   }
 }
 
@@ -391,6 +422,7 @@ const SUGGEST_TAG = {
   has_suggest: ["دارد", "ok"],
   no_suggest: ["ندارد", "no"],
 };
+const PENDING_HINT = "هنوز از گوگل پرسیده نشده — فاز ۳ را اجرا کنید";
 
 async function loadProducts() {
   if (!state.runId) return;
@@ -406,6 +438,7 @@ async function loadProducts() {
     $("#prodCount").textContent = `${from}–${data.offset + data.items.length} از ${data.total}`;
     $("#prodPrev").disabled = data.offset === 0;
     $("#prodNext").disabled = data.offset + data.limit >= data.total;
+    renderPager(data);
 
     $("#prodTable tbody").replaceChildren(...data.items.map(productRow));
     if (!data.items.length) {
@@ -415,8 +448,44 @@ async function loadProducts() {
   } catch (error) { toast(error.message, true); }
 }
 
+function renderPager(data) {
+  const pages = Math.ceil(data.total / data.limit) || 1;
+  const current = Math.floor(data.offset / data.limit);
+  const pager = $("#pager");
+  if (pages < 2) { pager.replaceChildren(); return; }
+
+  const buttons = [];
+  const add = (index) => {
+    const button = el("button", {
+      className: index === current ? "primary" : "ghost",
+      textContent: String(index + 1),
+    });
+    button.addEventListener("click", () => {
+      state.products.offset = index * data.limit;
+      loadProducts();
+      const box = $("#prodTable").closest(".scrollbox");
+      if (box) box.scrollTop = 0;
+    });
+    buttons.push(button);
+  };
+  // اول، آخر و چند صفحه دور صفحه‌ی جاری — با ۳۰۰ منبع فهرست صفحه‌ها طولانی می‌شود
+  const shown = new Set([0, pages - 1, current, current - 1, current + 1, current - 2, current + 2]);
+  let previous = -1;
+  for (let index = 0; index < pages; index += 1) {
+    if (!shown.has(index)) continue;
+    if (index - previous > 1) buttons.push(el("span", { className: "muted", textContent: "…" }));
+    add(index);
+    previous = index;
+  }
+  pager.replaceChildren(
+    el("span", { className: "muted", textContent: `صفحه ${current + 1} از ${pages}` }),
+    ...buttons,
+  );
+}
+
 function productRow(product) {
   const [tagText, tagClass] = SUGGEST_TAG[product.suggest_status] || ["در صف", "no"];
+  const tagTitle = product.suggest_status ? "" : PENDING_HINT;
   const radio = el("input", {
     type: "radio", name: "mergeTarget", value: product.id,
     checked: state.mergeTarget?.id === product.id,
@@ -445,7 +514,9 @@ function productRow(product) {
     el("td", {}, [title, product.needs_review ? el("span", { className: "tag flag", textContent: "بازبینی" }) : ""]),
     el("td", { textContent: String(product.member_count) }),
     el("td", { textContent: String(product.keyword_count) }),
-    el("td", {}, [el("span", { className: `tag ${tagClass}`, textContent: tagText })]),
+    el("td", {}, [
+      el("span", { className: `tag ${tagClass}`, textContent: tagText, title: tagTitle }),
+    ]),
     el("td", { className: "muted", textContent: product.domains.join("، ") }),
     actions,
   ]);

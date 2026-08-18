@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 RUNNING = "running"
 COMPLETED = "completed"
@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS runs (
     status        TEXT,
     current_phase INTEGER,
     categories    TEXT,   -- JSON: دسته‌های انتخاب‌شده‌ی این اجرا
-    sites         TEXT    -- JSON: سایت‌های همین اجرا (خالی = از config)
+    sites         TEXT,   -- JSON: سایت‌های همین اجرا (خالی = از config)
+    options       TEXT    -- JSON: تنظیمات همین اجرا (سقف محصول، رندر جاوااسکریپت)
 );
 
 CREATE TABLE IF NOT EXISTS raw_products (
@@ -103,7 +104,7 @@ def connect(path: str | Path) -> sqlite3.Connection:
 
 
 NEW_COLUMNS: dict[str, dict[str, str]] = {
-    "runs": {"categories": "TEXT", "sites": "TEXT"},
+    "runs": {"categories": "TEXT", "sites": "TEXT", "options": "TEXT"},
     "raw_products": {"category": "TEXT"},
 }
 
@@ -155,13 +156,15 @@ def create_run(
     run_id: str | None = None,
     categories: Sequence[str] | None = None,
     sites: Sequence[str] | None = None,
+    options: dict | None = None,
 ) -> str:
     run_id = run_id or new_run_id()
     with transaction(conn):
         conn.execute(
             """INSERT OR IGNORE INTO runs
-               (run_id, target_topic, created_at, status, current_phase, categories, sites)
-               VALUES (?,?,?,?,?,?,?)""",
+               (run_id, target_topic, created_at, status, current_phase,
+                categories, sites, options)
+               VALUES (?,?,?,?,?,?,?,?)""",
             (
                 run_id,
                 topic,
@@ -170,6 +173,7 @@ def create_run(
                 0,
                 json.dumps(list(categories or []), ensure_ascii=False),
                 json.dumps(list(sites or []), ensure_ascii=False),
+                json.dumps(options or {}, ensure_ascii=False),
             ),
         )
     return run_id
@@ -180,6 +184,18 @@ def run_categories(conn: sqlite3.Connection, run_id: str) -> list[str]:
     if row is None:
         return []
     return _json_list(row["categories"])
+
+
+def run_options(conn: sqlite3.Connection, run_id: str) -> dict:
+    """تنظیمات همین اجرا: سقف محصول در هر سایت، رندر جاوااسکریپت و ...."""
+    row = get_run(conn, run_id)
+    if row is None or not row["options"]:
+        return {}
+    try:
+        data = json.loads(row["options"])
+    except (TypeError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def run_sites(conn: sqlite3.Connection, run_id: str) -> list[str]:
@@ -196,9 +212,13 @@ def set_run_plan(
     categories: Sequence[str] | None = None,
     sites: Sequence[str] | None = None,
     topic: str | None = None,
+    options: dict | None = None,
 ) -> None:
-    """ویرایش نقشه‌ی یک اجرا: دسته‌ها، سایت‌ها و موضوع."""
+    """ویرایش نقشه‌ی یک اجرا: دسته‌ها، سایت‌ها، موضوع و تنظیمات."""
     sets, values = [], []
+    if options is not None:
+        sets.append("options=?")
+        values.append(json.dumps(options, ensure_ascii=False))
     if categories is not None:
         sets.append("categories=?")
         values.append(json.dumps(list(categories), ensure_ascii=False))

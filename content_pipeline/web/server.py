@@ -212,6 +212,21 @@ def api_presets(state: PanelState, query: dict) -> dict:
     return {"presets": presets.as_dicts(), "max_sites": MAX_SITES}
 
 
+def clean_options(raw: object) -> dict:
+    """تنظیمات اجرا از پنل — فقط کلیدهای شناخته‌شده و در بازه‌ی معقول."""
+    data = raw if isinstance(raw, dict) else {}
+    cap = data.get("max_products_per_site")
+    try:
+        cap = max(0, min(100000, int(cap or 0)))
+    except (TypeError, ValueError):
+        cap = 0
+    return {
+        "max_products_per_site": cap,
+        "require_product_signals": bool(data.get("require_product_signals", True)),
+        "js": bool(data.get("js")),
+    }
+
+
 def api_create_run(state: PanelState, body: dict) -> dict:
     categories = [str(c) for c in (body.get("categories") or []) if str(c).strip()]
     sites = clean_sites(body.get("sites"))
@@ -221,12 +236,16 @@ def api_create_run(state: PanelState, body: dict) -> dict:
     topic = (body.get("topic") or "، ".join(labels) or state.config.target_topic or "").strip()
     if not topic:
         raise ApiError("نوع محصول انتخاب نشده است. حداقل یک دسته را تیک بزنید.")
-    run_id = db.create_run(state.conn(), topic, categories=labels, sites=sites)
+    options = clean_options(body.get("options"))
+    run_id = db.create_run(
+        state.conn(), topic, categories=labels, sites=sites, options=options
+    )
     return {
         "run_id": run_id,
         "target_topic": topic,
         "categories": labels,
         "sites": len(sites),
+        "options": options,
     }
 
 
@@ -240,6 +259,7 @@ def api_plan(state: PanelState, query: dict) -> dict:
         "run_id": run_id,
         "target_topic": row["target_topic"],
         "categories": db.run_categories(conn, run_id),
+        "options": db.run_options(conn, run_id) or clean_options({}),
         "sites": sites,
         "from_config": not sites,
         "config_sites": [site.base_url for site in state.config.sites] if not sites else [],
@@ -261,7 +281,10 @@ def api_save_plan(state: PanelState, body: dict) -> dict:
     topic = body.get("topic")
     if topic is None and categories:
         topic = "، ".join(categories)
-    db.set_run_plan(conn, run_id, categories=categories, sites=sites, topic=topic)
+    options = clean_options(body.get("options")) if "options" in body else None
+    db.set_run_plan(
+        conn, run_id, categories=categories, sites=sites, topic=topic, options=options
+    )
     return api_plan(state, {"run_id": run_id})
 
 
@@ -463,7 +486,7 @@ def api_normalize(state: PanelState, query: dict) -> dict:
 
 
 def output_files(state: PanelState, run_id: str) -> list[Path]:
-    """فایل‌های خروجی این اجرا. بدون ``openpyxl`` خروجی چند CSV است، نه یک xlsx."""
+    """فایل‌هایی که فاز ۴ روی دیسک نوشته است (اگر نوشته باشد)."""
     template = str(
         state.config.get("output.xlsx_path", "content_pipeline/data/output-{run_id}.xlsx")
     )
@@ -473,7 +496,56 @@ def output_files(state: PanelState, run_id: str) -> list[Path]:
     return sorted(path.parent.glob(f"{path.stem}__*.csv"))
 
 
+def api_output(state: PanelState, query: dict) -> dict:
+    """چه چیزهایی قابل دانلود است.
+
+    خروجی همین‌جا از دیتابیس ساخته می‌شود، نه از فایل قبلی؛ پس ادغام‌های دستی
+    که بعد از فاز ۴ انجام داده‌اید هم در دانلود دیده می‌شوند.
+    """
+    conn = state.conn()
+    run_id = state.resolve_run(query.get("run_id"))
+    counts = pipeline.counters(conn, run_id)
+    hints = {
+        "ready": "محصولاتی که در گوگل ساجست دارند",
+        "archive": "محصولاتی که ساجست ندارند",
+        "all": "همه با هم، با ستون «ساجست: دارد/ندارد»",
+        "review": "مواردی که ابزار مطمئن نبوده",
+    }
+    tabs = state.config.get("output.tabs", {}) or {}
+    titles = {
+        "ready": tabs.get("ready", "آماده تولید محتوا"),
+        "archive": tabs.get("archive", "آرشیو آینده"),
+        "all": tabs.get("all", "همه محصولات"),
+        "review": tabs.get("review", "نیاز به بازبینی دستی"),
+    }
+    rows = {
+        "ready": counts["has_suggest"],
+        "archive": counts["no_suggest"] + counts["pending_suggest"],
+        "all": counts["canonical"],
+        "review": counts["needs_review"] + counts["borderline"],
+    }
+    return {
+        "run_id": run_id,
+        "xlsx": _xlsx_available(),
+        "downloads": [
+            {"key": key, "title": titles[key], "hint": hints[key], "rows": rows[key]}
+            for key in exporter.SHEET_KEYS
+        ],
+        "files": [
+            {"name": item.name, "size": item.stat().st_size}
+            for item in output_files(state, run_id)
+        ],
+    }
+
+
+def _xlsx_available() -> bool:
+    import importlib.util
+
+    return importlib.util.find_spec("openpyxl") is not None
+
+
 def api_sheets(state: PanelState, query: dict) -> dict:
+    """فهرست خروجی‌های ممکن و اینکه کدام‌ها در فاز ۴ ساخته می‌شوند."""
     tabs = state.config.get("output.tabs", {}) or {}
     names = {
         "ready": tabs.get("ready", "آماده تولید محتوا"),
@@ -496,22 +568,16 @@ def api_sheets(state: PanelState, query: dict) -> dict:
 
 
 def api_save_sheets(state: PanelState, body: dict) -> dict:
-    """انتخاب شیت‌ها در حافظه‌ی همین نشست می‌ماند و در config هم نوشته می‌شود."""
+    """انتخاب شیت‌ها در همین نشست اثر می‌گذارد (روی فایلی که فاز ۴ می‌سازد).
+
+    دانلود جداگانه‌ی هر فهرست مستقل از این انتخاب همیشه در دسترس است.
+    """
     chosen = [str(key) for key in (body.get("sheets") or []) if str(key) in exporter.SHEET_KEYS]
     if not chosen:
         raise ApiError("حداقل یک خروجی را انتخاب کنید.")
     state.config.raw.setdefault("output", {})["sheets"] = chosen
     state.runner.config = state.config
     return {"selected": chosen}
-
-
-def api_output(state: PanelState, query: dict) -> dict:
-    run_id = state.resolve_run(query.get("run_id"))
-    files = output_files(state, run_id)
-    return {
-        "run_id": run_id,
-        "files": [{"name": item.name, "size": item.stat().st_size} for item in files],
-    }
 
 
 GET_ROUTES: dict[str, Callable[[PanelState, dict], Any]] = {
@@ -662,34 +728,62 @@ class PanelHandler(BaseHTTPRequestHandler):
             self._json(payload)
 
     def _download(self, query: dict) -> None:
+        """یک فهرست (یا کل فایل) را همین‌جا می‌سازد و می‌فرستد."""
         try:
             run_id = self.panel.resolve_run(query.get("run_id"))
-            files = output_files(self.panel, run_id)
+            key = query.get("key") or "workbook"
+            fmt = (query.get("format") or "").lower()
+            conn = self.panel.conn()
+            config = self.panel.config
+
+            if key == "workbook":
+                sheets = [
+                    exporter.build_one(conn, run_id, config, name)
+                    for name in exporter.SHEET_KEYS
+                ]
+                label = "همه-فهرست‌ها"
+            elif key in exporter.SHEET_KEYS:
+                sheets = [exporter.build_one(conn, run_id, config, key)]
+                label = sheets[0].title.replace(" ", "-")
+            else:
+                self._error("نام فهرست نامعتبر است.", HTTPStatus.NOT_FOUND)
+                return
         except ApiError as exc:
             self._error(str(exc), exc.status)
             return
-        if not files:
-            self._error("فایل خروجی هنوز ساخته نشده است. اول فاز ۴ را اجرا کنید.",
-                        HTTPStatus.NOT_FOUND)
+        except ValueError as exc:
+            self._error(str(exc))
             return
-        # فقط از میان فایل‌های همین اجرا — نام دلخواه از بیرون پذیرفته نمی‌شود
-        wanted = query.get("name")
-        matches = [item for item in files if item.name == wanted] if wanted else files
-        if not matches:
-            self._error("فایلی با این نام در خروجی این اجرا نیست.", HTTPStatus.NOT_FOUND)
+
+        payload = None if fmt == "csv" else exporter.sheets_to_xlsx(sheets)
+        if payload is not None:
+            name, mime = f"{label}-{run_id}.xlsx", (
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        elif len(sheets) == 1:
+            payload, name, mime = (
+                exporter.sheet_to_csv(sheets[0]),
+                f"{label}-{run_id}.csv",
+                "text/csv; charset=utf-8",
+            )
+        else:
+            # بدون openpyxl نمی‌شود چند شیت را در یک فایل داد
+            self._error(
+                "برای فایل چندشیتی به openpyxl نیاز است: pip install openpyxl"
+                " — یا هر فهرست را جداگانه دانلود کنید.",
+                HTTPStatus.NOT_IMPLEMENTED,
+            )
             return
-        path = matches[0]
-        # هدرها latin-1 هستند؛ نام فارسی باید طبق RFC 5987 کدگذاری شود
-        ascii_name = path.name.encode("ascii", "replace").decode("ascii").replace('"', "_")
-        disposition = (
-            f'attachment; filename="{ascii_name}"; '
-            f"filename*=UTF-8''{quote(path.name, safe='')}"
-        )
+
+        ascii_name = name.encode("ascii", "replace").decode("ascii").replace('"', "_")
         self._send(
             HTTPStatus.OK,
-            path.read_bytes(),
-            mimetypes.guess_type(path.name)[0] or "application/octet-stream",
-            {"Content-Disposition": disposition},
+            payload,
+            mime,
+            {
+                "Content-Disposition": f'attachment; filename="{ascii_name}"; '
+                f"filename*=UTF-8''{quote(name, safe='')}"
+            },
         )
 
     def _static(self, path: str) -> None:

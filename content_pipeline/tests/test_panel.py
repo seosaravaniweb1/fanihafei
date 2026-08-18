@@ -318,40 +318,51 @@ def test_normalize_endpoint(panel):
     assert data["match"] == ""  # «دانلود» کلمه‌ی ایستای تجاری است
 
 
-def test_download_before_export_is_a_clear_error(panel):
-    _, created = panel("/api/runs", method="POST", body={"topic": "رمان"})
-    status, payload = panel(f"/download?run_id={created['run_id']}")
-    assert status == 404
-    assert "فاز ۴" in payload["error"]
+def test_each_list_can_be_downloaded_on_its_own(panel):
+    """«لیست با ساجست، بدون ساجست، و باهم» — هرکدام یک فایل جدا."""
+    run_id, merged, flagged, _ = seed(panel)
+
+    status, body = panel(f"/download?run_id={run_id}&key=ready&format=csv")
+    assert status == 200
+    text = body.decode("utf-8-sig")
+    assert "رمان شب سرد" in text        # ساجست دارد
+    assert "رمان شب گرم" not in text    # ندارد
+
+    status, body = panel(f"/download?run_id={run_id}&key=archive&format=csv")
+    assert status == 200
+    text = body.decode("utf-8-sig")
+    assert "رمان شب گرم" in text
+    assert "رمان شب سرد" not in text
+
+    status, body = panel(f"/download?run_id={run_id}&key=all&format=csv")
+    text = body.decode("utf-8-sig")
+    assert "رمان شب سرد" in text and "رمان شب گرم" in text
+    assert "دارد" in text and "ندارد" in text
 
 
-def test_output_lists_csv_bundle_when_xlsx_is_unavailable(panel, tmp_path):
-    """بدون openpyxl خروجی چند CSV است؛ داشبورد باید همان‌ها را نشان بدهد."""
-    _, created = panel("/api/runs", method="POST", body={"topic": "رمان"})
-    run_id = created["run_id"]
-    for title in ("آماده-تولید-محتوا", "آرشیو-آینده"):
-        (tmp_path / f"out-{run_id}__{title}.csv").write_text("a,b\n", encoding="utf-8")
+def test_download_reflects_manual_edits_not_the_old_file(panel):
+    """دانلود از دیتابیس ساخته می‌شود، پس ادغام دستیِ بعد از فاز ۴ هم دیده می‌شود."""
+    run_id, merged, flagged, _ = seed(panel)
+    panel("/api/products/rename", method="POST", body={"id": merged, "title": "نام تازه"})
 
+    _, body = panel(f"/download?run_id={run_id}&key=all&format=csv")
+    assert "نام تازه" in body.decode("utf-8-sig")
+
+
+def test_download_lists_what_is_available(panel):
+    run_id, _, _, _ = seed(panel)
     _, info = panel(f"/api/output?run_id={run_id}")
-    assert [item["name"] for item in info["files"]] == [
-        f"out-{run_id}__آرشیو-آینده.csv",
-        f"out-{run_id}__آماده-تولید-محتوا.csv",
-    ]
-
-    name = urllib.parse.quote(f"out-{run_id}__آرشیو-آینده.csv")
-    status, body = panel(f"/download?run_id={run_id}&name={name}")
-    assert status == 200 and body == b"a,b\n"
+    keys = {item["key"]: item["rows"] for item in info["downloads"]}
+    assert keys["ready"] == 1
+    assert keys["archive"] == 1
+    assert keys["all"] == 2
 
 
-def test_download_refuses_a_name_outside_the_run_output(panel, tmp_path):
-    _, created = panel("/api/runs", method="POST", body={"topic": "رمان"})
-    run_id = created["run_id"]
-    (tmp_path / f"out-{run_id}__x.csv").write_text("ok\n", encoding="utf-8")
-    (tmp_path / "secret.csv").write_text("no\n", encoding="utf-8")
-
-    status, payload = panel(f"/download?run_id={run_id}&name=secret.csv")
+def test_download_refuses_an_unknown_list(panel):
+    run_id, _, _, _ = seed(panel)
+    status, payload = panel(f"/download?run_id={run_id}&key=hack")
     assert status == 404
-    assert "نام" in payload["error"]
+    assert "نامعتبر" in payload["error"]
 
 
 # ------------------------------------------------------------- کار پس‌زمینه
@@ -360,7 +371,7 @@ def test_download_refuses_a_name_outside_the_run_output(panel, tmp_path):
 def test_job_runs_phases_in_order_and_captures_print(panel, monkeypatch):
     seen = []
 
-    def fake_phase(conn, run_id, config, phase, log=print):
+    def fake_phase(conn, run_id, config, phase, log=print, should_stop=None):
         seen.append(phase)
         print(f"چاپ داخل فاز {phase}")
         log(f"لاگ فاز {phase}")
@@ -421,7 +432,7 @@ def test_cancel_stops_before_the_next_phase(panel, monkeypatch):
     seen = []
     first = threading.Event()
 
-    def fake_phase(conn, run_id, config, phase, log=print):
+    def fake_phase(conn, run_id, config, phase, log=print, should_stop=None):
         seen.append(phase)
         first.set()
         time.sleep(0.05)

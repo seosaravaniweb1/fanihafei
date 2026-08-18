@@ -184,11 +184,15 @@ class JobRunner:
         self._thread.start()
 
     def cancel(self) -> bool:
-        """لغو تعاونی — فاز جاری تمام می‌شود و فازهای بعدی اجرا نمی‌شوند."""
+        """لغو — بین دو واحد کار (هر صفحه، هر کوئری) بررسی می‌شود.
+
+        صفحه‌ی در حال دانلود تمام می‌شود (چند ثانیه) ولی بعدش متوقف می‌شویم؛
+        نه اینکه تا آخر فاز ادامه بدهد.
+        """
         if not self.running:
             return False
         self._cancel.set()
-        self.log("⏹ درخواست لغو ثبت شد؛ بعد از پایان فاز جاری متوقف می‌شود.")
+        self.log("⏹ درخواست لغو ثبت شد؛ بعد از پایان کارِ در جریان متوقف می‌شود.")
         return True
 
     def join(self, timeout: float | None = None) -> None:
@@ -216,13 +220,19 @@ class JobRunner:
                 with self._lock:
                     self._state.phase = phase
                 self.log(f"▶ فاز {phase} — {pipeline.PHASE_NAMES[phase]}")
-                summary = pipeline.run_phase(conn, run_id, self.config, phase, self.log)
+                summary = pipeline.run_phase(
+                    conn, run_id, self.config, phase, self.log, self._cancel.is_set
+                )
                 for line in str(summary).splitlines():
                     self.log(line)
                 with self._lock:
                     self._state.done_phases.append(phase)
-            self.log("✔ پایان.")
-            self._finish(CANCELLED if self._cancel.is_set() else DONE)
+            if self._cancel.is_set():
+                self.log("⏹ اجرا لغو شد؛ آنچه تا اینجا پیدا شد در دیتابیس محفوظ است.")
+                self._finish(CANCELLED)
+            else:
+                self.log("✔ پایان.")
+                self._finish(DONE)
         except Exception as exc:  # noqa: BLE001 — پیام خطا باید به پنل برسد
             self.log(f"✖ خطا: {exc}")
             for line in traceback.format_exc().splitlines()[-12:]:
