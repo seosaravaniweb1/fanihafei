@@ -343,12 +343,27 @@ def relevant_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlite3
 
 
 def borderline_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
-    """عنوان‌های مرزی (``is_relevant IS NULL``) — مقصدشان شیت C است."""
+    """عنوان‌های مرزی — امتیاز گرفته‌اند ولی بین دو آستانه مانده‌اند.
+
+    شرط ``topic_score IS NOT NULL`` حیاتی است: امتیازدهی در انتهای فاز ۱
+    انجام می‌شود، پس وسط کراول همه‌ی عنوان‌ها ``is_relevant IS NULL`` هستند و
+    بدون این شرط، کل چیزی که تازه کراول شده به‌عنوان «مرزی» نشان داده می‌شد.
+    """
     return conn.execute(
         "SELECT * FROM raw_products WHERE run_id=? AND is_relevant IS NULL"
-        " ORDER BY topic_score DESC",
+        " AND topic_score IS NOT NULL ORDER BY topic_score DESC",
         (run_id,),
     ).fetchall()
+
+
+def unscored_count(conn: sqlite3.Connection, run_id: str) -> int:
+    """عنوان‌هایی که هنوز امتیاز موضوعی نگرفته‌اند (کراول تمام نشده)."""
+    return int(
+        conn.execute(
+            "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND topic_score IS NULL",
+            (run_id,),
+        ).fetchone()["c"]
+    )
 
 
 # ---------------------------------------------------------------------------

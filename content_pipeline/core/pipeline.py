@@ -122,7 +122,13 @@ def counters(conn: sqlite3.Connection, run_id: str) -> dict[str, int]:
     queries = {
         "raw": "SELECT COUNT(*) c FROM raw_products WHERE run_id=?",
         "relevant": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant=1",
-        "borderline": "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant IS NULL",
+        "borderline": (
+            "SELECT COUNT(*) c FROM raw_products WHERE run_id=?"
+            " AND is_relevant IS NULL AND topic_score IS NOT NULL"
+        ),
+        "unscored": (
+            "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND topic_score IS NULL"
+        ),
         "canonical": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=?",
         "needs_review": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND needs_review=1",
         "has_suggest": "SELECT COUNT(*) c FROM canonical_products WHERE run_id=? AND suggest_status='has_suggest'",

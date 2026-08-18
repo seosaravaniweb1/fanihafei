@@ -239,6 +239,7 @@ const COUNTER_LABELS = {
   raw: "عنوان خام",
   relevant: "مرتبط",
   borderline: "مرزی (شیت C)",
+  unscored: "در انتظار امتیاز",
   canonical: "محصول یکپارچه",
   needs_review: "نیازمند بازبینی",
   has_suggest: "دارای ساجست",
@@ -253,7 +254,10 @@ const STATUS_LABELS = {
 
 async function refreshState() {
   const data = await api("/api/state", { params: { run_id: state.runId } });
-  $("#topicLabel").textContent = data.target_topic ? `موضوع: ${data.target_topic}` : "";
+  const categories = data.current?.categories || [];
+  $("#topicLabel").textContent = categories.length
+    ? `دسته‌ها: ${categories.join("، ")}`
+    : (data.target_topic ? `موضوع: ${data.target_topic}` : "");
 
   const select = $("#runSelect");
   select.replaceChildren(...data.runs.map((run) =>
@@ -398,6 +402,12 @@ $("#runSelect").addEventListener("change", (event) => {
   sessionStorage.setItem("runId", state.runId);
   refreshState().catch((error) => toast(error.message, true));
 });
+
+// حین کراول سنگین، یک درخواست ممکن است بیفتد؛ پولینگ بعدی خودش جبران می‌کند
+// و هشدار قرمز دادن برایش فقط کاربر را می‌ترساند.
+function quietly(promise) {
+  return promise.catch(() => {});
+}
 
 $("#newRunBtn").addEventListener("click", () => {
   // ساخت اجرا از تب «شروع» انجام می‌شود تا دسته و سایت‌ها با هم تعیین شوند
@@ -684,6 +694,12 @@ async function loadReview() {
 
     const borderline = $("#borderlineList");
     borderline.replaceChildren();
+    if (data.unscored) {
+      borderline.append(el("div", { className: "warn" }, [
+        `${data.unscored} عنوان هنوز امتیاز موضوعی نگرفته‌اند. امتیازدهی در پایان فاز ۱ `
+        + `انجام می‌شود، پس تا تمام شدن کراول این‌ها نه مرتبط‌اند نه مرزی.`,
+      ]));
+    }
     if (!data.borderline.length) {
       borderline.append(el("div", { className: "muted", textContent: "عنوان مرزی‌ای ثبت نشده است." }));
     }
@@ -739,7 +755,7 @@ async function poll() {
     const wasRunning = state.jobStatus === "running";
     applyJob(job);
     if (wasRunning && job.status !== "running") {
-      await refreshState();
+      await quietly(refreshState());
       if ($("#tab-products").classList.contains("active")) loadProducts();
       toast(job.status === "failed" ? `اجرا شکست خورد: ${job.error}` : "اجرا تمام شد.",
             job.status === "failed");

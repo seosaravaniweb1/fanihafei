@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import re
+import time
 import sqlite3
 import urllib.parse
 from collections import deque
@@ -26,6 +27,18 @@ from ..core.embeddings import TopicMatcher
 from ..core.http import Fetcher
 
 _SITEMAP_GUESSES = ("/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml", "/wp-sitemap.xml")
+
+
+def _fa_duration(seconds: float) -> str:
+    """ثانیه → «۳ دقیقه» یا «۱ ساعت و ۵ دقیقه» — برای اینکه انتظار معلوم باشد."""
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f"{seconds} ثانیه"
+    minutes, rest = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes} دقیقه"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} ساعت و {minutes} دقیقه"
 
 
 @dataclass
@@ -260,10 +273,24 @@ def run(
             site.js = True
         urls = collect_urls(site, fetcher, max_urls, print if verbose else (lambda *_: None))
         if verbose:
-            print(f"  [{site.domain}] {len(urls)} آدرس کاندیدا")
+            delay = float(config.get("crawl.delay_seconds", 1.0))
+            print(
+                f"  [{site.domain}] {len(urls)} آدرس کاندیدا — با {delay} ثانیه فاصله بین "
+                f"درخواست‌ها حدود {_fa_duration(len(urls) * max(delay, 0.5))} طول می‌کشد"
+            )
 
         found_here = 0
-        for url in urls:
+        started = time.monotonic()
+        step = max(10, len(urls) // 20)  # حدود ۲۰ خط گزارش برای هر منبع
+        for position, url in enumerate(urls, start=1):
+            if verbose and (position % step == 0 or position == len(urls)):
+                elapsed = time.monotonic() - started
+                rate = position / elapsed if elapsed > 0 else 0
+                remaining = (len(urls) - position) / rate if rate > 0 else 0
+                print(
+                    f"  [{site.domain}] {position}/{len(urls)} صفحه — "
+                    f"{found_here} محصول — حدود {_fa_duration(remaining)} باقی‌مانده"
+                )
             if stop():
                 stats.stopped = True
                 break

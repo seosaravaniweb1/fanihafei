@@ -587,3 +587,60 @@ def test_empty_output_selection_is_refused(panel):
     status, payload = panel("/api/sheets", method="POST", body={"sheets": []})
     assert status == 400
     assert "حداقل" in payload["error"]
+
+
+# ------------------------------------------------- برچسب موضوع و امتیازنداده‌ها
+
+
+def test_header_shows_the_topic_of_the_selected_run_not_the_config_default(panel):
+    """config پیش‌فرض «رمان» دارد؛ اجرای انتخاب‌شده «جزوه» است.
+
+    سربرگ باید موضوع همان اجرا را نشان بدهد، وگرنه کاربر فکر می‌کند دسته‌ی
+    اشتباهی جمع‌آوری شده است.
+    """
+    _, created = panel(
+        "/api/runs", method="POST", body={"categories": ["جزوه"], "sites": "a.ir"}
+    )
+    _, state = panel(f"/api/state?run_id={created['run_id']}")
+
+    assert state["target_topic"] == "جزوه"
+    assert state["config_topic"] == "رمان"
+    assert state["current"]["categories"] == ["جزوه"]
+
+
+def test_review_reports_titles_that_have_no_score_yet(panel):
+    conn = panel.state.conn()
+    run_id = db.create_run(conn, "رمان")
+    with db.transaction(conn):
+        db.insert_raw_product(
+            conn,
+            run_id=run_id,
+            source_domain="a.ir",
+            source_url="https://a.ir/p/1",
+            raw_title="رمان تازه",
+            normalized_title="رمان تازه",
+        )
+
+    _, data = panel(f"/api/review?run_id={run_id}")
+
+    assert data["unscored"] == 1
+    assert data["borderline"] == []  # هنوز مرزی نیست، فقط امتیاز نگرفته
+
+
+def test_counters_separate_unscored_from_borderline(panel):
+    conn = panel.state.conn()
+    run_id = db.create_run(conn, "رمان")
+    with db.transaction(conn):
+        db.insert_raw_product(
+            conn, run_id=run_id, source_domain="a.ir", source_url="https://a.ir/1",
+            raw_title="بدون امتیاز", normalized_title="بدون امتیاز",
+        )
+        db.insert_raw_product(
+            conn, run_id=run_id, source_domain="a.ir", source_url="https://a.ir/2",
+            raw_title="مرزی", normalized_title="مرزی", topic_score=0.3, is_relevant=None,
+        )
+
+    _, state = panel(f"/api/state?run_id={run_id}")
+    counters = state["current"]["counters"]
+    assert counters["unscored"] == 1
+    assert counters["borderline"] == 1

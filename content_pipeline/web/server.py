@@ -168,12 +168,16 @@ def api_state(state: PanelState, query: dict) -> dict:
         if row is not None:
             current = run_dict(row)
             current["counters"] = pipeline.counters(conn, run_id)
+            current["categories"] = db.run_categories(conn, run_id)
     return {
         "runs": runs,
         "current": current,
         "phases": [{"n": n, "name": name} for n, name in pipeline.PHASE_NAMES.items()],
         "config_path": str(state.config_path) if state.config_path else "",
-        "target_topic": state.config.target_topic,
+        # موضوعِ همین اجرا؛ نه پیش‌فرض config — وگرنه سربرگ چیزی را نشان می‌دهد
+        # که ربطی به اجرای انتخاب‌شده ندارد.
+        "target_topic": (current or {}).get("target_topic") or state.config.target_topic,
+        "config_topic": state.config.target_topic,
         "db_path": state.config.db_path,
         "job": state.runner.snapshot(int(query.get("since") or 0)),
     }
@@ -470,6 +474,8 @@ def api_review(state: PanelState, query: dict) -> dict:
     borderline = db.borderline_raw_products(conn, run_id)
     return {
         "run_id": run_id,
+        # عنوان‌هایی که هنوز امتیاز نگرفته‌اند (کراول تمام نشده) مرزی نیستند
+        "unscored": db.unscored_count(conn, run_id),
         "products": [product_dict(conn, row, detail=True) for row in products],
         "borderline": [
             {

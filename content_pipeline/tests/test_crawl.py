@@ -447,3 +447,94 @@ def test_cancel_stops_the_crawl_in_the_middle(env):
     assert stats.stopped
     assert stats.titles_found < 30
     assert "متوقف" in stats.render()
+
+
+# ---------------------------------------------------------------------------
+# «هنوز امتیاز نگرفته» با «مرزی» یکی نیست
+# ---------------------------------------------------------------------------
+
+
+def test_titles_without_a_score_are_not_borderline(env):
+    """وسط کراول همه‌ی عنوان‌ها is_relevant IS NULL هستند.
+
+    بدون شرط topic_score، تب «بازبینی دستی» هرچه تازه کراول شده را به‌عنوان
+    «مرزی» نشان می‌داد — حتی رمان‌هایی که بعداً مرتبط تشخیص داده می‌شوند.
+    """
+    conn, run_id, config = env
+    with db.transaction(conn):
+        db.insert_raw_product(
+            conn,
+            run_id=run_id,
+            source_domain="shop.ir",
+            source_url="https://shop.ir/p/1",
+            raw_title="رمان تازه کراول‌شده",
+            normalized_title="رمان تازه کراول‌شده",
+        )
+    assert db.borderline_raw_products(conn, run_id) == []
+    assert db.unscored_count(conn, run_id) == 1
+
+
+def test_a_scored_middling_title_is_borderline(env):
+    conn, run_id, config = env
+    with db.transaction(conn):
+        db.insert_raw_product(
+            conn,
+            run_id=run_id,
+            source_domain="shop.ir",
+            source_url="https://shop.ir/p/2",
+            raw_title="عنوان مرزی",
+            normalized_title="عنوان مرزی",
+            topic_score=0.28,
+            is_relevant=None,
+        )
+    rows = db.borderline_raw_products(conn, run_id)
+    assert [r["raw_title"] for r in rows] == ["عنوان مرزی"]
+    assert db.unscored_count(conn, run_id) == 0
+
+
+def test_novels_from_a_real_shop_are_scored_relevant():
+    """امتیازدهی روی عنوان‌های واقعی: رمان‌ها قبول، بقیه رد."""
+    from content_pipeline.core import normalizer as N
+    from content_pipeline.core import presets
+
+    matcher = TopicMatcher.build_categories(
+        HashingEncoder(), [(p.label, p.examples) for p in presets.resolve(["رمان"])]
+    )
+    relevant, _ = matcher.thresholds["رمان"]
+    norm = N.config_from_mapping({})
+
+    novels = [
+        "رمان تقاطع اثر بهاره حسنی",
+        "دانلود رمان تاوان خیانت pdf نسخه کامل و اصلی",
+        "دانلود پی دی اف رمان ناتوان یا بی قدرت اثر لورن رابرتس Powerless",
+    ]
+    others = [
+        "دانلود پی دی اف کتاب شرح جامع قانون مدنی دکتر فرهاد بیات PDF",
+        "دانلود فارسی ساز FarCry 5",
+        "دانلود پی دی اف کتاب مقدمات نوروسایکولوژی معظمی",
+    ]
+    for title in novels:
+        assert matcher.score(N.normalize(title, norm)) >= relevant, title
+    for title in others:
+        assert matcher.score(N.normalize(title, norm)) < relevant, title
+
+
+def test_progress_is_reported_during_a_long_crawl(env, capsys):
+    """کراول ۳۰۰ صفحه‌ای بدون گزارش پیشرفت، «گیرکرده» به نظر می‌رسد."""
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    fetcher = FakeFetcher(_many_products(40))
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=True)
+
+    printed = capsys.readouterr().out
+    assert "صفحه —" in printed
+    assert "باقی‌مانده" in printed
+    assert "طول می‌کشد" in printed  # تخمین قبل از شروع
+
+
+def test_duration_is_written_in_persian():
+    assert p1_crawl._fa_duration(45) == "45 ثانیه"
+    assert p1_crawl._fa_duration(909) == "15 دقیقه"
+    assert p1_crawl._fa_duration(3700) == "1 ساعت و 1 دقیقه"
