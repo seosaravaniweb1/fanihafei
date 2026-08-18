@@ -60,6 +60,9 @@ SUGGEST_LABEL = {HAS_SUGGEST: "دارد", NO_SUGGEST: "ندارد", "": "برر�
 SHEET_KEYS = ("ready", "archive", "all", "review")
 DEFAULT_SHEETS = list(SHEET_KEYS)
 
+#: چند ستون جدا برای کلمات ساجست (ساجست ۱، ساجست ۲، ...) کنار ستون یکجا
+DEFAULT_KEYWORD_COLUMNS = 10
+
 REVIEW_HEADER = [
     "type",
     "title",
@@ -105,6 +108,23 @@ class ExportStats:
 # ---------------------------------------------------------------------------
 
 
+def keyword_columns(config: Config) -> int:
+    """تعداد ستون‌های «ساجست ۱..N». صفر یعنی فقط ستون یکجا."""
+    try:
+        return max(0, min(50, int(config.get("output.keyword_columns", DEFAULT_KEYWORD_COLUMNS))))
+    except (TypeError, ValueError):
+        return DEFAULT_KEYWORD_COLUMNS
+
+
+def _keyword_header(count: int) -> list[str]:
+    return [f"suggest_{index}" for index in range(1, count + 1)]
+
+
+def _keyword_cells(keywords: Sequence[str], count: int) -> list[str]:
+    padded = list(keywords[:count])
+    return padded + [""] * (count - len(padded))
+
+
 def selected_sheets(config: Config) -> list[str]:
     """کدام شیت‌ها ساخته شوند. ``output.sheets`` در config یا انتخاب پنل."""
     raw = config.get("output.sheets", DEFAULT_SHEETS) or DEFAULT_SHEETS
@@ -132,6 +152,8 @@ def build_one(conn: sqlite3.Connection, run_id: str, config: Config, key: str) -
 def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[Sheet]:
     tabs = config.get("output.tabs", {}) or {}
     wanted = selected_sheets(config)
+    columns = keyword_columns(config)
+    extra = _keyword_header(columns)
     ready: list[list] = []
     archive: list[list] = []
     everything: list[list] = []
@@ -148,6 +170,7 @@ def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[
         joined_keywords = " | ".join(keywords)
         tail = [category, " | ".join(domains), " | ".join(urls), len(urls), confidence]
 
+        cells = _keyword_cells(keywords, columns)
         everything.append(
             [
                 row["canonical_title"],
@@ -155,10 +178,13 @@ def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[
                 joined_keywords,
                 len(keywords),
                 *tail,
+                *cells,
             ]
         )
         if status == HAS_SUGGEST:
-            ready.append([row["canonical_title"], joined_keywords, len(keywords), *tail])
+            ready.append(
+                [row["canonical_title"], joined_keywords, len(keywords), *tail, *cells]
+            )
         else:
             archive.append([row["canonical_title"], len(keywords), *tail])
 
@@ -191,9 +217,9 @@ def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[
     review.sort(key=lambda r: (r[0], r[3]))
 
     available = {
-        "ready": Sheet(tabs.get("ready", "آماده تولید محتوا"), READY_HEADER, ready),
+        "ready": Sheet(tabs.get("ready", "آماده تولید محتوا"), READY_HEADER + extra, ready),
         "archive": Sheet(tabs.get("archive", "آرشیو آینده"), ARCHIVE_HEADER, archive),
-        "all": Sheet(tabs.get("all", "همه محصولات"), ALL_HEADER, everything),
+        "all": Sheet(tabs.get("all", "همه محصولات"), ALL_HEADER + extra, everything),
         "review": Sheet(tabs.get("review", "نیاز به بازبینی دستی"), REVIEW_HEADER, review),
     }
     return [available[key] for key in wanted]

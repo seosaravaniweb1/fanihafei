@@ -30,6 +30,7 @@ class SuggestStats:
     with_suggest: int = 0
     without_suggest: int = 0
     keywords_stored: int = 0
+    dropped_irrelevant: int = 0
     conflicts_resolved: int = 0
     stopped_early: str = ""
 
@@ -38,6 +39,7 @@ class SuggestStats:
             f"فاز ۳ — محصولات: {self.products}، کوئری زده‌شده: {self.queried}، "
             f"از کش: {self.from_cache}، دارای ساجست: {self.with_suggest}، "
             f"بدون ساجست: {self.without_suggest}، کلمات: {self.keywords_stored}، "
+            f"بی‌ربط (حذف‌شده): {self.dropped_irrelevant}، "
             f"تداخل حل‌شده: {self.conflicts_resolved}"
         )
         if self.stopped_early:
@@ -67,7 +69,12 @@ def run(
     stats.products = len(products)
 
     max_words = int(config.get("suggest.max_query_words", 8))
+    max_variants = max(1, int(config.get("suggest.max_variants_per_product", 4)))
+    enough = max(1, int(config.get("suggest.enough_keywords", 8)))
+    min_coverage = float(config.get("suggest.min_keyword_coverage", 1.0))
+    prefixes = config.get("suggest.query_prefixes", list(normalizer.DEFAULT_QUERY_PREFIXES))
     stop = should_stop or (lambda: False)
+
     for index, row in enumerate(products):
         if stop():
             stats.stopped_early = "به درخواست شما متوقف شد؛ بقیه در صف می‌مانند."
@@ -78,37 +85,66 @@ def run(
         title = row["canonical_title"] or ""
         # عنوان فروشگاهی («دانلود رمان ... نسخه کامل pdf») کوئری‌ای است که کسی
         # تایپ نمی‌کند؛ گوگل برایش پیشنهادی ندارد و همه‌چیز «بدون ساجست» می‌شود.
-        query = normalizer.search_query(title, norm_config, max_words) or title
+        variants = normalizer.search_variants(
+            title, norm_config, max_words, prefixes=prefixes
+        )[:max_variants] or [title]
         if verbose and index < 3:
-            print(f"  کوئری: {query}")
-        before = client.queries_sent
-        try:
-            suggestions = client.suggest(query)
-        except (SuggestBlocked, SessionLimitReached) as exc:
-            # داده‌ی تا اینجا در دیتابیس محفوظ است؛ با --resume-from 3 ادامه می‌دهید.
-            stats.stopped_early = str(exc)
+            print(f"  کوئری‌ها: {' | '.join(variants)}")
+
+        found: dict[str, str] = {}  # کلمه → کوئری‌ای که پیدایش کرد
+        halted = ""
+        for variant in variants:
+            if stop() or len(found) >= enough:
+                break
+            before = client.queries_sent
+            try:
+                suggestions = client.suggest(variant)
+            except (SuggestBlocked, SessionLimitReached) as exc:
+                # داده‌ی تا اینجا در دیتابیس محفوظ است؛ با --resume-from 3 ادامه می‌دهید.
+                halted = str(exc)
+                break
+            if client.queries_sent == before:
+                stats.from_cache += 1
+            else:
+                stats.queried += 1
+
+            for keyword in suggestions:
+                keyword = keyword.strip()
+                if not keyword or keyword in found:
+                    continue
+                # گوگل کنار پیشنهادهای مرتبط، شبیه‌ها را هم می‌دهد
+                if not normalizer.covers(keyword, variant, norm_config, min_coverage):
+                    stats.dropped_irrelevant += 1
+                    continue
+                found[keyword] = variant
+
+        if halted and not found:
+            # این محصول اصلاً جوابی نگرفت؛ «بدون ساجست» علامتش نمی‌زنیم تا با
+            # ادامه‌ی فاز ۳ دوباره پرسیده شود.
+            stats.stopped_early = halted
             if verbose:
-                print(f"  {exc}")
+                print(f"  {halted}")
             break
 
-        if client.queries_sent == before:
-            stats.from_cache += 1
-        else:
-            stats.queried += 1
-
         with db.transaction(conn):
-            for position, keyword in enumerate(suggestions, start=1):
-                db.insert_keyword(conn, canonical_id, keyword.strip(), position)
+            for position, (keyword, source) in enumerate(found.items(), start=1):
+                db.insert_keyword(conn, canonical_id, keyword, position, source)
                 stats.keywords_stored += 1
             db.update_canonical(
                 conn,
                 canonical_id,
-                suggest_status=HAS_SUGGEST if suggestions else NO_SUGGEST,
+                suggest_status=HAS_SUGGEST if found else NO_SUGGEST,
             )
-        if suggestions:
+        if found:
             stats.with_suggest += 1
         else:
             stats.without_suggest += 1
+
+        if halted:
+            stats.stopped_early = halted
+            if verbose:
+                print(f"  {halted}")
+            break
 
     stats.conflicts_resolved = resolve_conflicts(conn, run_id, norm_config)
     _refresh_status(conn, run_id)

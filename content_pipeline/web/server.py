@@ -138,10 +138,16 @@ def product_dict(conn: sqlite3.Connection, row: sqlite3.Row, detail: bool = Fals
     return data
 
 
-def suggest_query_of(state: "PanelState", title: str) -> str:
+def suggest_queries_of(state: "PanelState", title: str) -> list[str]:
+    """شکل‌هایی از عنوان که از گوگل پرسیده می‌شوند — قابل دیدن قبل از اجرا."""
     norm_config = normalizer.config_from_mapping(state.config.normalizer)
     max_words = int(state.config.get("suggest.max_query_words", 8))
-    return normalizer.search_query(title, norm_config, max_words) or title
+    limit = max(1, int(state.config.get("suggest.max_variants_per_product", 4)))
+    prefixes = state.config.get(
+        "suggest.query_prefixes", list(normalizer.DEFAULT_QUERY_PREFIXES)
+    )
+    variants = normalizer.search_variants(title, norm_config, max_words, prefixes=prefixes)
+    return variants[:limit] or [title]
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +410,11 @@ def api_product(state: PanelState, query: dict) -> dict:
     if row is None:
         raise ApiError("محصول پیدا نشد.", HTTPStatus.NOT_FOUND)
     data = product_dict(conn, row, detail=True)
-    data["suggest_query"] = suggest_query_of(state, row["canonical_title"] or "")
+    data["suggest_queries"] = suggest_queries_of(state, row["canonical_title"] or "")
+    data["keyword_sources"] = {
+        item["keyword"]: item["source_query"] or ""
+        for item in db.keywords_for(conn, int(row["id"]))
+    }
     return data
 
 

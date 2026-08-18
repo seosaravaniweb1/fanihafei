@@ -157,6 +157,10 @@ DEFAULTS: dict[str, Any] = {
         "delay_max": 4,
         "max_per_session": 300,
         "max_query_words": 8,
+        "max_variants_per_product": 4,
+        "enough_keywords": 8,
+        "min_keyword_coverage": 1.0,
+        "query_prefixes": ["دانلود", "پی دی اف"],
         "max_consecutive_failures": 3,
         "max_consecutive_empty": 40,
         "timeout": 15,
@@ -164,6 +168,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "output": {
         "sheets": ["ready", "archive", "all", "review"],
+        "keyword_columns": 10,
         "xlsx_path": "content_pipeline/data/output-{run_id}.xlsx",
         "sheet_id": "",
         "service_account_json": "",

@@ -80,25 +80,27 @@ def test_keywords_are_stored_as_rows_not_a_blob(env):
 
 
 def test_lsi_conflict_goes_to_the_closest_product(env):
+    """یک کلمه فقط به نزدیک‌ترین محصول می‌چسبد.
+
+    تداخل واقعی وقتی پیش می‌آید که کلمه، عنوان هر دو محصول را پوشش بدهد —
+    مثل «رمان تاوان خیانت» و «رمان تاوان خیانت آوا».
+    """
     conn, run_id, config = env
+    config.raw["suggest"]["max_variants_per_product"] = 1
     add_product(conn, run_id, "رمان تاوان خیانت آوا")
-    add_product(conn, run_id, "جزوه ریاضی گسسته")
+    add_product(conn, run_id, "رمان تاوان خیانت")
+    shared = "رمان تاوان خیانت آوا جلد دوم"
     client = FakeSuggest(
-        {
-            "رمان تاوان خیانت آوا": ["رمان تاوان خیانت آوا pdf"],
-            "جزوه ریاضی گسسته": ["رمان تاوان خیانت آوا pdf"],
-        }
+        {"رمان تاوان خیانت آوا": [shared], "رمان تاوان خیانت": [shared]}
     )
     stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
 
     assert stats.conflicts_resolved == 1
     owners = {
-        row["canonical_id"]
-        for row in db.all_keywords(conn, run_id)
-        if row["keyword"] == "رمان تاوان خیانت آوا pdf"
+        row["canonical_id"] for row in db.all_keywords(conn, run_id) if row["keyword"] == shared
     }
     winner_id = next(
-        r["id"] for r in db.canonical_products(conn, run_id) if "تاوان" in r["canonical_title"]
+        r["id"] for r in db.canonical_products(conn, run_id) if "آوا" in r["canonical_title"]
     )
     assert owners == {winner_id}
 
@@ -124,8 +126,12 @@ def test_blocked_run_stops_but_keeps_what_it_had(env):
     conn, run_id, config = env
     for index in range(4):
         add_product(conn, run_id, f"محصول {index}")
-    # کوئری با ارقام فارسی فرستاده می‌شود (نرمال‌سازی فاز ۰)
-    client = FakeSuggest({"محصول ۰": ["الف"], "محصول ۱": ["ب"]}, blow_up_after=2)
+    config.raw["suggest"]["max_variants_per_product"] = 1
+    # کوئری با ارقام فارسی فرستاده می‌شود (نرمال‌سازی فاز ۰) و کلمه‌ی پیشنهادی
+    # باید عنوان را پوشش بدهد، وگرنه بی‌ربط شمرده و حذف می‌شود
+    client = FakeSuggest(
+        {"محصول ۰": ["محصول ۰ کامل"], "محصول ۱": ["محصول ۱ کامل"]}, blow_up_after=2
+    )
 
     stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
     assert stats.stopped_early
@@ -184,9 +190,11 @@ def test_four_sheets_are_produced(env):
     assert archive.title == "آرشیو آینده"
     assert everything.title == "همه محصولات"
     assert review.title == "نیاز به بازبینی دستی"
-    assert ready.header == exporter.READY_HEADER
     assert archive.header == exporter.ARCHIVE_HEADER
-    assert everything.header == exporter.ALL_HEADER
+    # ستون‌های «ساجست ۱..N» به شیت‌های کلیدواژه‌دار اضافه می‌شوند
+    assert ready.header[: len(exporter.READY_HEADER)] == exporter.READY_HEADER
+    assert everything.header[: len(exporter.ALL_HEADER)] == exporter.ALL_HEADER
+    assert ready.header[-1] == "suggest_10"
 
 
 def test_ready_sheet_carries_keywords_and_counts(env):
@@ -330,11 +338,11 @@ def test_shop_noise_is_stripped_before_asking_google(env):
     """
     conn, run_id, config = env
     add_product(conn, run_id, "دانلود رمان بهار رضوانی از حدیثه نسخه کامل و اصلی pdf")
-    client = FakeSuggest({"رمان بهار رضوانی حدیثه": ["رمان بهار رضوانی کامل"]})
+    client = FakeSuggest({"رمان بهار رضوانی حدیثه": ["رمان بهار رضوانی حدیثه کامل"]})
 
     stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
 
-    assert client.queries == ["رمان بهار رضوانی حدیثه"]
+    assert client.queries[0] == "رمان بهار رضوانی حدیثه"
     assert stats.with_suggest == 1
 
 
@@ -342,8 +350,119 @@ def test_query_length_is_capped(env):
     conn, run_id, config = env
     add_product(conn, run_id, "یک دو سه چهار پنج شش هفت هشت نه ده یازده")
     config.raw.setdefault("suggest", {})["max_query_words"] = 4
+    config.raw["suggest"]["max_variants_per_product"] = 1
     client = FakeSuggest({})
 
     p3_suggest.run(conn, run_id, config, client, verbose=False)
 
     assert client.queries == ["یک دو سه چهار"]
+
+
+# ---------------------------------------------------------------------------
+# چند شکل کوئری و فیلتر ربط
+# ---------------------------------------------------------------------------
+
+
+def test_a_shorter_query_is_tried_when_the_full_one_is_empty(env):
+    """عنوان کامل ساجست ندارد ولی شکل کوتاه‌ترش دارد — روی نمونه‌ی واقعی دیده شد."""
+    conn, run_id, config = env
+    add_product(conn, run_id, "دانلود رمان ارباب تعصبی من اثر ناشناس نسخه کامل pdf")
+    client = FakeSuggest({"رمان ارباب تعصبی من": ["رمان ارباب تعصبی من رایگان"]})
+
+    stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    assert client.queries[0] == "رمان ارباب تعصبی من ناشناس"   # اول دقیق‌ترین
+    assert "رمان ارباب تعصبی من" in client.queries             # بعد کوتاه‌تر
+    assert stats.with_suggest == 1
+    canonical_id = db.canonical_products(conn, run_id)[0]["id"]
+    assert [k["keyword"] for k in db.keywords_for(conn, canonical_id)] == [
+        "رمان ارباب تعصبی من رایگان"
+    ]
+
+
+def test_a_prefixed_query_is_tried_too(env):
+    """«پی دی اف رمان ...» گاهی نتیجه می‌دهد که خود عنوان نمی‌دهد."""
+    conn, run_id, config = env
+    add_product(conn, run_id, "رمان ارباب تعصبی من")
+    client = FakeSuggest(
+        {"پی دی اف رمان ارباب تعصبی من": ["پی دی اف رمان ارباب تعصبی من کامل"]}
+    )
+
+    stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    assert stats.with_suggest == 1
+    assert any(q.startswith("پی دی اف") for q in client.queries)
+
+
+def test_irrelevant_suggestions_are_dropped(env):
+    """گوگل کنار پیشنهادهای مرتبط، شبیه‌های بی‌ربط هم می‌دهد."""
+    conn, run_id, config = env
+    config.raw["suggest"]["max_variants_per_product"] = 1
+    add_product(conn, run_id, "رمان ارباب تعصبی")
+    client = FakeSuggest(
+        {
+            "رمان ارباب تعصبی": [
+                "رمان ارباب تعصبی من",        # مرتبط
+                "جلد دوم رمان ارباب تعصبی من",  # مرتبط
+                "رمان ارباب",                  # بی‌ربط — «تعصبی» ندارد
+                "رمان غرور و تعصب",            # بی‌ربط
+            ]
+        }
+    )
+
+    stats = p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    canonical_id = db.canonical_products(conn, run_id)[0]["id"]
+    kept = [k["keyword"] for k in db.keywords_for(conn, canonical_id)]
+    assert kept == ["رمان ارباب تعصبی من", "جلد دوم رمان ارباب تعصبی من"]
+    assert stats.dropped_irrelevant == 2
+
+
+def test_the_query_that_found_each_keyword_is_recorded(env):
+    conn, run_id, config = env
+    add_product(conn, run_id, "رمان ارباب تعصبی من")
+    client = FakeSuggest({"رمان ارباب تعصبی من": ["رمان ارباب تعصبی من رایگان"]})
+
+    p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    canonical_id = db.canonical_products(conn, run_id)[0]["id"]
+    row = db.keywords_for(conn, canonical_id)[0]
+    assert row["source_query"] == "رمان ارباب تعصبی من"
+
+
+def test_variants_stop_once_enough_keywords_are_found(env):
+    conn, run_id, config = env
+    config.raw["suggest"]["enough_keywords"] = 2
+    add_product(conn, run_id, "رمان ارباب تعصبی من ناشناس")
+    client = FakeSuggest(
+        {"رمان ارباب تعصبی من ناشناس": [
+            "رمان ارباب تعصبی من ناشناس کامل",
+            "رمان ارباب تعصبی من ناشناس رایگان",
+        ]}
+    )
+
+    p3_suggest.run(conn, run_id, config, client, verbose=False)
+
+    assert client.queries == ["رمان ارباب تعصبی من ناشناس"]  # دومی لازم نشد
+
+
+def test_each_suggestion_gets_its_own_column(env):
+    """«ساجست‌های هر عنوان توی ستون خودش قرار بگیره»."""
+    conn, run_id, config = env
+    _prepare_export(conn, run_id)
+    config.raw["output"]["keyword_columns"] = 3
+
+    everything = exporter.build_sheets(conn, run_id, config)[2]
+
+    assert everything.header[-3:] == ["suggest_1", "suggest_2", "suggest_3"]
+    row = next(r for r in everything.rows if r[0] == "محصول الف")
+    assert row[-3:] == ["محصول الف pdf", "محصول الف کامل", ""]
+
+
+def test_keyword_columns_can_be_switched_off(env):
+    conn, run_id, config = env
+    _prepare_export(conn, run_id)
+    config.raw["output"]["keyword_columns"] = 0
+
+    ready = exporter.build_sheets(conn, run_id, config)[0]
+    assert ready.header == exporter.READY_HEADER

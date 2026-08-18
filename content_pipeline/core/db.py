@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 RUNNING = "running"
 COMPLETED = "completed"
@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS lsi_keywords (
     canonical_id INTEGER NOT NULL,
     keyword      TEXT,
     position     INTEGER,
+    source_query TEXT,   -- با کدام شکل از عنوان پیدا شد
     UNIQUE(canonical_id, keyword)
 );
 
@@ -106,6 +107,7 @@ def connect(path: str | Path) -> sqlite3.Connection:
 NEW_COLUMNS: dict[str, dict[str, str]] = {
     "runs": {"categories": "TEXT", "sites": "TEXT", "options": "TEXT"},
     "raw_products": {"category": "TEXT"},
+    "lsi_keywords": {"source_query": "TEXT"},
 }
 
 
@@ -444,11 +446,16 @@ def source_domains_for(conn: sqlite3.Connection, canonical_id: int) -> list[str]
 
 
 def insert_keyword(
-    conn: sqlite3.Connection, canonical_id: int, keyword: str, position: int
+    conn: sqlite3.Connection,
+    canonical_id: int,
+    keyword: str,
+    position: int,
+    source_query: str = "",
 ) -> None:
     conn.execute(
-        "INSERT OR IGNORE INTO lsi_keywords (canonical_id, keyword, position) VALUES (?,?,?)",
-        (canonical_id, keyword, position),
+        """INSERT OR IGNORE INTO lsi_keywords (canonical_id, keyword, position, source_query)
+           VALUES (?,?,?,?)""",
+        (canonical_id, keyword, position, source_query),
     )
 
 

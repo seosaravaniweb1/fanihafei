@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 
-from .normalizer import collapse_repeated_prefix
+from .normalizer import collapse_repeats
 
 try:  # pragma: no cover
     from selectolax.parser import HTMLParser as SelectolaxParser  # type: ignore
@@ -113,7 +113,7 @@ def extract_title(
     در حالت ``<title>`` نام سایت از انتهای/ابتدای عنوان حذف می‌شود، و در همه‌ی
     حالت‌ها پیشوند تکراری («دانلود رمان دانلود رمان ...») جمع می‌شود.
     """
-    return collapse_repeated_prefix(_title_candidate(page_html, selector, domain, site_name))
+    return collapse_repeats(_title_candidate(page_html, selector, domain, site_name))
 
 
 def _title_candidate(

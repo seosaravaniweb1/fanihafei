@@ -372,18 +372,44 @@ __all__ = [
 ]
 
 
-def collapse_repeated_prefix(text: str) -> str:
-    """«دانلود رمان دانلود رمان شب سرد» → «دانلود رمان شب سرد».
+#: بلندترین عبارتی که تکرار چسبیده‌اش حذف می‌شود
+_MAX_REPEAT = 4
 
-    خیلی از فروشگاه‌ها نام سایت را به ابتدای ``<title>`` می‌چسبانند در حالی که
-    خود عنوان محصول هم با همان عبارت شروع می‌شود. تکرارِ چسبیده همیشه خطای
-    قالب سایت است، پس حذفش امن است — برخلاف حدس زدن نام سایت.
+
+def collapse_repeats(text: str) -> str:
+    """تکرارِ چسبیده را هرجای عنوان که باشد جمع می‌کند.
+
+    * «دانلود رمان دانلود رمان شب سرد» → «دانلود رمان شب سرد» (اول عنوان)
+    * «رمان ماه طوفان از زینب ایلخانی pdf pdf» → «... pdf» (آخر عنوان)
+
+    فروشگاه‌ها نام سایت یا پسوند فایل را به ``<title>`` می‌چسبانند در حالی که
+    خود عنوان هم همان را دارد. تکرارِ چسبیده در فارسی طبیعی تقریباً وجود ندارد،
+    پس حذفش امن است — برخلاف حدس زدن نام سایت.
     """
     words = text.split()
-    for size in range(len(words) // 2, 0, -1):
-        if words[:size] == words[size : 2 * size]:
-            return " ".join(words[size:])
-    return text
+    for _ in range(3):  # تکرار سه‌تایی و بیشتر در چند دور جمع می‌شود
+        out: list[str] = []
+        index = 0
+        changed = False
+        while index < len(words):
+            for size in range(min(_MAX_REPEAT, (len(words) - index) // 2), 0, -1):
+                if words[index : index + size] == words[index + size : index + 2 * size]:
+                    out.extend(words[index : index + size])
+                    index += 2 * size
+                    changed = True
+                    break
+            else:
+                out.append(words[index])
+                index += 1
+        words = out
+        if not changed:
+            break
+    return " ".join(words)
+
+
+def collapse_repeated_prefix(text: str) -> str:
+    """نام قدیمی :func:`collapse_repeats` — برای سازگاری نگه داشته شده."""
+    return collapse_repeats(text)
 
 
 #: کلماتی که در تطبیق معنا دارند ولی در کوئری جستجو فقط نتیجه را خالی می‌کنند.
@@ -405,7 +431,7 @@ def search_query(
     برخلاف :func:`normalize`، نیم‌فاصله حفظ می‌شود: «پیش‌دانشگاهی» به
     «پیشدانشگاهی» تبدیل شود دیگر کلمه‌ی قابل جستجویی نیست.
     """
-    display = collapse_repeated_prefix(normalize_display(text, config))
+    display = collapse_repeats(normalize_display(text, config))
     kept: list[str] = []
     for token in display.split():
         probe = normalize(token, config)
@@ -417,3 +443,65 @@ def search_query(
         if len(kept) >= max_words:
             break
     return " ".join(kept) or display
+
+
+#: پیشوندهای رایجی که کاربر فارسی جلوی نام محصول تایپ می‌کند.
+#: گوگل ساجست پیشوندی کار می‌کند، پس همین‌ها گاهی نتیجه‌ای می‌دهند که
+#: کوئری بدون پیشوند نمی‌دهد.
+DEFAULT_QUERY_PREFIXES: tuple[str, ...] = ("دانلود", "پی دی اف")
+
+
+def search_variants(
+    text: str,
+    config: NormalizerConfig = DEFAULT_CONFIG,
+    max_words: int = 8,
+    min_words: int = 3,
+    prefixes: Sequence[str] = DEFAULT_QUERY_PREFIXES,
+) -> list[str]:
+    """چند شکل مختلف از یک عنوان برای پرسیدن از گوگل.
+
+    یک عبارت ممکن است با عنوان کامل هیچ پیشنهادی نداشته باشد ولی با دو کلمه
+    کمتر یا با پیشوند «دانلود» داشته باشد — این را روی نمونه‌های واقعی دیدیم.
+    ترتیب از مشخص‌ترین به عمومی‌ترین است تا اگر بودجه‌ی کوئری کم بود، اول
+    دقیق‌ترین شکل امتحان شود.
+    """
+    base = search_query(text, config, max_words)
+    tokens = base.split()
+    if not tokens:
+        return []
+    core = " ".join(tokens[: min(len(tokens), 4)])
+
+    ordered: list[str] = [base]
+    shorter = [" ".join(tokens[:size]) for size in range(len(tokens) - 1, min_words - 1, -1)]
+    prefixed = [f"{prefix} {core}".strip() for prefix in prefixes]
+
+    # یکی در میان: کوتاه‌شده، پیشونددار — تا با بودجه‌ی کم هم تنوع داشته باشیم
+    for index in range(max(len(shorter), len(prefixed))):
+        if index < len(shorter):
+            ordered.append(shorter[index])
+        if index < len(prefixed):
+            ordered.append(prefixed[index])
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for query in ordered:
+        query = query.strip()
+        if query and query not in seen:
+            seen.add(query)
+            out.append(query)
+    return out
+
+
+def covers(suggestion: str, query: str, config: NormalizerConfig = DEFAULT_CONFIG,
+           min_ratio: float = 1.0) -> bool:
+    """آیا این پیشنهاد واقعاً به همان عبارت مربوط است؟
+
+    گوگل کنار پیشنهادهای مرتبط، چیزهای شبیه هم برمی‌گرداند: برای «رمان ارباب
+    تعصبی» هم «رمان ارباب تعصبی من» می‌دهد (مرتبط) و هم «رمان غرور و تعصب»
+    (بی‌ربط). ملاک ما این است که کلمات خودِ عبارت در پیشنهاد آمده باشند.
+    """
+    wanted = set(meaningful_tokens(query, config))
+    if not wanted:
+        return True
+    found = set(meaningful_tokens(suggestion, config))
+    return len(wanted & found) / len(wanted) >= min_ratio

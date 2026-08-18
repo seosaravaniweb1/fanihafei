@@ -572,7 +572,7 @@ async function showDetail(id) {
     body.replaceChildren();
 
     const meta = el("div", { className: "muted" }, [
-      `کوئری ساجست: «${product.suggest_query}»`,
+      `کوئری‌هایی که از گوگل پرسیده می‌شود: ${product.suggest_queries.map((q) => `«${q}»`).join("، ")}`,
       el("br"),
       `اطمینان ادغام: ${product.merge_confidence ?? "—"}`,
       product.entity_tokens.length ? ` | توکن‌های تمایزدهنده: ${product.entity_tokens.join("، ")}` : "",
@@ -614,7 +614,18 @@ async function showDetail(id) {
     }
 
     body.append(el("h3", { textContent: `کلمات ساجست (${product.keywords.length})` }));
-    body.append(el("div", { className: "muted", textContent: product.keywords.join("، ") || "—" }));
+    if (!product.keywords.length) {
+      body.append(el("div", { className: "muted", textContent: "—" }));
+    }
+    for (const keyword of product.keywords) {
+      const source = product.keyword_sources[keyword];
+      body.append(el("div", { className: "member" }, [
+        el("div", { className: "grow" }, [
+          el("div", { textContent: keyword }),
+          source ? el("div", { className: "muted", textContent: `از کوئری: ${source}` }) : "",
+        ]),
+      ]));
+    }
   } catch (error) { toast(error.message, true); }
 }
 
