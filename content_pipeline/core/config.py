@@ -123,8 +123,10 @@ class Config:
 DEFAULTS: dict[str, Any] = {
     "database": {"path": "content_pipeline/data/runs.db"},
     "run": {
+        "categories": [],
         "target_topic": "",
         "topic_examples": [],
+        "auto_threshold": True,
         "relevance_threshold": 0.65,
         "review_threshold": 0.50,
     },
@@ -157,12 +159,14 @@ DEFAULTS: dict[str, Any] = {
         "cache_ttl_days": 30,
     },
     "output": {
+        "sheets": ["ready", "archive", "all", "review"],
         "xlsx_path": "content_pipeline/data/output-{run_id}.xlsx",
         "sheet_id": "",
         "service_account_json": "",
         "tabs": {
             "ready": "آماده تولید محتوا",
             "archive": "آرشیو آینده",
+            "all": "همه محصولات",
             "review": "نیاز به بازبینی دستی",
         },
     },

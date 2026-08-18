@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Callable
+from typing import Callable, Sequence
 
-from . import db
+from . import db, presets
 from .cache import QueryCache
 from .config import Config
 from .embeddings import TopicMatcher, get_encoder
@@ -29,12 +29,38 @@ PHASE_NAMES: dict[int, str] = {
 LAST_PHASE = 4
 
 
-def topic_matcher(config: Config, log: LogFn = print) -> TopicMatcher:
+def topic_matcher(
+    config: Config,
+    log: LogFn = print,
+    categories: Sequence[str] | None = None,
+) -> TopicMatcher:
+    """بردار مرجع تشخیص موضوعی.
+
+    اگر اجرا دسته دارد (انتخاب کاربر در پنل) از همان‌ها ساخته می‌شود و هر
+    عنوان به نزدیک‌ترین دسته نسبت داده می‌شود؛ وگرنه از ``run.target_topic``
+    و نمونه‌عنوان‌های config.
+    """
     encoder = get_encoder(config.get("embeddings.model"))
     log(f"انکودر: {encoder.name}")
+
+    chosen = presets.resolve(categories or config.get("run.categories") or [])
+    if chosen:
+        log(f"دسته‌ها: {'، '.join(p.label for p in chosen)}")
+        pairs = []
+        extra = list(config.topic_examples)
+        for preset in chosen:
+            examples = list(preset.examples) or extra
+            pairs.append((preset.label, examples))
+        return TopicMatcher.build_categories(encoder, pairs)
+
     if not config.target_topic:
-        raise ValueError("run.target_topic در config خالی است.")
-    return TopicMatcher.build(encoder, config.target_topic, config.topic_examples)
+        raise ValueError(
+            "نه دسته‌ای انتخاب شده و نه run.target_topic پر است."
+            " از تب «شروع» پنل نوع محصول را انتخاب کنید."
+        )
+    return TopicMatcher.build_categories(
+        encoder, [(config.target_topic, list(config.topic_examples))]
+    )
 
 
 def run_phase(
@@ -46,7 +72,7 @@ def run_phase(
 ) -> str:
     """اجرای یک فاز. خروجی، خط خلاصه‌ی همان فاز است."""
     if phase == 1:
-        matcher = topic_matcher(config, log)
+        matcher = topic_matcher(config, log, db.run_categories(conn, run_id))
         with fetcher_from_config(config) as fetcher:
             log(f"backend HTTP: {fetcher.backend}")
             if fetcher.backend != "curl_cffi":

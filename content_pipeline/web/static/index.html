@@ -21,7 +21,8 @@
 </header>
 
 <nav id="tabs">
-  <button data-tab="dashboard" class="active">داشبورد</button>
+  <button data-tab="setup" class="active">شروع</button>
+  <button data-tab="dashboard">داشبورد</button>
   <button data-tab="run">اجرا</button>
   <button data-tab="products">محصولات</button>
   <button data-tab="review">بازبینی دستی</button>
@@ -32,8 +33,59 @@
 <div id="toast" hidden></div>
 
 <main>
+  <!-- --------------------------------------------------------- شروع -->
+  <section id="tab-setup" class="tab active">
+    <div class="panel">
+      <h2>۱. چه نوع محصولاتی می‌خواهید؟</h2>
+      <p class="muted">
+        هر تیک یک دسته است و می‌توانید چند تا را با هم بزنید. عنوان‌های پیداشده
+        به نزدیک‌ترین دسته نسبت داده می‌شوند و همان نام در ستون «دسته»ی خروجی می‌آید.
+      </p>
+      <div id="presetList" class="preset-grid"></div>
+      <div class="row">
+        <input id="customCategory" placeholder="دسته‌ی دلخواه خودتان (اختیاری) — مثلاً: کتاب صوتی">
+        <button id="addCategory" class="ghost">افزودن</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>۲. سایت‌های رقیب</h2>
+      <p class="muted">
+        هر خط یک آدرس. از اکسل یا مرورگر کپی کنید؛ آدرس بدون <code>https://</code>
+        هم قبول است. تکراری‌ها خودشان حذف می‌شوند.
+        <span id="siteLimit"></span>
+      </p>
+      <textarea id="sitesText" dir="ltr" spellcheck="false"
+                placeholder="https://example1.ir&#10;https://example2.ir&#10;example3.com"></textarea>
+      <div class="row">
+        <span class="muted" id="siteCount"></span>
+        <span class="spacer"></span>
+        <span class="muted" id="planSource"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>۳. کدام خروجی را می‌خواهید؟</h2>
+      <p class="muted">
+        در شیت «همه محصولات» ستونی هست که می‌گوید هر محصول ساجست دارد یا نه —
+        پس حتی اگر همه را یکجا بخواهید، تفکیک از دست نمی‌رود.
+      </p>
+      <div id="sheetList" class="phase-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row wrap">
+        <button id="createRunBtn" class="primary">ساخت اجرای جدید با این تنظیمات</button>
+        <button id="savePlanBtn" class="ghost">ذخیره روی اجرای فعلی</button>
+        <span class="spacer"></span>
+        <button id="goRunBtn" class="ghost">رفتن به تب اجرا ◀</button>
+      </div>
+      <div id="setupSummary" class="muted"></div>
+    </div>
+  </section>
+
   <!-- ------------------------------------------------------ داشبورد -->
-  <section id="tab-dashboard" class="tab active">
+  <section id="tab-dashboard" class="tab">
     <div class="cards" id="counterCards"></div>
     <div class="panel">
       <h2>وضعیت اجرا</h2>

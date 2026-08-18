@@ -23,6 +23,7 @@ READY_HEADER = [
     "canonical_title",
     "lsi_keywords",
     "lsi_count",
+    "category",
     "source_domains",
     "source_urls",
     "merge_count",
@@ -32,11 +33,31 @@ READY_HEADER = [
 ARCHIVE_HEADER = [
     "canonical_title",
     "lsi_count",
+    "category",
     "source_domains",
     "source_urls",
     "merge_count",
     "confidence",
 ]
+
+# شیت «همه محصولات»: همه در یک جا، با ستونی که می‌گوید کدام ساجست دارد.
+ALL_HEADER = [
+    "canonical_title",
+    "suggest",
+    "lsi_keywords",
+    "lsi_count",
+    "category",
+    "source_domains",
+    "source_urls",
+    "merge_count",
+    "confidence",
+]
+
+SUGGEST_LABEL = {HAS_SUGGEST: "دارد", NO_SUGGEST: "ندارد", "": "بررسی نشده"}
+
+# کلید هر شیت، برای انتخاب در config و پنل
+SHEET_KEYS = ("ready", "archive", "all", "review")
+DEFAULT_SHEETS = list(SHEET_KEYS)
 
 REVIEW_HEADER = [
     "type",
@@ -60,6 +81,7 @@ class Sheet:
 class ExportStats:
     ready_rows: int = 0
     archive_rows: int = 0
+    all_rows: int = 0
     review_rows: int = 0
     local_path: str = ""
     sheet_url: str = ""
@@ -67,7 +89,8 @@ class ExportStats:
     def render(self) -> str:
         parts = [
             f"خروجی — آماده تولید محتوا: {self.ready_rows}، "
-            f"آرشیو آینده: {self.archive_rows}، نیاز به بازبینی: {self.review_rows}"
+            f"آرشیو آینده: {self.archive_rows}، همه محصولات: {self.all_rows}، "
+            f"نیاز به بازبینی: {self.review_rows}"
         ]
         if self.local_path:
             parts.append(f"فایل محلی: {self.local_path}")
@@ -81,10 +104,21 @@ class ExportStats:
 # ---------------------------------------------------------------------------
 
 
+def selected_sheets(config: Config) -> list[str]:
+    """کدام شیت‌ها ساخته شوند. ``output.sheets`` در config یا انتخاب پنل."""
+    raw = config.get("output.sheets", DEFAULT_SHEETS) or DEFAULT_SHEETS
+    if isinstance(raw, str):
+        raw = [part.strip() for part in raw.split(",")]
+    chosen = [key for key in SHEET_KEYS if key in {str(item).strip() for item in raw}]
+    return chosen or DEFAULT_SHEETS
+
+
 def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[Sheet]:
     tabs = config.get("output.tabs", {}) or {}
+    wanted = selected_sheets(config)
     ready: list[list] = []
     archive: list[list] = []
+    everything: list[list] = []
     review: list[list] = []
 
     for row in db.canonical_products(conn, run_id):
@@ -93,18 +127,24 @@ def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[
         domains = db.source_domains_for(conn, canonical_id)
         urls = db.source_urls_for(conn, canonical_id)
         confidence = round(float(row["merge_confidence"] or 0.0), 3)
-        common = [
-            len(keywords),
-            " | ".join(domains),
-            " | ".join(urls),
-            len(urls),
-            confidence,
-        ]
+        category = db.category_of(conn, canonical_id)
+        status = row["suggest_status"] or ""
+        joined_keywords = " | ".join(keywords)
+        tail = [category, " | ".join(domains), " | ".join(urls), len(urls), confidence]
 
-        if (row["suggest_status"] or NO_SUGGEST) == HAS_SUGGEST:
-            ready.append([row["canonical_title"], " | ".join(keywords), *common])
+        everything.append(
+            [
+                row["canonical_title"],
+                SUGGEST_LABEL.get(status, "بررسی نشده"),
+                joined_keywords,
+                len(keywords),
+                *tail,
+            ]
+        )
+        if status == HAS_SUGGEST:
+            ready.append([row["canonical_title"], joined_keywords, len(keywords), *tail])
         else:
-            archive.append([row["canonical_title"], *common])
+            archive.append([row["canonical_title"], len(keywords), *tail])
 
         if row["needs_review"]:
             review.append(
@@ -131,13 +171,16 @@ def build_sheets(conn: sqlite3.Connection, run_id: str, config: Config) -> list[
     # پرمحتواترین‌ها اول، تا اولویت تولید محتوا از بالای شیت مشخص باشد
     ready.sort(key=lambda r: (-r[2], r[0]))
     archive.sort(key=lambda r: r[0])
+    everything.sort(key=lambda r: (r[1] != "دارد", -r[3], r[0]))
     review.sort(key=lambda r: (r[0], r[3]))
 
-    return [
-        Sheet(tabs.get("ready", "آماده تولید محتوا"), READY_HEADER, ready),
-        Sheet(tabs.get("archive", "آرشیو آینده"), ARCHIVE_HEADER, archive),
-        Sheet(tabs.get("review", "نیاز به بازبینی دستی"), REVIEW_HEADER, review),
-    ]
+    available = {
+        "ready": Sheet(tabs.get("ready", "آماده تولید محتوا"), READY_HEADER, ready),
+        "archive": Sheet(tabs.get("archive", "آرشیو آینده"), ARCHIVE_HEADER, archive),
+        "all": Sheet(tabs.get("all", "همه محصولات"), ALL_HEADER, everything),
+        "review": Sheet(tabs.get("review", "نیاز به بازبینی دستی"), REVIEW_HEADER, review),
+    }
+    return [available[key] for key in wanted]
 
 
 # ---------------------------------------------------------------------------
@@ -250,10 +293,12 @@ def run(
     verbose: bool = True,
 ) -> ExportStats:
     sheets = build_sheets(conn, run_id, config)
+    counts = {key: len(sheet.rows) for key, sheet in zip(selected_sheets(config), sheets)}
     stats = ExportStats(
-        ready_rows=len(sheets[0].rows),
-        archive_rows=len(sheets[1].rows),
-        review_rows=len(sheets[2].rows),
+        ready_rows=counts.get("ready", 0),
+        archive_rows=counts.get("archive", 0),
+        all_rows=counts.get("all", 0),
+        review_rows=counts.get("review", 0),
     )
 
     xlsx_path = config.get("output.xlsx_path", "content_pipeline/data/output-{run_id}.xlsx")

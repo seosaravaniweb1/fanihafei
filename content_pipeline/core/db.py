@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 RUNNING = "running"
 COMPLETED = "completed"
@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS runs (
     target_topic  TEXT NOT NULL,
     created_at    TIMESTAMP,
     status        TEXT,
-    current_phase INTEGER
+    current_phase INTEGER,
+    categories    TEXT,   -- JSON: دسته‌های انتخاب‌شده‌ی این اجرا
+    sites         TEXT    -- JSON: سایت‌های همین اجرا (خالی = از config)
 );
 
 CREATE TABLE IF NOT EXISTS raw_products (
@@ -41,6 +43,7 @@ CREATE TABLE IF NOT EXISTS raw_products (
     normalized_title TEXT,
     topic_score      REAL,
     is_relevant      BOOLEAN,
+    category         TEXT,   -- دسته‌ای که این عنوان به آن نزدیک‌تر بوده
     UNIQUE(run_id, source_url)
 );
 
@@ -99,10 +102,30 @@ def connect(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
+NEW_COLUMNS: dict[str, dict[str, str]] = {
+    "runs": {"categories": "TEXT", "sites": "TEXT"},
+    "raw_products": {"category": "TEXT"},
+}
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    _migrate(conn)
     conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
     conn.commit()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """ستون‌های تازه را به دیتابیس‌های ساخته‌شده با نسخه‌های قبلی اضافه می‌کند.
+
+    ``CREATE TABLE IF NOT EXISTS`` جدول موجود را دست نمی‌زند، پس بدون این،
+    اجرای قدیمی کاربر بعد از به‌روزرسانی می‌شکست.
+    """
+    for table, columns in NEW_COLUMNS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for column, kind in columns.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
 
 @contextmanager
@@ -126,16 +149,80 @@ def new_run_id() -> str:
     return f"{stamp}-{uuid.uuid4().hex[:6]}"
 
 
-def create_run(conn: sqlite3.Connection, topic: str, run_id: str | None = None) -> str:
+def create_run(
+    conn: sqlite3.Connection,
+    topic: str,
+    run_id: str | None = None,
+    categories: Sequence[str] | None = None,
+    sites: Sequence[str] | None = None,
+) -> str:
     run_id = run_id or new_run_id()
     with transaction(conn):
         conn.execute(
             """INSERT OR IGNORE INTO runs
-               (run_id, target_topic, created_at, status, current_phase)
-               VALUES (?,?,?,?,?)""",
-            (run_id, topic, utcnow(), RUNNING, 0),
+               (run_id, target_topic, created_at, status, current_phase, categories, sites)
+               VALUES (?,?,?,?,?,?,?)""",
+            (
+                run_id,
+                topic,
+                utcnow(),
+                RUNNING,
+                0,
+                json.dumps(list(categories or []), ensure_ascii=False),
+                json.dumps(list(sites or []), ensure_ascii=False),
+            ),
         )
     return run_id
+
+
+def run_categories(conn: sqlite3.Connection, run_id: str) -> list[str]:
+    row = get_run(conn, run_id)
+    if row is None:
+        return []
+    return _json_list(row["categories"])
+
+
+def run_sites(conn: sqlite3.Connection, run_id: str) -> list[str]:
+    """سایت‌های همین اجرا. فهرست خالی یعنی «از config بخوان»."""
+    row = get_run(conn, run_id)
+    if row is None:
+        return []
+    return _json_list(row["sites"])
+
+
+def set_run_plan(
+    conn: sqlite3.Connection,
+    run_id: str,
+    categories: Sequence[str] | None = None,
+    sites: Sequence[str] | None = None,
+    topic: str | None = None,
+) -> None:
+    """ویرایش نقشه‌ی یک اجرا: دسته‌ها، سایت‌ها و موضوع."""
+    sets, values = [], []
+    if categories is not None:
+        sets.append("categories=?")
+        values.append(json.dumps(list(categories), ensure_ascii=False))
+    if sites is not None:
+        sets.append("sites=?")
+        values.append(json.dumps(list(sites), ensure_ascii=False))
+    if topic is not None:
+        sets.append("target_topic=?")
+        values.append(topic)
+    if not sets:
+        return
+    values.append(run_id)
+    with transaction(conn):
+        conn.execute(f"UPDATE runs SET {', '.join(sets)} WHERE run_id=?", values)
+
+
+def _json_list(value: Any) -> list[str]:
+    if not value:
+        return []
+    try:
+        data = json.loads(value)
+    except (TypeError, ValueError):
+        return []
+    return [str(item) for item in data] if isinstance(data, list) else []
 
 
 def get_run(conn: sqlite3.Connection, run_id: str) -> sqlite3.Row | None:
@@ -203,12 +290,28 @@ def insert_raw_product(
 
 
 def update_raw_relevance(
-    conn: sqlite3.Connection, raw_id: int, topic_score: float, is_relevant: bool | None
+    conn: sqlite3.Connection,
+    raw_id: int,
+    topic_score: float,
+    is_relevant: bool | None,
+    category: str | None = None,
 ) -> None:
     conn.execute(
-        "UPDATE raw_products SET topic_score=?, is_relevant=? WHERE id=?",
-        (topic_score, None if is_relevant is None else int(is_relevant), raw_id),
+        "UPDATE raw_products SET topic_score=?, is_relevant=?, category=? WHERE id=?",
+        (topic_score, None if is_relevant is None else int(is_relevant), category, raw_id),
     )
+
+
+def category_of(conn: sqlite3.Connection, canonical_id: int) -> str:
+    """دسته‌ی یک محصول یکپارچه = پرتکرارترین دسته‌ی عنوان‌های خامش."""
+    row = conn.execute(
+        """SELECT r.category AS category, COUNT(*) AS c
+           FROM product_mapping m JOIN raw_products r ON r.id = m.raw_id
+           WHERE m.canonical_id=? AND r.category IS NOT NULL AND r.category <> ''
+           GROUP BY r.category ORDER BY c DESC, r.category LIMIT 1""",
+        (canonical_id,),
+    ).fetchone()
+    return row["category"] if row else ""
 
 
 def relevant_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:

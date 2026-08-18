@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, quote, urlparse
 
-from ..core import db, normalizer, pipeline
+from ..core import db, normalizer, pipeline, presets
+from ..output import exporter
 from ..core.config import Config, ConfigError, load_config
 from . import jobs
 
@@ -166,12 +167,96 @@ def api_state(state: PanelState, query: dict) -> dict:
     }
 
 
+MAX_SITES = 300
+
+
+def clean_sites(raw: object) -> list[str]:
+    """متن چسبانده‌شده‌ی کاربر → فهرست آدرس یکتا.
+
+    هر چیزی که آدرس نباشد کنار گذاشته می‌شود و آدرس بدون ``http`` هم قبول
+    است (``example.ir`` → ``https://example.ir``) چون کاربر معمولاً از اکسل
+    یا مرورگر کپی می‌کند.
+    """
+    if isinstance(raw, str):
+        items = raw.replace(",", "\n").split("\n")
+    elif isinstance(raw, list):
+        items = [str(item) for item in raw]
+    else:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        url = str(item).strip().strip("\u200c").rstrip("/")
+        if not url or url.startswith("#"):
+            continue
+        if "://" not in url:
+            url = f"https://{url}"
+        parts = urlparse(url)
+        if parts.scheme not in {"http", "https"} or "." not in parts.netloc:
+            continue
+        key = parts.netloc.lower() + parts.path.rstrip("/")
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(url)
+    return out
+
+
+def api_presets(state: PanelState, query: dict) -> dict:
+    return {"presets": presets.as_dicts(), "max_sites": MAX_SITES}
+
+
 def api_create_run(state: PanelState, body: dict) -> dict:
-    topic = (body.get("topic") or state.config.target_topic or "").strip()
+    categories = [str(c) for c in (body.get("categories") or []) if str(c).strip()]
+    sites = clean_sites(body.get("sites"))
+    if len(sites) > MAX_SITES:
+        raise ApiError(f"حداکثر {MAX_SITES} سایت در هر اجرا؛ شما {len(sites)} تا دادید.")
+    labels = [preset.label for preset in presets.resolve(categories)]
+    topic = (body.get("topic") or "، ".join(labels) or state.config.target_topic or "").strip()
     if not topic:
-        raise ApiError("موضوع هدف خالی است. یا اینجا بنویسید یا run.target_topic را پر کنید.")
-    run_id = db.create_run(state.conn(), topic)
-    return {"run_id": run_id, "target_topic": topic}
+        raise ApiError("نوع محصول انتخاب نشده است. حداقل یک دسته را تیک بزنید.")
+    run_id = db.create_run(state.conn(), topic, categories=labels, sites=sites)
+    return {
+        "run_id": run_id,
+        "target_topic": topic,
+        "categories": labels,
+        "sites": len(sites),
+    }
+
+
+def api_plan(state: PanelState, query: dict) -> dict:
+    """نقشه‌ی اجرا: دسته‌ها و سایت‌هایش."""
+    conn = state.conn()
+    run_id = state.resolve_run(query.get("run_id"))
+    row = db.get_run(conn, run_id)
+    sites = db.run_sites(conn, run_id)
+    return {
+        "run_id": run_id,
+        "target_topic": row["target_topic"],
+        "categories": db.run_categories(conn, run_id),
+        "sites": sites,
+        "from_config": not sites,
+        "config_sites": [site.base_url for site in state.config.sites] if not sites else [],
+    }
+
+
+def api_save_plan(state: PanelState, body: dict) -> dict:
+    _guard_idle(state)
+    conn = state.conn()
+    run_id = state.resolve_run(body.get("run_id"))
+    categories = None
+    if "categories" in body:
+        categories = [preset.label for preset in presets.resolve(body.get("categories") or [])]
+    sites = None
+    if "sites" in body:
+        sites = clean_sites(body.get("sites"))
+        if len(sites) > MAX_SITES:
+            raise ApiError(f"حداکثر {MAX_SITES} سایت در هر اجرا؛ شما {len(sites)} تا دادید.")
+    topic = body.get("topic")
+    if topic is None and categories:
+        topic = "، ".join(categories)
+    db.set_run_plan(conn, run_id, categories=categories, sites=sites, topic=topic)
+    return api_plan(state, {"run_id": run_id})
 
 
 def api_delete_run(state: PanelState, body: dict) -> dict:
@@ -380,6 +465,38 @@ def output_files(state: PanelState, run_id: str) -> list[Path]:
     return sorted(path.parent.glob(f"{path.stem}__*.csv"))
 
 
+def api_sheets(state: PanelState, query: dict) -> dict:
+    tabs = state.config.get("output.tabs", {}) or {}
+    names = {
+        "ready": tabs.get("ready", "آماده تولید محتوا"),
+        "archive": tabs.get("archive", "آرشیو آینده"),
+        "all": tabs.get("all", "همه محصولات"),
+        "review": tabs.get("review", "نیاز به بازبینی دستی"),
+    }
+    hints = {
+        "ready": "محصولاتی که در گوگل ساجست دارند",
+        "archive": "محصولاتی که ساجست ندارند",
+        "all": "همه با هم، با ستون «ساجست: دارد/ندارد»",
+        "review": "مواردی که ابزار مطمئن نبوده",
+    }
+    return {
+        "selected": exporter.selected_sheets(state.config),
+        "sheets": [
+            {"key": key, "title": names[key], "hint": hints[key]} for key in exporter.SHEET_KEYS
+        ],
+    }
+
+
+def api_save_sheets(state: PanelState, body: dict) -> dict:
+    """انتخاب شیت‌ها در حافظه‌ی همین نشست می‌ماند و در config هم نوشته می‌شود."""
+    chosen = [str(key) for key in (body.get("sheets") or []) if str(key) in exporter.SHEET_KEYS]
+    if not chosen:
+        raise ApiError("حداقل یک خروجی را انتخاب کنید.")
+    state.config.raw.setdefault("output", {})["sheets"] = chosen
+    state.runner.config = state.config
+    return {"selected": chosen}
+
+
 def api_output(state: PanelState, query: dict) -> dict:
     run_id = state.resolve_run(query.get("run_id"))
     files = output_files(state, run_id)
@@ -398,6 +515,9 @@ GET_ROUTES: dict[str, Callable[[PanelState, dict], Any]] = {
     "/api/review": api_review,
     "/api/normalize": api_normalize,
     "/api/output": api_output,
+    "/api/presets": api_presets,
+    "/api/plan": api_plan,
+    "/api/sheets": api_sheets,
 }
 
 POST_ROUTES: dict[str, Callable[[PanelState, dict], Any]] = {
@@ -410,6 +530,8 @@ POST_ROUTES: dict[str, Callable[[PanelState, dict], Any]] = {
     "/api/products/detach": api_detach,
     "/api/products/rename": api_rename,
     "/api/products/review": api_review_flag,
+    "/api/plan": api_save_plan,
+    "/api/sheets": api_save_sheets,
 }
 
 

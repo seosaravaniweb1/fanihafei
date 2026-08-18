@@ -120,6 +120,22 @@ def _filter_urls(urls: Iterable[str], site: SiteConfig) -> list[str]:
     return out
 
 
+def sites_for_run(conn: sqlite3.Connection, run_id: str, config: Config):
+    """سایت‌های یک اجرا: اول فهرست خودِ اجرا (از پنل)، وگرنه ``sites`` در config.
+
+    هر اجرا فهرست سایت‌های خودش را نگه می‌دارد تا اجرای بعدی با فهرست دیگر،
+    اجرای قبلی را دست‌کاری نکند.
+    """
+    urls = db.run_sites(conn, run_id)
+    if not urls:
+        return config.sites
+    defaults = {
+        "max_depth": config.get("crawl.max_depth", 3),
+        "max_pages": config.get("crawl.max_pages", 500),
+    }
+    return [SiteConfig.from_entry(url, defaults) for url in urls]
+
+
 def run(
     conn: sqlite3.Connection,
     run_id: str,
@@ -131,9 +147,12 @@ def run(
 ) -> CrawlStats:
     norm_config = normalizer.config_from_mapping(config.normalizer)
     stats = CrawlStats()
-    sites = config.sites
+    sites = sites_for_run(conn, run_id, config)
     if not sites:
-        raise ValueError("هیچ سایتی در config تعریف نشده است (کلید sites).")
+        raise ValueError(
+            "هیچ سایتی برای این اجرا ثبت نشده است. از تب «شروع» پنل لینک سایت‌ها"
+            " را وارد کنید یا کلید sites را در config پر کنید."
+        )
 
     for site in sites:
         max_urls = min(site.max_pages, limit or site.max_pages)
@@ -190,8 +209,13 @@ def score_relevance(
     * کمتر                          → نامرتبط
     """
     stats = stats or CrawlStats()
-    threshold = config.relevance_threshold
-    review = config.review_threshold
+    fallback = (config.relevance_threshold, config.review_threshold)
+    auto = bool(config.get("run.auto_threshold", True)) and bool(matcher.thresholds)
+    if verbose and auto:
+        limits = "، ".join(
+            f"{label}: {rel}/{rev}" for label, (rel, rev) in matcher.thresholds.items()
+        )
+        print(f"  آستانه‌ی کالیبره‌شده (مرتبط/مرزی) — {limits}")
     rows = conn.execute(
         "SELECT id, raw_title, normalized_title FROM raw_products WHERE run_id=?", (run_id,)
     ).fetchall()
@@ -200,9 +224,10 @@ def score_relevance(
     for start in range(0, len(rows), batch_size):
         chunk = rows[start : start + batch_size]
         titles = [r["normalized_title"] or r["raw_title"] or "" for r in chunk]
-        scores = matcher.score_batch(titles)
+        verdicts = matcher.classify_batch(titles)
         with db.transaction(conn):
-            for row, score in zip(chunk, scores):
+            for row, (label, score) in zip(chunk, verdicts):
+                threshold, review = matcher.limits(label, fallback) if auto else fallback
                 if score >= threshold:
                     is_relevant: bool | None = True
                     stats.relevant += 1
@@ -211,7 +236,9 @@ def score_relevance(
                     stats.borderline += 1
                 else:
                     is_relevant = False
-                db.update_raw_relevance(conn, int(row["id"]), float(score), is_relevant)
+                db.update_raw_relevance(
+                    conn, int(row["id"]), float(score), is_relevant, label or None
+                )
 
     path = export_borderline(conn, run_id, config)
     if verbose and path:

@@ -172,16 +172,18 @@ def _prepare_export(conn, run_id):
     return ready
 
 
-def test_three_sheets_are_produced(env):
+def test_four_sheets_are_produced(env):
     conn, run_id, config = env
     _prepare_export(conn, run_id)
-    ready, archive, review = exporter.build_sheets(conn, run_id, config)
+    ready, archive, everything, review = exporter.build_sheets(conn, run_id, config)
 
     assert ready.title == "آماده تولید محتوا"
     assert archive.title == "آرشیو آینده"
+    assert everything.title == "همه محصولات"
     assert review.title == "نیاز به بازبینی دستی"
     assert ready.header == exporter.READY_HEADER
     assert archive.header == exporter.ARCHIVE_HEADER
+    assert everything.header == exporter.ALL_HEADER
 
 
 def test_ready_sheet_carries_keywords_and_counts(env):
@@ -193,8 +195,8 @@ def test_ready_sheet_carries_keywords_and_counts(env):
     assert row[0] == "محصول الف"
     assert row[1] == "محصول الف pdf | محصول الف کامل"
     assert row[2] == 2  # lsi_count
-    assert row[3] == "a.ir"  # source_domains
-    assert row[5] == 1  # merge_count
+    assert row[4] == "a.ir"  # source_domains
+    assert row[6] == 1  # merge_count
 
 
 def test_archive_sheet_has_no_keyword_column(env):
@@ -208,7 +210,7 @@ def test_archive_sheet_has_no_keyword_column(env):
 def test_review_sheet_mixes_merge_doubts_and_borderline_titles(env):
     conn, run_id, config = env
     _prepare_export(conn, run_id)
-    review = exporter.build_sheets(conn, run_id, config)[2]
+    review = exporter.build_sheets(conn, run_id, config)[3]
 
     kinds = {row[0] for row in review.rows}
     assert kinds == {"ادغام مبهم", "ارتباط مرزی با موضوع"}
@@ -223,6 +225,7 @@ def test_export_writes_a_local_file(env):
     assert stats.local_path
     assert stats.ready_rows == 1
     assert stats.archive_rows == 2
+    assert stats.all_rows == 3       # همه‌ی محصولات در یک شیت
     assert stats.review_rows == 2
 
 
@@ -247,3 +250,65 @@ def test_pipeline_run_phase_rejects_unknown_phase(env):
     conn, run_id, config = env
     with pytest.raises(ValueError):
         pipeline.run_phase(conn, run_id, config, 9)
+
+
+# ---------------------------------------------------------------------------
+# انتخاب خروجی و ستون ساجست
+# ---------------------------------------------------------------------------
+
+
+def test_all_products_sheet_marks_which_have_suggest(env):
+    conn, run_id, config = env
+    _prepare_export(conn, run_id)
+    everything = exporter.build_sheets(conn, run_id, config)[2]
+
+    status = {row[0]: row[1] for row in everything.rows}
+    assert status["محصول الف"] == "دارد"
+    assert status["محصول ب"] == "ندارد"
+    # ساجست‌دارها بالای شیت می‌آیند
+    assert everything.rows[0][1] == "دارد"
+
+
+def test_user_can_ask_for_only_the_sheets_they_want(env):
+    conn, run_id, config = env
+    _prepare_export(conn, run_id)
+    config.raw["output"]["sheets"] = ["all"]
+
+    sheets = exporter.build_sheets(conn, run_id, config)
+
+    assert [sheet.title for sheet in sheets] == ["همه محصولات"]
+    stats = exporter.run(conn, run_id, config, push_to_sheets=False, verbose=False)
+    assert stats.all_rows == 3
+    assert stats.ready_rows == 0  # ساخته نشده، نه اینکه خالی باشد
+
+
+def test_only_products_with_suggest(env):
+    conn, run_id, config = env
+    _prepare_export(conn, run_id)
+    config.raw["output"]["sheets"] = ["ready"]
+
+    sheets = exporter.build_sheets(conn, run_id, config)
+
+    assert [sheet.title for sheet in sheets] == ["آماده تولید محتوا"]
+    assert len(sheets[0].rows) == 1
+
+
+def test_unknown_sheet_names_fall_back_to_everything(env):
+    conn, run_id, config = env
+    _prepare_export(conn, run_id)
+    config.raw["output"]["sheets"] = ["چیز عجیب"]
+    assert len(exporter.build_sheets(conn, run_id, config)) == 4
+
+
+def test_category_column_follows_the_raw_titles(env):
+    conn, run_id, config = env
+    canonical = _prepare_export(conn, run_id)
+    conn.execute(
+        "UPDATE raw_products SET category='رمان' WHERE run_id=? AND raw_title LIKE 'محصول الف%'",
+        (run_id,),
+    )
+    conn.commit()
+
+    ready = exporter.build_sheets(conn, run_id, config)[0]
+    assert db.category_of(conn, canonical) == "رمان"
+    assert ready.rows[0][3] == "رمان"

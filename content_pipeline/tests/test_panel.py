@@ -467,3 +467,112 @@ def test_log_buffer_is_bounded(panel, monkeypatch):
     assert len(lines) == 10
     assert lines[0] == "خط 15"
     assert next_line == 25
+
+
+# ------------------------------------------------- نقشه‌ی اجرا: دسته و سایت
+
+
+def test_presets_are_offered_to_the_user(panel):
+    _, data = panel("/api/presets")
+    labels = [preset["label"] for preset in data["presets"]]
+    assert "جزوه" in labels and "رمان" in labels and "کتاب دانشگاهی" in labels
+    assert data["max_sites"] == 300
+    assert all(preset["examples"] for preset in data["presets"])
+
+
+def test_run_is_created_with_categories_and_sites(panel):
+    status, created = panel(
+        "/api/runs",
+        method="POST",
+        body={
+            "categories": ["رمان", "jozve"],
+            "sites": "https://a.ir\nb.ir\n\nhttps://a.ir/\n#کامنت\nنه یک آدرس",
+        },
+    )
+    assert status == 200
+    assert created["categories"] == ["رمان", "جزوه"]
+    assert created["target_topic"] == "رمان، جزوه"
+    assert created["sites"] == 2  # تکراری و خط‌های بی‌ربط حذف شدند
+
+    _, plan = panel(f"/api/plan?run_id={created['run_id']}")
+    assert plan["sites"] == ["https://a.ir", "https://b.ir"]  # بدون http هم پذیرفته شد
+    assert plan["categories"] == ["رمان", "جزوه"]
+
+
+def test_run_without_any_category_is_refused(panel):
+    status, payload = panel("/api/runs", method="POST", body={"categories": [], "sites": "a.ir"})
+    # موضوع از config پر می‌شود، پس این اجرا ساخته می‌شود
+    assert status == 200 and payload["target_topic"] == "رمان"
+
+
+def test_site_limit_is_enforced(panel):
+    many = "\n".join(f"https://site{i}.ir" for i in range(301))
+    status, payload = panel(
+        "/api/runs", method="POST", body={"categories": ["رمان"], "sites": many}
+    )
+    assert status == 400
+    assert "۳۰۰" in payload["error"] or "300" in payload["error"]
+
+
+def test_plan_can_be_edited_later(panel):
+    _, created = panel(
+        "/api/runs", method="POST", body={"categories": ["رمان"], "sites": "a.ir"}
+    )
+    status, plan = panel(
+        "/api/plan",
+        method="POST",
+        body={"run_id": created["run_id"], "categories": ["جزوه"], "sites": "c.ir\nd.ir"},
+    )
+    assert status == 200
+    assert plan["categories"] == ["جزوه"]
+    assert plan["sites"] == ["https://c.ir", "https://d.ir"]
+    _, state = panel("/api/state")
+    assert state["current"]["target_topic"] == "جزوه"
+
+
+def test_plan_falls_back_to_config_sites(panel):
+    _, created = panel("/api/runs", method="POST", body={"categories": ["رمان"], "sites": ""})
+    _, plan = panel(f"/api/plan?run_id={created['run_id']}")
+    assert plan["sites"] == []
+    assert plan["from_config"] is True
+
+
+def test_plan_is_locked_while_a_job_runs(panel, monkeypatch):
+    _, created = panel("/api/runs", method="POST", body={"categories": ["رمان"], "sites": "a.ir"})
+    gate = threading.Event()
+    monkeypatch.setattr(pipeline, "run_phase", lambda *a, **k: (gate.wait(5), "ok")[1])
+    panel.state.runner.start(created["run_id"], [1])
+    try:
+        status, _ = panel(
+            "/api/plan", method="POST", body={"run_id": created["run_id"], "sites": "z.ir"}
+        )
+        assert status == 409
+    finally:
+        gate.set()
+        panel.state.runner.join(5)
+
+
+# ------------------------------------------------------- انتخاب خروجی
+
+
+def test_sheet_choices_are_listed_with_hints(panel):
+    _, data = panel("/api/sheets")
+    keys = [sheet["key"] for sheet in data["sheets"]]
+    assert keys == ["ready", "archive", "all", "review"]
+    assert set(data["selected"]) == set(keys)
+    combined = next(sheet for sheet in data["sheets"] if sheet["key"] == "all")
+    assert "ساجست" in combined["hint"]
+
+
+def test_user_can_pick_only_the_output_they_want(panel):
+    status, saved = panel("/api/sheets", method="POST", body={"sheets": ["all", "review"]})
+    assert status == 200
+    assert saved["selected"] == ["all", "review"]
+    _, data = panel("/api/sheets")
+    assert data["selected"] == ["all", "review"]
+
+
+def test_empty_output_selection_is_refused(panel):
+    status, payload = panel("/api/sheets", method="POST", body={"sheets": []})
+    assert status == 400
+    assert "حداقل" in payload["error"]

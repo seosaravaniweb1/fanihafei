@@ -198,3 +198,28 @@ code { background: var(--code-bg); padding: .1rem .3rem; border-radius: 4px; }
   max-width: 26rem;
 }
 #toast.bad { border-inline-start-color: var(--danger); }
+
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .5rem; margin: .6rem 0; }
+.preset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .6rem .7rem;
+  cursor: pointer;
+  display: flex;
+  gap: .5rem;
+  align-items: flex-start;
+}
+.preset:hover { border-color: var(--accent); }
+.preset.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.preset b { display: block; }
+.preset small { color: var(--muted); }
+
+textarea#sitesText {
+  width: 100%;
+  height: 13rem;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: .85rem;
+  background: var(--code-bg);
+  white-space: pre;
+  overflow: auto;
+}

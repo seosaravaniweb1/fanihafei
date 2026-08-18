@@ -14,7 +14,7 @@ import hashlib
 import math
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Protocol, Sequence
 
 _DIM = 512
@@ -108,12 +108,57 @@ def get_encoder(prefer_model: str | None = None) -> Encoder:
         return HashingEncoder()
 
 
+def _percentile(values: Sequence[float], fraction: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, round(fraction * (len(ordered) - 1))))
+    return ordered[index]
+
+
+def _calibrate(
+    encoder: "Encoder",
+    named: Sequence[tuple[str, list[float]]],
+    examples_by_label: dict[str, Sequence[str]],
+) -> dict[str, tuple[float, float]]:
+    """آستانه‌ی هر دسته را از فاصله‌ی نمونه‌های خودش تا نمونه‌های بی‌ربط می‌سازد.
+
+    آستانه‌ی ثابت با انکودرهای مختلف معنای یکسانی ندارد: انکودر جایگزین به
+    عنوان مرتبط ۰.۵ می‌دهد و e5 به عنوان بی‌ربط ۰.۷. پس به‌جای عدد ثابت،
+    مرز را وسط دو ابر نقطه می‌گذاریم.
+    """
+    from .presets import NEGATIVE_SAMPLES
+
+    negatives = encoder.encode(list(NEGATIVE_SAMPLES), kind="passage")
+    out: dict[str, tuple[float, float]] = {}
+    for label, reference in named:
+        examples = [e for e in examples_by_label.get(label, ()) if e]
+        if not examples:
+            continue
+        positive = [cosine(v, reference) for v in encoder.encode(examples, kind="passage")]
+        negative = [cosine(v, reference) for v in negatives]
+        low = _percentile(positive, 0.15)      # پایین‌ترین نمونه‌های خودی
+        high = _percentile(negative, 0.90)     # بالاترین نمونه‌های بی‌ربط
+        if low <= high:  # دو ابر روی هم افتاده‌اند — کالیبراسیون قابل اتکا نیست
+            continue
+        gap = low - high
+        out[label] = (
+            round(min(0.95, max(0.05, high + 0.50 * gap)), 4),
+            round(min(0.95, max(0.03, high + 0.25 * gap)), 4),
+        )
+    return out
+
+
 @dataclass
 class TopicMatcher:
     """بردار مرجع موضوع = میانگین بردارهای ``target_topic`` + نمونه‌عنوان‌ها."""
 
     encoder: Encoder
     reference: list[float]
+    # (نام دسته، بردار مرجع) — خالی یعنی حالت تک‌موضوعی قدیمی
+    categories: list[tuple[str, list[float]]] = field(default_factory=list)
+    # نام دسته → (آستانه‌ی مرتبط، آستانه‌ی مرزی) — از روی نمونه‌ها کالیبره می‌شود
+    thresholds: dict[str, tuple[float, float]] = field(default_factory=dict)
 
     @classmethod
     def build(cls, encoder: Encoder, topic: str, examples: Iterable[str]) -> "TopicMatcher":
@@ -128,10 +173,67 @@ class TopicMatcher:
                 summed[i] += value
         return cls(encoder=encoder, reference=_normalize_vector(summed))
 
+    @classmethod
+    def build_categories(
+        cls, encoder: Encoder, categories: Sequence[tuple[str, Sequence[str]]]
+    ) -> "TopicMatcher":
+        """چند دسته با هم — هر دسته بردار مرجع خودش را دارد.
+
+        امتیاز هر عنوان، بیشترین شباهت به میان دسته‌هاست. اگر همه‌ی دسته‌ها را
+        در یک بردار میانگین می‌گرفتیم، «رمان» و «کتاب درسی» به یک نقطه‌ی وسطِ
+        بی‌معنا تبدیل می‌شدند و هیچ‌کدام درست تشخیص داده نمی‌شدند.
+        """
+        named: list[tuple[str, list[float]]] = []
+        for label, examples in categories:
+            texts = [label] + [e for e in examples if e]
+            vectors = encoder.encode(texts, kind="query")
+            if not vectors:
+                continue
+            summed = [0.0] * len(vectors[0])
+            for vector in vectors:
+                for i, value in enumerate(vector):
+                    summed[i] += value
+            named.append((label, _normalize_vector(summed)))
+        if not named:
+            raise ValueError("برای ساخت بردار مرجع حداقل به یک دسته نیاز است.")
+        overall = [0.0] * len(named[0][1])
+        for _, vector in named:
+            for i, value in enumerate(vector):
+                overall[i] += value
+        matcher = cls(encoder=encoder, reference=_normalize_vector(overall), categories=named)
+        matcher.thresholds = _calibrate(encoder, named, dict(categories))
+        return matcher
+
+    def limits(self, label: str, fallback: tuple[float, float]) -> tuple[float, float]:
+        """(آستانه‌ی مرتبط، آستانه‌ی مرزی) برای یک دسته؛ اگر کالیبره نشده،
+        همان مقادیر config."""
+        return self.thresholds.get(label, fallback)
+
+    @property
+    def labels(self) -> list[str]:
+        return [label for label, _ in self.categories]
+
+    def _best(self, vector: Sequence[float]) -> tuple[str, float]:
+        if not self.categories:
+            return "", cosine(vector, self.reference)
+        best_label, best_score = "", -1.0
+        for label, reference in self.categories:
+            score = cosine(vector, reference)
+            if score > best_score:
+                best_label, best_score = label, score
+        return best_label, best_score
+
     def score(self, title: str) -> float:
+        return self.classify(title)[1]
+
+    def classify(self, title: str) -> tuple[str, float]:
+        """(نام دسته، امتیاز). بدون دسته‌بندی، نام خالی برمی‌گردد."""
         vector = self.encoder.encode([title], kind="passage")[0]
-        return cosine(vector, self.reference)
+        return self._best(vector)
 
     def score_batch(self, titles: Sequence[str]) -> list[float]:
+        return [score for _, score in self.classify_batch(titles)]
+
+    def classify_batch(self, titles: Sequence[str]) -> list[tuple[str, float]]:
         vectors = self.encoder.encode(list(titles), kind="passage")
-        return [cosine(v, self.reference) for v in vectors]
+        return [self._best(v) for v in vectors]

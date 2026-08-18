@@ -55,6 +55,10 @@ const state = {
   jobStatus: "idle",
   products: { filter: "all", q: "", offset: 0, limit: 50, total: 0 },
   mergeTarget: null,
+  presets: [],
+  categories: new Set(),
+  sheets: new Set(),
+  maxSites: 300,
 };
 
 /* -------------------------------------------------------------------- تب */
@@ -64,11 +68,152 @@ for (const button of document.querySelectorAll("#tabs button")) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
     button.classList.add("active");
     $(`#tab-${button.dataset.tab}`).classList.add("active");
+    if (button.dataset.tab === "setup") loadSetup();
     if (button.dataset.tab === "products") loadProducts();
     if (button.dataset.tab === "review") loadReview();
     if (button.dataset.tab === "config") loadConfig();
   });
 }
+
+/* ----------------------------------------------------------------- شروع */
+async function loadSetup() {
+  try {
+    if (!state.presets.length) {
+      const data = await api("/api/presets");
+      state.presets = data.presets;
+      state.maxSites = data.max_sites;
+      $("#siteLimit").textContent = `حداکثر ${data.max_sites} سایت در هر اجرا.`;
+    }
+    const sheets = await api("/api/sheets");
+    state.sheets = new Set(sheets.selected);
+    renderSheets(sheets.sheets);
+
+    if (state.runId) {
+      const plan = await api("/api/plan", { params: { run_id: state.runId } });
+      state.categories = new Set(plan.categories);
+      $("#sitesText").value = (plan.sites.length ? plan.sites : plan.config_sites).join("\n");
+      $("#planSource").textContent = plan.sites.length
+        ? "سایت‌های همین اجرا"
+        : (plan.config_sites.length ? "برگرفته از config — با ذخیره، مال این اجرا می‌شود" : "");
+    }
+    renderPresets();
+    updateSiteCount();
+  } catch (error) { toast(error.message, true); }
+}
+
+function renderPresets() {
+  const known = new Set(state.presets.map((p) => p.label));
+  const extra = [...state.categories].filter((label) => !known.has(label))
+    .map((label) => ({ key: label, label, hint: "دسته‌ی دلخواه شما", examples: [] }));
+
+  $("#presetList").replaceChildren(...[...state.presets, ...extra].map((preset) => {
+    const box = el("input", { type: "checkbox", checked: state.categories.has(preset.label) });
+    box.addEventListener("change", () => {
+      if (box.checked) state.categories.add(preset.label);
+      else state.categories.delete(preset.label);
+      renderPresets();
+      renderSummary();
+    });
+    const card = el("label", { className: `preset${state.categories.has(preset.label) ? " on" : ""}` }, [
+      box,
+      el("span", {}, [
+        el("b", { textContent: preset.label }),
+        el("small", { textContent: preset.hint }),
+      ]),
+    ]);
+    return card;
+  }));
+  renderSummary();
+}
+
+function renderSheets(sheets) {
+  $("#sheetList").replaceChildren(...sheets.map((sheet) => {
+    const box = el("input", { type: "checkbox", checked: state.sheets.has(sheet.key) });
+    box.addEventListener("change", async () => {
+      if (box.checked) state.sheets.add(sheet.key);
+      else state.sheets.delete(sheet.key);
+      try {
+        await api("/api/sheets", { method: "POST", body: { sheets: [...state.sheets] } });
+      } catch (error) {
+        toast(error.message, true);
+        box.checked = !box.checked;
+        if (box.checked) state.sheets.add(sheet.key); else state.sheets.delete(sheet.key);
+      }
+      renderSummary();
+    });
+    return el("label", {}, [box, `${sheet.title} — `, el("span", { className: "muted", textContent: sheet.hint })]);
+  }));
+}
+
+function siteLines() {
+  return $("#sitesText").value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+function updateSiteCount() {
+  const count = siteLines().length;
+  $("#siteCount").textContent = count ? `${count} خط وارد شده` : "هنوز سایتی وارد نشده";
+  renderSummary();
+}
+
+function renderSummary() {
+  const parts = [];
+  parts.push(state.categories.size ? `دسته‌ها: ${[...state.categories].join("، ")}` : "هیچ دسته‌ای انتخاب نشده");
+  parts.push(`${siteLines().length} سایت`);
+  parts.push(`خروجی: ${state.sheets.size} شیت`);
+  $("#setupSummary").textContent = parts.join("  |  ");
+}
+
+$("#sitesText").addEventListener("input", updateSiteCount);
+
+$("#addCategory").addEventListener("click", () => {
+  const value = $("#customCategory").value.trim();
+  if (!value) return;
+  state.categories.add(value);
+  $("#customCategory").value = "";
+  renderPresets();
+});
+$("#customCategory").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); $("#addCategory").click(); }
+});
+
+$("#createRunBtn").addEventListener("click", async () => {
+  if (!state.categories.size) return toast("حداقل یک نوع محصول را تیک بزنید.", true);
+  if (!siteLines().length) return toast("حداقل یک سایت وارد کنید.", true);
+  try {
+    const created = await api("/api/runs", {
+      method: "POST",
+      body: { categories: [...state.categories], sites: $("#sitesText").value },
+    });
+    state.runId = created.run_id;
+    sessionStorage.setItem("runId", state.runId);
+    toast(`اجرای تازه ساخته شد — ${created.sites} سایت، ${created.categories.length} دسته.`);
+    await refreshState();
+    await loadSetup();
+  } catch (error) { toast(error.message, true); }
+});
+
+$("#savePlanBtn").addEventListener("click", async () => {
+  if (!state.runId) return toast("اول یک اجرا بسازید.", true);
+  try {
+    const plan = await api("/api/plan", {
+      method: "POST",
+      body: {
+        run_id: state.runId,
+        categories: [...state.categories],
+        sites: $("#sitesText").value,
+      },
+    });
+    $("#sitesText").value = plan.sites.join("\n");
+    $("#planSource").textContent = "سایت‌های همین اجرا";
+    updateSiteCount();
+    toast(`ذخیره شد — ${plan.sites.length} سایت.`);
+    await refreshState();
+  } catch (error) { toast(error.message, true); }
+});
+
+$("#goRunBtn").addEventListener("click", () => {
+  document.querySelector('#tabs button[data-tab="run"]').click();
+});
 
 /* -------------------------------------------------------------- داشبورد */
 const COUNTER_LABELS = {
@@ -223,16 +368,10 @@ $("#runSelect").addEventListener("change", (event) => {
   refreshState().catch((error) => toast(error.message, true));
 });
 
-$("#newRunBtn").addEventListener("click", async () => {
-  const topic = prompt("موضوع هدف این اجرا:", $("#topicLabel").textContent.replace("موضوع: ", ""));
-  if (topic === null) return;
-  try {
-    const created = await api("/api/runs", { method: "POST", body: { topic } });
-    state.runId = created.run_id;
-    sessionStorage.setItem("runId", state.runId);
-    toast(`اجرای تازه ساخته شد: ${created.run_id}`);
-    await refreshState();
-  } catch (error) { toast(error.message, true); }
+$("#newRunBtn").addEventListener("click", () => {
+  // ساخت اجرا از تب «شروع» انجام می‌شود تا دسته و سایت‌ها با هم تعیین شوند
+  document.querySelector('#tabs button[data-tab="setup"]').click();
+  toast("نوع محصول و سایت‌ها را انتخاب کنید، بعد دکمه‌ی ساخت اجرا را بزنید.");
 });
 
 $("#deleteRunBtn").addEventListener("click", async () => {
@@ -525,5 +664,7 @@ async function poll() {
   setTimeout(poll, state.jobStatus === "running" ? 1000 : 4000);
 }
 
-refreshState().catch((error) => toast(error.message, true));
+refreshState()
+  .then(loadSetup)
+  .catch((error) => toast(error.message, true));
 poll();
