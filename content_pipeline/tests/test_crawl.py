@@ -538,3 +538,155 @@ def test_duration_is_written_in_persian():
     assert p1_crawl._fa_duration(45) == "45 ثانیه"
     assert p1_crawl._fa_duration(909) == "15 دقیقه"
     assert p1_crawl._fa_duration(3700) == "1 ساعت و 1 دقیقه"
+
+
+# ---------------------------------------------------------------------------
+# عنوان محصول در سایت‌هایی که لوگو را در h1 می‌گذارند
+# ---------------------------------------------------------------------------
+
+ASPX_PAGE = """<html><head><meta charset="utf-8">
+<meta property="og:site_name" content="فارس فایل">
+<meta property="og:title" content="جزوه کامل ریاضی مهندسی">
+<title>جزوه کامل ریاضی مهندسی - فارس فایل</title></head>
+<body class="single-product"><h1 class="logo">فارس فایل</h1>
+<span class="price">۱۲,۰۰۰ تومان</span>
+<button class="add-to-cart">افزودن به سبد خرید</button></body></html>"""
+
+
+def test_logo_in_h1_does_not_become_the_product_title():
+    """قالب‌های ASP.NET لوگو را در h1 می‌گذارند.
+
+    با برداشتن کورکورانه‌ی اولین h1، عنوان همه‌ی محصولات یک سایت می‌شد
+    «نام فروشگاه» و همه در تشخیص موضوعی رد می‌شدند.
+    """
+    assert extract.extract_title(ASPX_PAGE, domain="farsfile.ir") == "جزوه کامل ریاضی مهندسی"
+
+
+def test_title_tag_is_used_when_only_the_logo_h1_exists():
+    page = ASPX_PAGE.replace(
+        '<meta property="og:title" content="جزوه کامل ریاضی مهندسی">', ""
+    )
+    assert extract.extract_title(page, domain="farsfile.ir") == "جزوه کامل ریاضی مهندسی"
+
+
+def test_the_longest_non_site_h1_wins():
+    page = ('<html><head><title>فارس فایل</title></head><body>'
+            '<h1>فارس فایل</h1><h1>جزوه کامل ریاضی مهندسی برای دانشجویان</h1></body></html>')
+    assert extract.extract_title(page, domain="farsfile.ir") == (
+        "جزوه کامل ریاضی مهندسی برای دانشجویان"
+    )
+
+
+def test_a_normal_site_is_unaffected():
+    page = "<html><head><title>رمان شب سرد</title></head><body><h1>رمان شب سرد</h1></body></html>"
+    assert extract.extract_title(page, domain="romanino.ir") == "رمان شب سرد"
+
+
+# ---------------------------------------------------------------------------
+# «خودم فیلتر کرده‌ام» و دیده شدن ردشده‌ها
+# ---------------------------------------------------------------------------
+
+
+def test_accept_all_keeps_everything_the_crawl_found(env):
+    """وقتی کاربر آدرس نتایج جستجو را داده، خودش فیلتر کرده است."""
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    db.set_run_plan(conn, run_id, options={"accept_all": True})
+    fetcher = FakeFetcher(
+        {
+            "https://shop.ir/sitemap.xml": (
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                "<url><loc>https://shop.ir/product/1</loc></url></urlset>"
+            ),
+            "https://shop.ir/product/1": WOO.replace("رمان شب سرد", "پاورپوینت درس علوم"),
+        }
+    )
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    stats = p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=False)
+
+    assert stats.relevant == 1  # با فیلتر موضوعی رد می‌شد
+    row = conn.execute("SELECT * FROM raw_products WHERE run_id=?", (run_id,)).fetchone()
+    assert row["is_relevant"] == 1
+    assert row["topic_score"] is not None  # امتیاز ثبت می‌شود، فقط ملاک رد نیست
+
+
+def test_rejected_titles_stay_visible(env):
+    conn, run_id, config = env
+    with db.transaction(conn):
+        db.insert_raw_product(
+            conn, run_id=run_id, source_domain="a.ir", source_url="https://a.ir/1",
+            raw_title="پاورپوینت بی‌ربط", normalized_title="پاورپوینت بی‌ربط",
+            topic_score=0.02, is_relevant=False,
+        )
+    rows = db.rejected_raw_products(conn, run_id)
+    assert [r["raw_title"] for r in rows] == ["پاورپوینت بی‌ربط"]
+
+
+def test_phase1_warns_when_the_same_title_repeats(env, capsys):
+    """عنوان یکسان برای چند صفحه یعنی عنوان محصول خوانده نشده."""
+    conn, run_id, config = env
+    config.raw["sites"] = [{"url": "https://shop.ir", "domain": "shop.ir"}]
+    pages = {
+        "https://shop.ir/sitemap.xml": (
+            '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            + "".join(f"<url><loc>https://shop.ir/p/{i}</loc></url>" for i in range(4))
+            + "</urlset>"
+        )
+    }
+    for index in range(4):
+        pages[f"https://shop.ir/p/{index}"] = WOO.replace("رمان شب سرد", "فروشگاه من")
+    matcher = TopicMatcher.build(HashingEncoder(), "رمان", ["رمان شب سرد"])
+
+    p1_crawl.run(conn, run_id, config, FakeFetcher(pages), matcher, verbose=True)
+
+    printed = capsys.readouterr().out
+    assert "تکرار شده" in printed
+    assert "عنوان‌های ردشده" in printed
+
+
+# ---------------------------------------------------------------------------
+# صفحه‌بندی سایت‌هایی که لینک «بعدی» ندارند (ASP.NET)
+# ---------------------------------------------------------------------------
+
+
+def test_next_page_url_is_guessed_for_common_patterns():
+    guess = p1_crawl.guess_next_page
+    assert guess("https://f.ir/search.aspx?key=x", 2) == "https://f.ir/search.aspx?key=x&page=2"
+    assert guess("https://f.ir/?s=x&page=1", 3) == "https://f.ir/?s=x&page=3"
+    assert guess("https://f.ir/cat/page/1/", 4) == "https://f.ir/cat/page/4/"
+    assert guess("https://f.ir/list?p=1", 2) == "https://f.ir/list?p=2"
+
+
+def test_listing_without_a_next_link_still_follows_pagination(env):
+    """۲۰۰۰ محصول در ۱۶تایی یعنی صد صفحه؛ با یک صفحه فقط ۱۶ تا برداشته می‌شد."""
+    conn, run_id, config = env
+    seed = "https://f.ir/search.aspx?key=jozve"
+    config.raw["sites"] = [{"url": seed, "domain": "f.ir"}]
+    pages = {
+        seed: '<a href="/p/1">۱</a><a href="/p/2">۲</a>',            # بدون لینک «بعدی»
+        f"{seed}&page=2": '<a href="/p/3">۳</a><a href="/p/4">۴</a>',
+        f"{seed}&page=3": "<p>نتیجه‌ای یافت نشد</p>",                 # ته فهرست
+    }
+    for index in range(1, 5):
+        pages[f"https://f.ir/p/{index}"] = WOO.replace("رمان شب سرد", f"جزوه شماره {index}")
+    matcher = TopicMatcher.build(HashingEncoder(), "جزوه", ["جزوه ریاضی"])
+
+    stats = p1_crawl.run(conn, run_id, config, FakeFetcher(pages), matcher, verbose=False)
+
+    assert stats.titles_found == 4  # هر دو صفحه‌ی فهرست خوانده شد
+
+
+def test_guessing_stops_when_a_page_adds_nothing(env):
+    conn, run_id, config = env
+    seed = "https://f.ir/search.aspx?key=jozve"
+    config.raw["sites"] = [{"url": seed, "domain": "f.ir"}]
+    pages = {seed: '<a href="/p/1">۱</a>', "https://f.ir/p/1": WOO}
+    matcher = TopicMatcher.build(HashingEncoder(), "جزوه", ["جزوه ریاضی"])
+    fetcher = FakeFetcher(pages)
+
+    p1_crawl.run(conn, run_id, config, fetcher, matcher, verbose=False)
+
+    # صفحه‌ی حدس‌زده ۴۰۴ می‌دهد و حلقه می‌ایستد؛ نه ده‌ها درخواست بی‌فایده
+    guessed = [u for u in fetcher.requested if "page=" in u]
+    assert len(guessed) <= 2

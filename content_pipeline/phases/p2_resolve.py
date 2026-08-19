@@ -431,7 +431,17 @@ def run(
     )
     candidates = load_candidates(conn, run_id, extractor)
     if not candidates:
-        raise ValueError("هیچ عنوان مرتبطی برای فاز ۲ وجود ندارد. اول فاز ۱ را اجرا کنید.")
+        total = conn.execute(
+            "SELECT COUNT(*) c FROM raw_products WHERE run_id=?", (run_id,)
+        ).fetchone()["c"]
+        if total:
+            raise ValueError(
+                f"{total} عنوان کراول شده ولی هیچ‌کدام به دسته‌ی انتخابی نزدیک نبود، "
+                "پس چیزی برای ادغام نیست. لاگ فاز ۱ نمونه‌ی عنوان‌های ردشده را نشان "
+                "می‌دهد؛ یا دسته را عوض کنید یا در تب «شروع» تیک «آدرس‌ها را خودم "
+                "فیلتر کرده‌ام» را بزنید و فاز ۱ را دوباره اجرا کنید."
+            )
+        raise ValueError("هیچ عنوانی کراول نشده است. اول فاز ۱ را اجرا کنید.")
 
     groups, node_confidence, review, stats = resolve(
         candidates,

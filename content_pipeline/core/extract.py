@@ -13,6 +13,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from typing import Sequence
 
 from .normalizer import collapse_repeats
 
@@ -108,10 +109,10 @@ def extract_title(
     domain: str = "",
     site_name: str = "",
 ) -> str:
-    """عنوان محصول: selector سفارشی → ``<h1>`` → ``og:title`` → ``<title>``.
+    """عنوان محصول: selector سفارشی → ``og:title`` → بهترین ``<h1>`` → ``<title>``.
 
-    در حالت ``<title>`` نام سایت از انتهای/ابتدای عنوان حذف می‌شود، و در همه‌ی
-    حالت‌ها پیشوند تکراری («دانلود رمان دانلود رمان ...») جمع می‌شود.
+    نامزدهایی که خودِ نام سایت‌اند کنار گذاشته می‌شوند، نام سایت از انتهای
+    عنوان حذف می‌شود، و تکرار چسبیده («دانلود رمان دانلود رمان ...») جمع می‌شود.
     """
     return collapse_repeats(_title_candidate(page_html, selector, domain, site_name))
 
@@ -122,6 +123,13 @@ def _title_candidate(
     domain: str = "",
     site_name: str = "",
 ) -> str:
+    """بهترین نامزدِ عنوان محصول را انتخاب می‌کند، نه اولین را.
+
+    خیلی از سایت‌ها (به‌ویژه ASP.NET و قالب‌های قدیمی) لوگوی سایت را داخل
+    ``<h1>`` می‌گذارند. اگر کورکورانه اولین ``<h1>`` را برداریم، عنوان همه‌ی
+    محصولات یک سایت می‌شود «نام فروشگاه» و همه‌شان در تشخیص موضوعی رد می‌شوند.
+    پس نامزدها جمع و آن‌هایی که نام سایت‌اند کنار گذاشته می‌شوند.
+    """
     if not page_html:
         return ""
     if selector and SelectolaxParser is not None:  # pragma: no cover - نیازمند selectolax
@@ -130,21 +138,69 @@ def _title_candidate(
             text = node.text(strip=True)
             if text:
                 return text
+
+    names = _site_names(page_html, domain, site_name)
+
+    og = ""
     for pattern in (
-        r"<h1[^>]*>(.*?)</h1>",
         r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\']',
         r'<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']og:title["\']',
+        r'<meta[^>]+name=["\']twitter:title["\'][^>]+content=["\'](.*?)["\']',
     ):
         match = re.search(pattern, page_html, re.S | re.I)
         if match:
-            text = strip_tags(match.group(1))
-            if text:
-                return text
+            og = strip_site_name(strip_tags(match.group(1)), page_html, domain, site_name)
+            if _usable_title(og, names):
+                return og
+            break
+
+    # میان چند <h1>، بلندترینی که نام سایت نیست
+    headings = [
+        strip_tags(m.group(1))
+        for m in re.finditer(r"<h1[^>]*>(.*?)</h1>", page_html, re.S | re.I)
+    ]
+    usable = [h for h in headings if _usable_title(h, names)]
+    if usable:
+        return max(usable, key=len)
 
     match = re.search(r"<title[^>]*>(.*?)</title>", page_html, re.S | re.I)
     if match:
-        return strip_site_name(strip_tags(match.group(1)), page_html, domain, site_name)
-    return ""
+        stripped = strip_site_name(strip_tags(match.group(1)), page_html, domain, site_name)
+        if _usable_title(stripped, names):
+            return stripped
+
+    # هیچ نامزد تمیزی نبود؛ هرچه هست بهتر از هیچ است
+    return og or (headings[0] if headings else "")
+
+
+def _site_names(page_html: str, domain: str, site_name: str) -> list[str]:
+    names: list[str] = []
+    if site_name:
+        names.append(site_name.strip().lower())
+    match = re.search(
+        r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\'](.*?)["\']',
+        page_html,
+        re.I,
+    )
+    if match:
+        names.append(strip_tags(match.group(1)).lower())
+    if domain:
+        label = domain.lower().replace("www.", "").split(".")[0]
+        names.extend([domain.lower(), label])
+    return [n for n in names if n]
+
+
+def _usable_title(text: str, names: Sequence[str]) -> bool:
+    """آیا این متن می‌تواند عنوان یک محصول باشد؟"""
+    text = (text or "").strip()
+    if len(text) < 4:
+        return False
+    lowered = text.lower()
+    # خودِ نام سایت یا چیزی خیلی نزدیک به آن، عنوان محصول نیست
+    for name in names:
+        if lowered == name or (name and len(lowered) <= len(name) + 4 and name in lowered):
+            return False
+    return True
 
 
 def strip_site_name(

@@ -356,6 +356,21 @@ def borderline_raw_products(conn: sqlite3.Connection, run_id: str) -> list[sqlit
     ).fetchall()
 
 
+def rejected_raw_products(
+    conn: sqlite3.Connection, run_id: str, limit: int = 200
+) -> list[sqlite3.Row]:
+    """عنوان‌هایی که به‌خاطر امتیاز موضوعی پایین رد شدند.
+
+    این‌ها در خروجی نمی‌آیند، ولی باید دیده شوند: اگر فیلتر موضوعی اشتباه
+    کرده باشد، تنها راه فهمیدنش همین فهرست است.
+    """
+    return conn.execute(
+        "SELECT * FROM raw_products WHERE run_id=? AND is_relevant=0"
+        " ORDER BY topic_score DESC LIMIT ?",
+        (run_id, limit),
+    ).fetchall()
+
+
 def unscored_count(conn: sqlite3.Connection, run_id: str) -> int:
     """عنوان‌هایی که هنوز امتیاز موضوعی نگرفته‌اند (کراول تمام نشده)."""
     return int(

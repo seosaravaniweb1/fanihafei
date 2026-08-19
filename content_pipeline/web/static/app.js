@@ -94,6 +94,7 @@ async function loadSetup() {
       $("#maxProducts").value = plan.options.max_products_per_site ?? 0;
       $("#requireProduct").checked = plan.options.require_product_signals !== false;
       $("#forceJs").checked = Boolean(plan.options.js);
+      $("#acceptAll").checked = Boolean(plan.options.accept_all);
       $("#sitesText").value = (plan.sites.length ? plan.sites : plan.config_sites).join("\n");
       $("#planSource").textContent = plan.sites.length
         ? "سایت‌های همین اجرا"
@@ -173,6 +174,7 @@ function planOptions() {
     max_products_per_site: Math.max(0, Number($("#maxProducts").value) || 0),
     require_product_signals: $("#requireProduct").checked,
     js: $("#forceJs").checked,
+    accept_all: $("#acceptAll").checked,
   };
 }
 
@@ -239,6 +241,7 @@ const COUNTER_LABELS = {
   raw: "عنوان خام",
   relevant: "مرتبط",
   borderline: "مرزی (شیت C)",
+  rejected: "رد شده",
   unscored: "در انتظار امتیاز",
   canonical: "محصول یکپارچه",
   needs_review: "نیازمند بازبینی",
@@ -690,6 +693,25 @@ async function loadReview() {
         el("div", { className: "muted", textContent: product.members.map((m) => m.raw_title).join("  |  ") }),
         el("div", { className: "row" }, [open, accept]),
       ]));
+    }
+
+    const rejected = $("#rejectedList");
+    rejected.replaceChildren();
+    if (!data.rejected.length) {
+      rejected.append(el("div", { className: "muted", textContent: "چیزی رد نشده است." }));
+    } else {
+      rejected.append(el("div", { className: "muted", textContent:
+        `${data.rejected_total} عنوان رد شده` +
+        (data.rejected_total > data.rejected.length ? ` (${data.rejected.length} تای اول)` : "") }));
+      for (const item of data.rejected) {
+        rejected.append(el("div", { className: "member" }, [
+          el("div", { className: "grow" }, [
+            el("div", { textContent: item.raw_title }),
+            el("div", { className: "muted", textContent:
+              `${item.domain} | امتیاز موضوعی: ${item.topic_score?.toFixed?.(3) ?? "—"}` }),
+          ]),
+        ]));
+      }
     }
 
     const borderline = $("#borderlineList");

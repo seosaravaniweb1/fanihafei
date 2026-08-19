@@ -29,6 +29,20 @@ from ..core.http import Fetcher
 _SITEMAP_GUESSES = ("/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml", "/wp-sitemap.xml")
 
 
+def _progress(
+    domain: str, position: int, total: int, found: int, started: float, step: int, verbose: bool
+) -> None:
+    if not verbose or (position % step and position != total):
+        return
+    elapsed = time.monotonic() - started
+    rate = position / elapsed if elapsed > 0 else 0
+    remaining = (total - position) / rate if rate > 0 else 0
+    print(
+        f"  [{domain}] {position}/{total} صفحه — {found} محصول — "
+        f"حدود {_fa_duration(remaining)} باقی‌مانده"
+    )
+
+
 def _fa_duration(seconds: float) -> str:
     """ثانیه → «۳ دقیقه» یا «۱ ساعت و ۵ دقیقه» — برای اینکه انتظار معلوم باشد."""
     seconds = max(0, int(seconds))
@@ -76,7 +90,11 @@ def is_listing_seed(url: str) -> bool:
 
 
 def collect_urls(
-    site: SiteConfig, fetcher: Fetcher, max_urls: int, log=print
+    site: SiteConfig,
+    fetcher: Fetcher,
+    max_urls: int,
+    log=print,
+    max_listing_pages: int = 50,
 ) -> list[str]:
     """URLهای کاندیدای یک منبع.
 
@@ -85,7 +103,7 @@ def collect_urls(
     """
     if is_listing_seed(site.base_url):
         log(f"  [{site.domain}] صفحه‌ی فهرست — لینک‌های همین فهرست دنبال می‌شوند")
-        urls = _from_listing(site, fetcher, max_urls, log)
+        urls = _from_listing(site, fetcher, max_urls, log, max_listing_pages)
     else:
         urls = _from_sitemaps(site, fetcher, max_urls)
         if not urls:
@@ -111,7 +129,43 @@ def _next_page(page_html: str, base_url: str) -> str:
     return ""
 
 
-def _from_listing(site: SiteConfig, fetcher: Fetcher, max_urls: int, log=print) -> list[str]:
+#: پارامترهای رایج شماره‌ی صفحه در فروشگاه‌های فارسی
+_PAGE_PARAMS = ("page", "p", "pageindex", "pagenumber", "pagenum", "pg", "paged", "start")
+_PATH_PAGE = re.compile(r"(/page/)(\d+)", re.I)
+
+
+def guess_next_page(url: str, page_number: int) -> str:
+    """وقتی لینک «بعدی» پیدا نشد، آدرس صفحه‌ی بعد را حدس می‌زنیم.
+
+    سایت‌های ASP.NET صفحه‌بندی را با ``__doPostBack`` می‌سازند و هیچ لینک
+    ``rel="next"`` ندارند؛ ولی تقریباً همیشه پارامتر شماره‌ی صفحه را در آدرس
+    هم می‌پذیرند. بدون این، از یک فهرست ۲۰۰۰ محصولی فقط ۱۶ تا برداشته می‌شد.
+    """
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+
+    for index, (key, _) in enumerate(query):
+        if key.lower() in _PAGE_PARAMS:
+            query[index] = (key, str(page_number))
+            return urllib.parse.urlunsplit(
+                parts._replace(query=urllib.parse.urlencode(query))
+            )
+
+    if _PATH_PAGE.search(parts.path):
+        path = _PATH_PAGE.sub(lambda m: f"{m.group(1)}{page_number}", parts.path)
+        return urllib.parse.urlunsplit(parts._replace(path=path))
+
+    query.append(("page", str(page_number)))
+    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
+
+
+def _from_listing(
+    site: SiteConfig,
+    fetcher: Fetcher,
+    max_urls: int,
+    log=print,
+    max_listing_pages: int = 50,
+) -> list[str]:
     """لینک‌های یک صفحه‌ی فهرست/جستجو و صفحه‌های بعدی‌اش."""
     collected: list[str] = []
     seen: set[str] = set()
@@ -120,15 +174,20 @@ def _from_listing(site: SiteConfig, fetcher: Fetcher, max_urls: int, log=print) 
     visited: set[str] = set()
     url = site.base_url
     pages = 0
-    max_pages = max(1, site.max_depth * 10)
+    guessed = False
+    max_pages = max(1, max_listing_pages)
     while url and pages < max_pages and len(collected) < max_urls * 4:
         if url in visited:
             break
         visited.add(url)
+        before_page = len(collected)
         result = fetcher.fetch(url, force_browser=site.js)
         pages += 1
         if not result.ok:
-            log(f"  [{site.domain}] صفحه‌ی فهرست باز نشد: {url}")
+            if guessed:
+                log(f"  [{site.domain}] فهرست تمام شد (صفحه‌ی {pages} وجود ندارد)")
+            else:
+                log(f"  [{site.domain}] صفحه‌ی فهرست باز نشد: {url}")
             break
         for link in extract.extract_links(result.html, result.final_url or url):
             if link in seen or not extract.same_domain(link, site.domain):
@@ -136,6 +195,12 @@ def _from_listing(site: SiteConfig, fetcher: Fetcher, max_urls: int, log=print) 
             seen.add(link)
             collected.append(link)
         following = _next_page(result.html, result.final_url or url)
+        if not following:
+            # صفحه‌بندی جاوااسکریپتی — آدرس صفحه‌ی بعد را حدس می‌زنیم و فقط
+            # وقتی ادامه می‌دهیم که لینک تازه‌ای بیاورد.
+            guess = guess_next_page(site.base_url, pages + 1)
+            if guess not in visited and len(collected) > before_page:
+                following, guessed = guess, True
         url = following if following and following not in visited else ""
     # خودِ صفحه‌های فهرست کاندیدای محصول نیستند؛ دوباره دانلودشان نمی‌کنیم
     collected = [url for url in collected if url not in visited]
@@ -271,7 +336,16 @@ def run(
             print(f"  [{site.domain}] جمع‌آوری URL...")
         if force_js:
             site.js = True
-        urls = collect_urls(site, fetcher, max_urls, print if verbose else (lambda *_: None))
+        urls = collect_urls(
+            site,
+            fetcher,
+            max_urls,
+            print if verbose else (lambda *_: None),
+            max_listing_pages=int(
+                options.get("max_listing_pages")
+                or config.get("crawl.max_listing_pages", 50)
+            ),
+        )
         if verbose:
             delay = float(config.get("crawl.delay_seconds", 1.0))
             print(
@@ -283,14 +357,6 @@ def run(
         started = time.monotonic()
         step = max(10, len(urls) // 20)  # حدود ۲۰ خط گزارش برای هر منبع
         for position, url in enumerate(urls, start=1):
-            if verbose and (position % step == 0 or position == len(urls)):
-                elapsed = time.monotonic() - started
-                rate = position / elapsed if elapsed > 0 else 0
-                remaining = (len(urls) - position) / rate if rate > 0 else 0
-                print(
-                    f"  [{site.domain}] {position}/{len(urls)} صفحه — "
-                    f"{found_here} محصول — حدود {_fa_duration(remaining)} باقی‌مانده"
-                )
             if stop():
                 stats.stopped = True
                 break
@@ -318,6 +384,7 @@ def run(
                 continue
             stats.titles_found += 1
             found_here += 1
+            _progress(site.domain, position, len(urls), found_here, started, step, verbose)
             with db.transaction(conn):
                 db.insert_raw_product(
                     conn,
@@ -340,6 +407,59 @@ def run(
     return stats
 
 
+def _report_samples(
+    conn: sqlite3.Connection, run_id: str, stats: CrawlStats, accept_all: bool
+) -> None:
+    """چند نمونه از پذیرفته‌شده‌ها و ردشده‌ها با امتیازشان.
+
+    بدون این، وقتی «مرتبط: ۰» می‌شود هیچ راهی نیست بفهمید چه چیزی استخراج شده
+    و چرا رد شده — که دقیقاً همان جایی است که کاربر گیر می‌کند.
+    """
+    def sample(where: str, limit: int = 5) -> list:
+        return conn.execute(
+            f"SELECT raw_title, topic_score FROM raw_products WHERE run_id=? AND {where}"
+            " ORDER BY topic_score DESC LIMIT ?",
+            (run_id, limit),
+        ).fetchall()
+
+    accepted = sample("is_relevant=1")
+    if accepted:
+        print("  نمونه‌ی عنوان‌های پذیرفته‌شده:")
+        for row in accepted:
+            print(f"    {row['topic_score']:.3f} | {row['raw_title']}")
+
+    rejected = sample("is_relevant=0")
+    if rejected:
+        print("  نمونه‌ی عنوان‌های ردشده (بالاترین امتیازها):")
+        for row in rejected:
+            print(f"    {row['topic_score']:.3f} | {row['raw_title']}")
+
+    repeated = conn.execute(
+        """SELECT raw_title, COUNT(*) c FROM raw_products WHERE run_id=?
+           GROUP BY raw_title HAVING c > 2 ORDER BY c DESC LIMIT 1""",
+        (run_id,),
+    ).fetchone()
+    if repeated:
+        print(
+            f"\n  ⚠ عنوان «{repeated['raw_title']}» برای {repeated['c']} صفحه تکرار شده.\n"
+            "    یعنی عنوان محصول از صفحه خوانده نشده و چیز ثابتی (معمولاً نام سایت\n"
+            "    داخل h1) برداشته شده. اگر سایت با جاوااسکریپت رندر می‌شود، تیک\n"
+            "    «رندر جاوااسکریپت» را بزنید؛ وگرنه در config برای همان سایت\n"
+            "    title_selector بدهید."
+        )
+
+    if stats.relevant == 0 and stats.titles_found > 0 and not accept_all:
+        print(
+            "\n  ⚠ هیچ عنوانی به دسته‌ی انتخابی شما نزدیک نبود.\n"
+            "    عنوان‌های بالا را نگاه کنید:\n"
+            "    • اگر واقعاً از دسته‌ی دیگری هستند، دسته را در تب «شروع» عوض کنید.\n"
+            "    • اگر عنوان عمومی سایت‌اند (مثل نام فروشگاه)، سایت عنوان محصول را\n"
+            "      در <h1> نمی‌گذارد؛ گزینه‌ی «رندر جاوااسکریپت» را امتحان کنید.\n"
+            "    • اگر خودتان قبلاً فیلتر کرده‌اید (آدرس نتایج جستجو داده‌اید)،\n"
+            "      تیک «آدرس‌ها را خودم فیلتر کرده‌ام» را در تب «شروع» بزنید."
+        )
+
+
 def score_relevance(
     conn: sqlite3.Connection,
     run_id: str,
@@ -355,8 +475,12 @@ def score_relevance(
     * کمتر                          → نامرتبط
     """
     stats = stats or CrawlStats()
+    options = db.run_options(conn, run_id)
+    accept_all = bool(options.get("accept_all"))
     fallback = (config.relevance_threshold, config.review_threshold)
     auto = bool(config.get("run.auto_threshold", True)) and bool(matcher.thresholds)
+    if accept_all and verbose:
+        print("  «همه را قبول کن» روشن است — تشخیص موضوعی فقط امتیاز می‌دهد، رد نمی‌کند")
     if verbose and auto:
         limits = "، ".join(
             f"{label}: {rel}/{rev}" for label, (rel, rev) in matcher.thresholds.items()
@@ -374,6 +498,13 @@ def score_relevance(
         with db.transaction(conn):
             for row, (label, score) in zip(chunk, verdicts):
                 threshold, review = matcher.limits(label, fallback) if auto else fallback
+                if accept_all:
+                    # کاربر خودش منبع را فیلتر کرده (مثلاً آدرس نتایج جستجو داده)
+                    stats.relevant += 1
+                    db.update_raw_relevance(
+                        conn, int(row["id"]), float(score), True, label or None
+                    )
+                    continue
                 if score >= threshold:
                     is_relevant: bool | None = True
                     stats.relevant += 1
@@ -385,6 +516,9 @@ def score_relevance(
                 db.update_raw_relevance(
                     conn, int(row["id"]), float(score), is_relevant, label or None
                 )
+
+    if verbose:
+        _report_samples(conn, run_id, stats, accept_all)
 
     path = export_borderline(conn, run_id, config)
     if verbose and path:

@@ -234,6 +234,7 @@ def clean_options(raw: object) -> dict:
         "max_products_per_site": cap,
         "require_product_signals": bool(data.get("require_product_signals", True)),
         "js": bool(data.get("js")),
+        "accept_all": bool(data.get("accept_all")),
     }
 
 
@@ -487,6 +488,17 @@ def api_review(state: PanelState, query: dict) -> dict:
             }
             for row in borderline
         ],
+        "rejected": [
+            {
+                "raw_id": row["id"],
+                "raw_title": row["raw_title"],
+                "domain": row["source_domain"],
+                "url": row["source_url"],
+                "topic_score": row["topic_score"],
+            }
+            for row in db.rejected_raw_products(conn, run_id, limit=100)
+        ],
+        "rejected_total": pipeline.counters(conn, run_id)["rejected"],
     }
 
 

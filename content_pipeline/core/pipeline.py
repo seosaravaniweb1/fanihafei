@@ -126,6 +126,9 @@ def counters(conn: sqlite3.Connection, run_id: str) -> dict[str, int]:
             "SELECT COUNT(*) c FROM raw_products WHERE run_id=?"
             " AND is_relevant IS NULL AND topic_score IS NOT NULL"
         ),
+        "rejected": (
+            "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND is_relevant=0"
+        ),
         "unscored": (
             "SELECT COUNT(*) c FROM raw_products WHERE run_id=? AND topic_score IS NULL"
         ),

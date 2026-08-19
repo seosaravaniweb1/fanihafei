@@ -134,6 +134,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "sites": [],
     "crawl": {
+        "max_listing_pages": 50,
         "max_depth": 3,
         "max_pages": 500,
         "delay_seconds": 1.0,
