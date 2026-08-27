@@ -4,7 +4,7 @@ Theme URI: https://github.com/seosaravaniweb1/fanihafei
 Author: Saravani Web
 Description: قالب فروشگاه فایل «لوکسو فایل» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
 Version: 2.0.0
-Requires at least: 6.0
+Requires at least: 6.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -6268,4 +6268,257 @@ body.fs-noscroll { overflow: hidden; }
 
 @media (max-width: 600px) {
   .fs-cart__panel { width: 100vw; }
+}
+
+/* =========================================================================
+   برگه‌های گوتنبرگ — سبک‌ها و الگوهای قالب
+   ========================================================================= */
+
+/* متن آغازین برگه ---------------------------------------------------------- */
+.fs-page__body .fs-lead {
+  font: 600 14px/2.1 var(--fs-font);
+  color: var(--fs-ink-3);
+  background: var(--fs-grad-soft);
+  border: 1px solid var(--fs-brand-edge);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 26px;
+}
+
+/* جعبه‌ها ------------------------------------------------------------------ */
+.fs-page__body .is-style-fs-card,
+.fs-page__body .is-style-fs-note,
+.fs-page__body .is-style-fs-warn,
+.fs-page__body .is-style-fs-steps,
+.fs-page__body .fs-videobox,
+.fs-page__body .fs-cta {
+  border-radius: 16px;
+  padding: 20px;
+  margin: 1.4em 0;
+}
+
+.fs-page__body .is-style-fs-card {
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, .05);
+  height: 100%;
+}
+
+.fs-page__body .is-style-fs-note {
+  background: var(--fs-brand-wash);
+  border: 1px solid var(--fs-brand-edge);
+}
+
+.fs-page__body .is-style-fs-warn {
+  background: var(--fs-accent-wash);
+  border: 1px solid var(--fs-accent-edge);
+}
+
+.fs-page__body .is-style-fs-note p:last-child,
+.fs-page__body .is-style-fs-warn p:last-child { margin-bottom: 0; }
+
+/* مراحل شماره‌دار ---------------------------------------------------------- */
+.fs-page__body .is-style-fs-steps {
+  background: var(--fs-bg);
+  border: 1px solid var(--fs-line-2);
+  counter-reset: fsstep;
+}
+
+.fs-page__body .is-style-fs-steps h3 {
+  counter-increment: fsstep;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 1.5em 0 .5em;
+  font-size: 14px;
+}
+
+.fs-page__body .is-style-fs-steps > h3:first-child { margin-top: 0; }
+
+.fs-page__body .is-style-fs-steps h3::before {
+  content: counter(fsstep);
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--fs-grad);
+  color: #fff;
+  font: 800 12.5px var(--fs-font);
+}
+
+/* هر مرحله کمی تورفته تا زیر شماره‌اش بنشیند. */
+.fs-page__body .is-style-fs-steps p { padding-inline-start: 39px; margin-bottom: 0; }
+
+/* فهرست تیک‌دار ------------------------------------------------------------ */
+.fs-page__body .is-style-fs-check {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.4em;
+}
+
+.fs-page__body .is-style-fs-check li {
+  position: relative;
+  padding-inline-start: 28px;
+  margin-bottom: .8em;
+}
+
+.fs-page__body .is-style-fs-check li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: .55em;
+  width: 17px;
+  height: 17px;
+  border-radius: 6px;
+  background: var(--fs-brand-wash) var(--fs-check-icon) center / 11px no-repeat;
+  border: 1px solid var(--fs-brand-edge);
+}
+
+:root {
+  --fs-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236d28d9' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7'/%3E%3C/svg%3E");
+}
+
+/* جعبه ویدیو -------------------------------------------------------------- */
+.fs-page__body .fs-videobox {
+  background: var(--fs-grad-dark);
+  color: #fff;
+}
+
+.fs-page__body .fs-videobox h3 { color: #fff; margin-top: 0; }
+.fs-page__body .fs-videobox p { color: rgba(255, 255, 255, .78); }
+
+.fs-page__body .fs-videobox .wp-block-video,
+.fs-page__body .fs-videobox .wp-block-embed { margin: 14px 0 0; }
+
+/* ویدیو و جاسازی ----------------------------------------------------------- */
+.fs-page__body .wp-block-video video,
+.fs-page__body .wp-block-embed iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 14px;
+  display: block;
+}
+
+/* پرسش و پاسخ بازشونده ----------------------------------------------------- */
+.fs-page__body .fs-acc {
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  padding: 0;
+  margin: 0 0 9px;
+  overflow: hidden;
+}
+
+.fs-page__body .fs-acc summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 15px 18px;
+  font: 700 12.5px var(--fs-font);
+  color: var(--fs-ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: background .2s;
+}
+
+.fs-page__body .fs-acc summary::-webkit-details-marker { display: none; }
+
+.fs-page__body .fs-acc summary::after {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--fs-chevron-icon) center / contain no-repeat;
+  transition: transform .25s;
+}
+
+.fs-page__body .fs-acc[open] summary { background: var(--fs-brand-wash); }
+.fs-page__body .fs-acc[open] summary::after { transform: rotate(180deg); }
+
+.fs-page__body .fs-acc > *:not(summary) {
+  padding-inline: 18px;
+  margin-bottom: 0;
+}
+
+.fs-page__body .fs-acc > p:last-child { padding-bottom: 16px; }
+
+:root {
+  --fs-chevron-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236d28d9' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* دعوت به تماس ------------------------------------------------------------- */
+.fs-page__body .fs-cta {
+  background: var(--fs-grad);
+  color: #fff;
+  text-align: center;
+}
+
+.fs-page__body .fs-cta h3 { color: #fff; margin-top: 0; }
+.fs-page__body .fs-cta p { color: rgba(255, 255, 255, .85); }
+
+.fs-page__body .fs-cta .wp-block-buttons { justify-content: center; }
+
+.fs-page__body .wp-block-button__link {
+  background: #fff;
+  color: var(--fs-brand-d);
+  font: 800 12.5px var(--fs-font);
+  padding: 13px 28px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: transform .2s;
+}
+
+.fs-page__body .wp-block-button__link:hover { transform: translateY(-2px); }
+
+/* ستون‌ها ------------------------------------------------------------------ */
+.fs-page__body .wp-block-columns {
+  display: flex;
+  gap: 14px;
+  margin: 1.4em 0;
+}
+
+.fs-page__body .wp-block-column { flex: 1; min-width: 0; }
+
+.fs-page__body .fs-cardrow .wp-block-column { display: flex; }
+
+/* جدول قالب ---------------------------------------------------------------- */
+.fs-page__body .is-style-fs-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.fs-page__body .is-style-fs-table th {
+  background: var(--fs-brand-wash);
+  color: var(--fs-ink);
+  font-weight: 800;
+}
+
+/* جداکننده ----------------------------------------------------------------- */
+.fs-page__body .wp-block-separator {
+  border: 0;
+  border-top: 1px solid var(--fs-line);
+  margin: 2em 0;
+}
+
+@media (max-width: 767px) {
+  .fs-page__body .wp-block-columns { flex-direction: column; }
+  .fs-page__body .fs-lead { font-size: 12.5px; padding: 15px 16px; }
+
+  .fs-page__body .is-style-fs-card,
+  .fs-page__body .is-style-fs-note,
+  .fs-page__body .is-style-fs-warn,
+  .fs-page__body .is-style-fs-steps,
+  .fs-page__body .fs-videobox,
+  .fs-page__body .fs-cta { padding: 16px; border-radius: 14px; }
+
+  .fs-page__body .is-style-fs-steps p { padding-inline-start: 0; }
 }
