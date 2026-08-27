@@ -2,7 +2,7 @@
 /**
  * صفحه‌ی «پرداخت موفق» — برگردان طرح «Checkout Flow UI» (حالت done).
  *
- * @package FanniSoal
+ * @package SiFile
  *
  * @var WC_Order|false $order
  */
@@ -61,7 +61,7 @@ if ( ! $order ) {
 			</div>
 
 			<div class="fs-thanks__note">
-				<?php fs_the_icon( 'user', 16, array( 'stroke' => '#059669', 'width' => '1.9' ) ); ?>
+				<?php fs_the_icon( 'user', 16, array( 'stroke' => '#6d28d9', 'width' => '1.9' ) ); ?>
 				<span>لینک دانلود به ایمیل و شماره‌ی شما هم ارسال شد. همیشه از «دانلودهای من» در پیشخوان قابل دسترسی است.</span>
 			</div>
 		</div>

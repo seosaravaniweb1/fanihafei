@@ -2,7 +2,7 @@
 /**
  * منوی پیشخوان کاربری.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

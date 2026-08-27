@@ -2,7 +2,7 @@
 /**
  * پاورقی سایت.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

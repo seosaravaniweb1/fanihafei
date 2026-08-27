@@ -1,8 +1,8 @@
 <?php
 /**
- * بخش «جدیدترین نمونه سوالات».
+ * بخش «جدیدترین فایل‌ها».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

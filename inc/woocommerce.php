@@ -2,7 +2,7 @@
 /**
  * یکپارچگی با ووکامرس: فیلدهای اختصاصی محصول و قلاب‌های فروشگاه.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -18,30 +18,60 @@ function fs_product_fields() {
 	return apply_filters(
 		'fs_product_fields',
 		array(
-			'question_count'    => array(
-				'label' => 'تعداد سوالات',
+			'file_format'       => array(
+				'label' => 'فرمت فایل',
 				'type'  => 'text',
-				'desc'  => 'فقط عدد. مثلاً ۱۷۰',
+				'desc'  => 'مثلاً PDF یا «PDF + Word». اگر خالی بماند PDF در نظر گرفته می‌شود.',
 			),
-			'computer_code'     => array(
-				'label' => 'کد رایانه‌کار',
+			'page_count'        => array(
+				'label' => 'تعداد صفحه',
 				'type'  => 'text',
-				'desc'  => 'کد استاندارد رشته با اسلش. مثلاً ۲۱/۴۵۲۶۶',
+				'desc'  => 'فقط عدد. مثلاً ۱۲۰',
+			),
+			'file_size'         => array(
+				'label' => 'حجم فایل',
+				'type'  => 'text',
+				'desc'  => 'مثلاً ۱۲ مگابایت. خالی بگذارید تا نمایش داده نشود.',
+			),
+			'language'          => array(
+				'label' => 'زبان فایل',
+				'type'  => 'text',
+				'desc'  => 'مثلاً فارسی یا انگلیسی. خالی بگذارید تا نمایش داده نشود.',
+			),
+			'author_name'       => array(
+				'label' => 'نویسنده / پدیدآورنده',
+				'type'  => 'text',
+				'desc'  => 'اگر نویسنده را در «برندهای ووکامرس» ثبت کرده باشید خودکار خوانده می‌شود و نیازی به این فیلد نیست؛ این فیلد فقط برای زمانی است که برند ثبت نکرده‌اید.',
+			),
+			'translator_name'   => array(
+				'label' => 'مترجم',
+				'type'  => 'text',
+				'desc'  => 'برای کتاب‌های ترجمه‌شده. خالی بگذارید تا نمایش داده نشود.',
+			),
+			'publisher'         => array(
+				'label' => 'ناشر',
+				'type'  => 'text',
+				'desc'  => 'خالی بگذارید تا نمایش داده نشود.',
+			),
+			'publish_year'      => array(
+				'label' => 'سال انتشار',
+				'type'  => 'text',
+				'desc'  => 'مثلاً ۱۴۰۳. خالی بگذارید تا نمایش داده نشود.',
+			),
+			'question_count'    => array(
+				'label' => 'تعداد سوال',
+				'type'  => 'text',
+				'desc'  => 'فقط برای فایل‌های نمونه سوال و آزمون. فقط عدد.',
 			),
 			'has_answers'       => array(
 				'label' => 'دارای پاسخنامه',
 				'type'  => 'checkbox',
 				'desc'  => 'اگر تیک بخورد، «پاسخنامه: دارد» در صفحه محصول نمایش داده می‌شود.',
 			),
-			'attach_note'       => array(
-				'label' => 'ضمیمه: جزوه',
-				'type'  => 'checkbox',
-				'desc'  => '',
-			),
-			'attach_book'       => array(
-				'label' => 'ضمیمه: کتاب آموزشی',
-				'type'  => 'checkbox',
-				'desc'  => '',
+			'extras'            => array(
+				'label' => 'ضمیمه‌ها',
+				'type'  => 'textarea',
+				'desc'  => 'هر خط یک ضمیمه. مثلاً: جزوه / خلاصه کتاب / نمونه سوال / فایل صوتی',
 			),
 			'audio_url'         => array(
 				'label' => 'فایل صوتی معرفی',
@@ -54,9 +84,9 @@ function fs_product_fields() {
 				'desc'  => 'نشانی مستقیم ویدیو (mp4) یا نشانی صفحه/امبد آپارات. در پاپ‌آپ پخش می‌شود.',
 			),
 			'free_download_url' => array(
-				'label' => 'لینک دانلود رایگان',
+				'label' => 'لینک پیش‌نمایش رایگان',
 				'type'  => 'url',
-				'desc'  => 'بخشی از نمونه سوالات برای پیش‌نمایش. خالی بگذارید تا نمایش داده نشود.',
+				'desc'  => 'بخشی از فایل برای پیش‌نمایش. خالی بگذارید تا نمایش داده نشود.',
 			),
 			'view_count'        => array(
 				'label' => 'تعداد بازدید',
@@ -64,9 +94,9 @@ function fs_product_fields() {
 				'desc'  => 'برای نمایش روی کارت‌ها. خالی بگذارید تا نمایش داده نشود.',
 			),
 			'toc'               => array(
-				'label' => 'سرفصل سوالات',
+				'label' => 'سرفصل‌های دستی',
 				'type'  => 'textarea',
-				'desc'  => 'هر خط یک سرفصل',
+				'desc'  => 'اختیاری. سرفصل‌ها به‌طور خودکار از تیترهای متن توضیحات ساخته می‌شوند؛ این فیلد فقط وقتی استفاده می‌شود که متن توضیحات هیچ تیتری نداشته باشد. هر خط یک سرفصل.',
 			),
 		)
 	);
@@ -98,7 +128,7 @@ add_filter( 'woocommerce_product_data_tabs', 'fs_product_data_tab' );
 function fs_product_data_panel() {
 	echo '<div id="fs_specs_data" class="panel woocommerce_options_panel">';
 
-	echo '<p class="form-field"><span class="description" style="margin:0">فرمت فایل همه محصولات PDF است و نیازی به ثبت ندارد.</span></p>';
+	echo '<p class="form-field"><span class="description" style="margin:0">فقط فیلدهایی را پر کنید که برای این فایل معنا دارند؛ هر فیلد خالی اصلاً در صفحه محصول نمایش داده نمی‌شود.</span></p>';
 
 	foreach ( fs_product_fields() as $key => $field ) {
 		switch ( $field['type'] ) {
@@ -196,14 +226,23 @@ function fs_product_flag( $product_id, $key ) {
 }
 
 /**
- * ضمیمه‌های تیک‌خورده.
+ * ضمیمه‌های یک فایل — از فیلد «ضمیمه‌ها» (هر خط یک مورد).
+ *
+ * چک‌باکس‌های نسخه‌ی قبلی قالب (جزوه / کتاب آموزشی) هم خوانده می‌شوند تا
+ * محصولات قدیمی مقدارشان را از دست ندهند.
  *
  * @param int $product_id شناسه محصول.
  * @return string[]
  */
 function fs_get_product_attachments( $product_id ) {
 	$out = array();
+	$raw = fs_product_field( $product_id, 'extras' );
 
+	if ( $raw ) {
+		$out = array_filter( array_map( 'trim', explode( "\n", $raw ) ) );
+	}
+
+	// سازگاری با فیلدهای قدیمی.
 	if ( fs_product_flag( $product_id, 'attach_note' ) ) {
 		$out[] = 'جزوه';
 	}
@@ -212,11 +251,136 @@ function fs_get_product_attachments( $product_id ) {
 		$out[] = 'کتاب آموزشی';
 	}
 
+	return array_values( array_unique( $out ) );
+}
+
+/**
+ * فرمت فایل — از فیلد محصول، وگرنه PDF.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return string
+ */
+function fs_product_format( $product_id ) {
+	$value = fs_product_field( $product_id, 'file_format' );
+
+	return $value ? $value : apply_filters( 'fs_default_file_format', 'PDF' );
+}
+
+/**
+ * تعداد صفحه‌ی فایل با ارقام فارسی.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return string
+ */
+function fs_product_pages( $product_id ) {
+	$value = fs_product_field( $product_id, 'page_count' );
+
+	return $value ? fs_fa_num( $value ) : '';
+}
+
+/**
+ * نام تاکسونومی برندهای ووکامرس — هسته‌ی ووکامرس یا افزونه‌های رایج برند.
+ *
+ * @return string
+ */
+function fs_brand_taxonomy() {
+	$candidates = apply_filters(
+		'fs_brand_taxonomies',
+		array( 'product_brand', 'pwb-brand', 'pa_brand', 'yith_product_brand', 'berocket_brand' )
+	);
+
+	foreach ( $candidates as $taxonomy ) {
+		if ( taxonomy_exists( $taxonomy ) ) {
+			return $taxonomy;
+		}
+	}
+
+	return '';
+}
+
+/**
+ * نویسنده‌ی فایل — اگر در «برندهای ووکامرس» ثبت شده باشد خودکار خوانده و به
+ * صفحه‌ی همان برند لینک می‌شود؛ اگر برندی ثبت نشده باشد از فیلد متنی محصول
+ * خوانده می‌شود و اگر آن هم خالی باشد اصلاً نمایش داده نمی‌شود.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return array<int, array{name:string,link:string}>
+ */
+function fs_get_product_authors( $product_id ) {
+	$out      = array();
+	$taxonomy = fs_brand_taxonomy();
+
+	if ( $taxonomy ) {
+		$terms = get_the_terms( $product_id, $taxonomy );
+
+		if ( $terms && ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term ) {
+				$link = get_term_link( $term );
+
+				$out[] = array(
+					'name' => $term->name,
+					'link' => is_wp_error( $link ) ? '' : $link,
+				);
+			}
+		}
+	}
+
+	if ( ! $out ) {
+		$manual = fs_product_field( $product_id, 'author_name' );
+
+		if ( $manual ) {
+			$out[] = array(
+				'name' => $manual,
+				'link' => '',
+			);
+		}
+	}
+
 	return $out;
 }
 
 /**
+ * آخرین شاخه‌ی دسته‌بندی محصول — عمیق‌ترین دسته‌ای که محصول در آن قرار دارد.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return array{name:string,link:string}|null
+ */
+function fs_get_product_leaf_cat( $product_id ) {
+	$terms = get_the_terms( $product_id, 'product_cat' );
+
+	if ( ! $terms || is_wp_error( $terms ) ) {
+		return null;
+	}
+
+	$deepest = null;
+	$depth   = -1;
+
+	foreach ( $terms as $term ) {
+		$level  = count( get_ancestors( $term->term_id, 'product_cat', 'taxonomy' ) );
+
+		if ( $level > $depth ) {
+			$depth   = $level;
+			$deepest = $term;
+		}
+	}
+
+	if ( ! $deepest ) {
+		return null;
+	}
+
+	$link = get_term_link( $deepest );
+
+	return array(
+		'name' => $deepest->name,
+		'link' => is_wp_error( $link ) ? '' : $link,
+	);
+}
+
+/**
  * مشخصات محصول برای نمایش — فقط مواردی که مقدار دارند.
+ *
+ * ترتیب از پرکاربردترین به کم‌کاربردترین چیده شده: فرمت و تعداد صفحه همیشه
+ * لازم‌اند، بقیه فقط اگر برای آن فایل پر شده باشند.
  *
  * @param int $product_id شناسه محصول.
  * @return array<int, array{k:string,v:string}>
@@ -224,18 +388,45 @@ function fs_get_product_attachments( $product_id ) {
 function fs_get_product_specs( $product_id ) {
 	$out = array();
 
-	// فرمت فایل همیشه PDF است.
 	$out[] = array(
 		'k' => 'فرمت فایل',
-		'v' => 'PDF',
+		'v' => fs_product_format( $product_id ),
 	);
+
+	$pages = fs_product_pages( $product_id );
+
+	if ( $pages ) {
+		$out[] = array(
+			'k' => 'تعداد صفحه',
+			'v' => $pages . ' صفحه',
+		);
+	}
+
+	$simple = array(
+		'file_size'       => 'حجم فایل',
+		'language'        => 'زبان فایل',
+		'translator_name' => 'مترجم',
+		'publisher'       => 'ناشر',
+		'publish_year'    => 'سال انتشار',
+	);
+
+	foreach ( $simple as $key => $label ) {
+		$value = fs_product_field( $product_id, $key );
+
+		if ( $value ) {
+			$out[] = array(
+				'k' => $label,
+				'v' => fs_fa_num( $value ),
+			);
+		}
+	}
 
 	$questions = fs_product_field( $product_id, 'question_count' );
 
 	if ( $questions ) {
 		$out[] = array(
-			'k' => 'تعداد سوالات',
-			'v' => fs_fa_num( $questions ) . ' نمونه سوال',
+			'k' => 'تعداد سوال',
+			'v' => fs_fa_num( $questions ) . ' سوال',
 		);
 	}
 
@@ -255,32 +446,57 @@ function fs_get_product_specs( $product_id ) {
 		);
 	}
 
-	return $out;
+	return apply_filters( 'fs_product_specs', $out, $product_id );
 }
 
 /**
- * خط کوتاه نشان‌های محصول برای کارت‌ها — «PDF · پاسخنامه دارد · جزوه» و مانند آن،
- * فقط از روی فیلدهای واقعی همان محصول؛ اگر تیک نخورده باشد نشان داده نمی‌شود.
+ * نشان‌های کوتاه کارت محصول — طبق طرح فروشگاه فایل فقط سه چیز: آخرین شاخه‌ی
+ * دسته‌بندی، فرمت فایل و تعداد صفحه. هر کدام که مقدار نداشته باشد حذف می‌شود.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return array<int, array{icon:string,text:string}>
+ */
+function fs_product_chips( $product_id ) {
+	$chips = array();
+	$cat   = fs_get_product_leaf_cat( $product_id );
+
+	if ( $cat ) {
+		$chips[] = array(
+			'icon' => 'grid',
+			'text' => $cat['name'],
+		);
+	}
+
+	$chips[] = array(
+		'icon' => 'file',
+		'text' => fs_product_format( $product_id ),
+	);
+
+	$pages = fs_product_pages( $product_id );
+
+	if ( $pages ) {
+		$chips[] = array(
+			'icon' => 'file-lines',
+			'text' => $pages . ' صفحه',
+		);
+	}
+
+	return apply_filters( 'fs_product_chips', $chips, $product_id );
+}
+
+/**
+ * همان نشان‌ها به‌صورت یک خط متنی — برای جاهایی که فضای چیپ نیست.
  *
  * @param int $product_id شناسه محصول.
  * @return string
  */
 function fs_product_badges_line( $product_id ) {
-	$parts = array( 'PDF' );
-
-	if ( fs_product_flag( $product_id, 'has_answers' ) ) {
-		$parts[] = 'پاسخنامه دارد';
-	}
-
-	foreach ( fs_get_product_attachments( $product_id ) as $fs_attachment ) {
-		$parts[] = $fs_attachment;
-	}
-
-	return implode( ' · ', $parts );
+	return implode( ' · ', wp_list_pluck( fs_product_chips( $product_id ), 'text' ) );
 }
 
 /**
- * سرفصل‌های محصول.
+ * سرفصل‌های محصول — نسخه‌ی دستی، فقط به‌عنوان جایگزین وقتی متن توضیحات
+ * هیچ تیتری ندارد. سرفصل خودکار در fs_toc_from_content() ساخته می‌شود.
  *
  * @param int $product_id شناسه محصول.
  * @return string[]
@@ -518,3 +734,138 @@ add_filter( 'loop_shop_per_page', 'fs_products_per_page', 20 );
 
 // «تضمین‌های کنار دکمه خرید» اکنون در تب «صفحه محصول» تنظیمات قالب مدیریت می‌شود؛
 // نگاه کنید به fs_get_guarantees() در inc/theme-settings.php.
+
+/**
+ * شناسه‌ی لنگر برای یک تیتر فارسی.
+ *
+ * از sanitize_title استفاده نمی‌کنیم چون متن فارسی را درصدی (percent-encoded)
+ * می‌کند و آن‌وقت شناسه‌ی تگ با فرگمنت لینک یکی نمی‌شود؛ مرورگر فرگمنت را
+ * پیش از مقایسه رمزگشایی می‌کند. اینجا شناسه به‌صورت یونیکد خام ساخته می‌شود
+ * تا هم خوانا بماند و هم دقیقاً با href مطابقت داشته باشد.
+ *
+ * @param string $text متن تیتر.
+ * @return string
+ */
+function fs_anchor_slug( $text ) {
+	$text = wp_strip_all_tags( (string) $text );
+
+	// نیم‌فاصله و فاصله‌ی صفرعرض حذف می‌شوند تا واژه‌ها به‌هم نچسبند اما تکه‌تکه هم نشوند.
+	$slug = preg_replace( '/[\x{200c}\x{200b}\x{200e}\x{200f}]/u', '', $text );
+
+	// هر جداکننده‌ای به خط تیره.
+	$slug = preg_replace( '/[\s\.\/_]+/u', '-', trim( (string) $slug ) );
+
+	// فقط حرف، رقم و خط تیره باقی می‌ماند.
+	$slug = preg_replace( '/[^\p{L}\p{N}\-]+/u', '', (string) $slug );
+	$slug = preg_replace( '/-+/', '-', (string) $slug );
+	$slug = trim( (string) $slug, '-' );
+
+	return '' === $slug ? 'fs-h' : $slug;
+}
+
+/**
+ * ساخت فهرست سرفصل‌ها از روی تیترهای خود متن.
+ *
+ * تیترهای h2/h3 متن توضیحات پیدا می‌شوند، به هرکدام یک شناسه‌ی یکتا داده
+ * می‌شود و فهرستی از لینک‌های لنگری (شارپ‌لینک) برگردانده می‌شود؛ کاربر با
+ * کلیک روی هر سرفصل دقیقاً به همان تیتر در متن می‌رود.
+ *
+ * @param string $html متن توضیحات.
+ * @return array{html:string,items:array<int, array{id:string,text:string,level:int}>}
+ */
+function fs_toc_from_content( $html ) {
+	$html  = (string) $html;
+	$items = array();
+
+	if ( ! trim( $html ) || ! preg_match( '/<h[23][\s>]/i', $html ) ) {
+		return array(
+			'html'  => $html,
+			'items' => array(),
+		);
+	}
+
+	$used = array();
+
+	$html = preg_replace_callback(
+		'#<(h[23])([^>]*)>(.*?)</\1>#is',
+		function ( $m ) use ( &$items, &$used ) {
+			$tag   = strtolower( $m[1] );
+			$attrs = $m[2];
+			$text  = trim( wp_strip_all_tags( $m[3] ) );
+
+			if ( '' === $text ) {
+				return $m[0];
+			}
+
+			// اگر خود تیتر از قبل شناسه دارد، همان نگه داشته می‌شود.
+			if ( preg_match( '/\sid=["\']([^"\']+)["\']/i', $attrs, $has ) ) {
+				$id = $has[1];
+			} else {
+				$id   = fs_anchor_slug( $text );
+				$base = $id;
+				$n    = 2;
+
+				while ( isset( $used[ $id ] ) ) {
+					$id = $base . '-' . $n;
+					++$n;
+				}
+
+				$attrs .= ' id="' . esc_attr( $id ) . '"';
+			}
+
+			$used[ $id ] = true;
+
+			$items[] = array(
+				'id'    => $id,
+				'text'  => $text,
+				'level' => 'h2' === $tag ? 2 : 3,
+			);
+
+			return '<' . $tag . $attrs . ' class="fs-anchor">' . $m[3] . '</' . $tag . '>';
+		},
+		$html
+	);
+
+	return array(
+		'html'  => $html,
+		'items' => $items,
+	);
+}
+
+/**
+ * تعداد فروش موفق یک محصول — از شمارنده‌ی خود ووکامرس.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return int
+ */
+function fs_product_sales( $product_id ) {
+	return (int) get_post_meta( $product_id, 'total_sales', true );
+}
+
+/**
+ * تبدیل سرفصل‌های دستی (هر خط یک مورد) به ساختار آیتم‌های فهرست.
+ *
+ * این‌ها لینک لنگری ندارند چون تیتری در متن نیست که به آن وصل شوند.
+ *
+ * @param string[] $lines خطوط سرفصل.
+ * @return array<int, array{id:string,text:string,level:int}>
+ */
+function fs_toc_lines_to_items( $lines ) {
+	$out = array();
+
+	foreach ( (array) $lines as $line ) {
+		$line = trim( (string) $line );
+
+		if ( '' === $line ) {
+			continue;
+		}
+
+		$out[] = array(
+			'id'    => '',
+			'text'  => $line,
+			'level' => 2,
+		);
+	}
+
+	return $out;
+}

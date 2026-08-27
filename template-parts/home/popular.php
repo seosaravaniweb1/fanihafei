@@ -2,7 +2,7 @@
 /**
  * بخش «پربازدیدترین‌ها».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -23,7 +23,7 @@ if ( ! $fs_popular ) {
 
 			<div>
 				<span class="fs-pop__badge">
-					<?php fs_the_icon( 'trending', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.2' ) ); ?>
+					<?php fs_the_icon( 'trending', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.2' ) ); ?>
 					<?php echo esc_html( fs_copy( 'pop_badge' ) ); ?>
 				</span>
 
@@ -32,7 +32,7 @@ if ( ! $fs_popular ) {
 					<span class="fs-only-mobile"><?php echo esc_html( fs_copy( 'pop_title_m' ) ); ?></span>
 				</h2>
 
-				<div class="fs-pop__tabs" role="tablist" aria-label="رشته‌های پربازدید">
+				<div class="fs-pop__tabs" role="tablist" aria-label="دسته‌های پربازدید">
 					<?php foreach ( $fs_popular as $fs_i => $fs_tab ) : ?>
 						<button class="fs-darktab<?php echo 0 === $fs_i ? ' is-active' : ''; ?>"
 							type="button"
@@ -68,8 +68,7 @@ if ( ! $fs_popular ) {
 									<span class="fs-vcard__top">
 										<span class="fs-vcard__fmt">
 											<?php fs_the_icon( 'file', 12, array( 'stroke' => '#94a3b8' ) ); ?>
-											<span class="fs-only-desktop">PDF</span>
-											<span class="fs-only-mobile">PDF · پاسخنامه دارد</span>
+											<?php echo esc_html( $fs_item['fmt'] ); ?>
 										</span>
 										<?php if ( $fs_item['views'] ) : ?>
 											<span class="fs-vcard__views">
@@ -81,13 +80,22 @@ if ( ! $fs_popular ) {
 
 									<span class="fs-vcard__title"><?php echo esc_html( $fs_item['title'] ); ?></span>
 
-									<span class="fs-vcard__ans">
-										<?php fs_the_icon( 'check', 11, array( 'stroke' => '#059669', 'width' => '2.6' ) ); ?>
-										پاسخنامه دارد
+									<span class="fs-vcard__chips">
+										<?php if ( $fs_item['cat'] ) : ?>
+											<span class="fs-chipmeta">
+												<?php fs_the_icon( 'grid', 11, array( 'stroke' => '#94a3b8' ) ); ?>
+												<?php echo esc_html( $fs_item['cat']['name'] ); ?>
+											</span>
+										<?php endif; ?>
+										<?php if ( $fs_item['pages'] ) : ?>
+											<span class="fs-chipmeta">
+												<?php fs_the_icon( 'file-lines', 11, array( 'stroke' => '#94a3b8' ) ); ?>
+												<?php echo esc_html( $fs_item['pages'] ); ?> صفحه
+											</span>
+										<?php endif; ?>
 									</span>
 
 									<span class="fs-vcard__foot">
-										<span class="fs-vcard__q"><?php echo esc_html( $fs_item['q'] ); ?> سوال</span>
 										<span class="fs-vcard__price"><?php echo wp_kses_post( $fs_item['price'] ); ?></span>
 									</span>
 

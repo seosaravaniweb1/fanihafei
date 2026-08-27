@@ -4,7 +4,7 @@
  *
  * تمام‌عرض، بدون سایدبار، بدون صفحه‌بندی — با اسکرول محصولات بعدی بارگذاری می‌شوند.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -69,7 +69,7 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 		<div class="fs-cathero__stats">
 			<div class="fs-cathero__stat">
 				<div class="fs-cathero__stat-v"><?php echo esc_html( fs_fa_num( number_format_i18n( $fs_total ) ) ); ?></div>
-				<div class="fs-cathero__stat-k">نمونه سوال</div>
+				<div class="fs-cathero__stat-k">فایل</div>
 			</div>
 			<?php if ( $fs_subs ) : ?>
 				<div class="fs-cathero__stat">
@@ -102,7 +102,7 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 						<?php fs_the_icon( 'grid', 26, array( 'width' => '1.7' ) ); ?>
 					</span>
 					<span class="fs-subtile__name"><?php echo esc_html( $fs_sub->name ); ?></span>
-					<span class="fs-subtile__n"><?php echo esc_html( fs_fa_num( $fs_sub->count ) ); ?> سوال</span>
+					<span class="fs-subtile__n"><?php echo esc_html( fs_fa_num( $fs_sub->count ) ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
 				</a>
 			<?php endforeach; ?>
 		</div>
@@ -115,7 +115,7 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 			<h2 class="fs-catabout__title">
 				<?php
 				echo 0 === (int) $fs_term->parent
-					? 'درباره نمونه سوالات ' . esc_html( $fs_term->name )
+					? 'درباره فایل‌های ' . esc_html( $fs_term->name )
 					: 'درباره این دسته';
 				?>
 			</h2>
@@ -150,7 +150,7 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 			</div>
 
 			<div class="fs-toolbar__count">
-				نمایش <span><?php echo esc_html( fs_fa_num( number_format_i18n( $fs_total ) ) ); ?></span> نمونه سوال
+				نمایش <span><?php echo esc_html( fs_fa_num( number_format_i18n( $fs_total ) ) ); ?></span> فایل
 			</div>
 		</div>
 	</section>

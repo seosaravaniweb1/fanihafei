@@ -5,7 +5,7 @@
  * برای «آخرین آپدیت» و «ویژه آزمون ...» که باید خودکار با ماه و سال جاری
  * هماهنگ بمانند.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -111,4 +111,61 @@ function fs_jalali_month_year() {
 	$months = fs_jalali_months();
 
 	return $months[ $today[1] - 1 ] . ' ' . fs_fa_num( $today[0] );
+}
+
+/**
+ * ماه و سال شمسی یک زمان مشخص — مثلاً «خرداد ۱۴۰۴».
+ *
+ * @param int|string $timestamp مهر زمانی یا رشته‌ی تاریخ.
+ * @return string
+ */
+function fs_jalali_month_year_of( $timestamp ) {
+	if ( ! is_numeric( $timestamp ) ) {
+		$timestamp = strtotime( (string) $timestamp );
+	}
+
+	$timestamp = (int) $timestamp;
+
+	if ( $timestamp <= 0 ) {
+		return '';
+	}
+
+	// زمان محلی سایت، نه UTC — وگرنه اول و آخر ماه یک روز جابه‌جا می‌شود.
+	$local = $timestamp + (int) ( (float) get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+
+	list( $jy, $jm ) = fs_gregorian_to_jalali(
+		(int) gmdate( 'Y', $local ),
+		(int) gmdate( 'n', $local ),
+		(int) gmdate( 'j', $local )
+	);
+
+	$months = fs_jalali_months();
+
+	return $months[ $jm - 1 ] . ' ' . fs_fa_num( $jy );
+}
+
+/**
+ * تاریخ درج و بروزرسانی یک محصول — خودکار از خود وردپرس خوانده می‌شود.
+ *
+ * اگر محصول بعد از انتشار ویرایش نشده باشد (یا در همان ماه ویرایش شده باشد)
+ * فقط تاریخ درج برگردانده می‌شود تا خط اضافه‌ی بی‌معنی نمایش داده نشود.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return array{published:string,updated:string}
+ */
+function fs_product_dates( $product_id ) {
+	$published = get_post_time( 'U', false, $product_id );
+	$modified  = get_post_modified_time( 'U', false, $product_id );
+
+	$published_label = $published ? fs_jalali_month_year_of( $published ) : '';
+	$updated_label   = $modified ? fs_jalali_month_year_of( $modified ) : '';
+
+	if ( $updated_label === $published_label ) {
+		$updated_label = '';
+	}
+
+	return array(
+		'published' => $published_label,
+		'updated'   => $updated_label,
+	);
 }

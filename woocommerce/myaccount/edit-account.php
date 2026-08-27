@@ -2,7 +2,7 @@
 /**
  * ویرایش مشخصات — فقط نام، نام خانوادگی، تلفن و ایمیل؛ بدون آدرس پستی.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

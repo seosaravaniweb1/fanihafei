@@ -2,7 +2,7 @@
 /**
  * بخش هیرو.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -17,8 +17,8 @@ $fs_trust = fs_data_trust();
 	<div class="fs-hero__grid">
 
 		<div>
-			<span class="fs-badge-orange">
-				<?php fs_the_icon( 'zap', 14, array( 'stroke' => '#c2410c', 'width' => '2.2' ) ); ?>
+			<span class="fs-badge-accent">
+				<?php fs_the_icon( 'zap', 14, array( 'stroke' => '#9d174d', 'width' => '2.2' ) ); ?>
 				<?php echo esc_html( fs_copy( 'hero_badge' ) ); ?>
 			</span>
 
@@ -29,7 +29,7 @@ $fs_trust = fs_data_trust();
 
 			<form class="fs-hero__search" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
 				<?php fs_the_icon( 'search', 18, array( 'stroke' => '#94a3b8' ) ); ?>
-				<label class="fs-sr-only" for="fs-hero-search">جست‌وجوی نمونه سوال</label>
+				<label class="fs-sr-only" for="fs-hero-search">جست‌وجوی فایل</label>
 				<input class="fs-hero__search-input" id="fs-hero-search" type="search" name="s"
 					value="<?php echo esc_attr( get_search_query() ); ?>"
 					placeholder="<?php echo esc_attr( fs_copy( 'hero_search_ph' ) ); ?>">
@@ -60,7 +60,7 @@ $fs_trust = fs_data_trust();
 						<?php foreach ( $fs_trust as $fs_item ) : ?>
 							<div class="fs-trust__item">
 								<span class="fs-trust__icon">
-									<?php fs_the_icon( 'check', 15, array( 'stroke' => '#059669', 'width' => '2.4' ) ); ?>
+									<?php fs_the_icon( 'check', 15, array( 'stroke' => '#6d28d9', 'width' => '2.4' ) ); ?>
 								</span>
 								<span class="fs-trust__text"><?php echo esc_html( $fs_item ); ?></span>
 							</div>

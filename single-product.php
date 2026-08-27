@@ -2,7 +2,7 @@
 /**
  * صفحه تک‌محصول — برگردان طرح «Product Page UI».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -26,15 +26,20 @@ while ( have_posts() ) :
 	$fs_rev_summary = fs_get_review_summary( $product );
 	$fs_reviews     = $fs_rev_summary ? fs_get_product_reviews( $fs_id ) : array();
 
+
 	$fs_sku      = $product->get_sku();
 	$fs_code     = $fs_sku ? $fs_sku : $fs_id;
-	$fs_code_pc  = fs_product_field( $fs_id, 'computer_code' );
 	$fs_audio    = fs_product_field( $fs_id, 'audio_url' );
 	$fs_video    = fs_video_source( fs_product_field( $fs_id, 'video_url' ) );
 	$fs_free     = fs_product_field( $fs_id, 'free_download_url' );
 	$fs_gallery  = $product->get_gallery_image_ids();
-	$fs_year     = fs_fa_num( fs_jalali_year() );
-	$fs_updated  = fs_jalali_month_year();
+	$fs_dates    = fs_product_dates( $fs_id );
+	$fs_views    = fs_product_views( $fs_id );
+	$fs_sales    = fs_product_sales( $fs_id );
+	$fs_satisf   = fs_product_satisfaction();
+	$fs_authors  = fs_get_product_authors( $fs_id );
+	$fs_why      = fs_get_why_box();
+	$fs_updated  = $fs_dates['updated'] ? $fs_dates['updated'] : $fs_dates['published'];
 	?>
 
 	<nav class="fs-crumbs" aria-label="مسیر">
@@ -45,10 +50,12 @@ while ( have_posts() ) :
 
 		<div class="fs-product__media">
 			<div class="fs-product__cover" style="background:<?php echo esc_attr( fs_grad( 0 ) ); ?>">
-				<span class="fs-product__update">
-					<?php fs_the_icon( 'clock', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.2' ) ); ?>
-					آخرین آپدیت: <?php echo esc_html( $fs_updated ); ?>
-				</span>
+				<?php if ( $fs_updated ) : ?>
+					<span class="fs-product__update">
+						<?php fs_the_icon( 'clock', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.2' ) ); ?>
+						آخرین آپدیت: <?php echo esc_html( $fs_updated ); ?>
+					</span>
+				<?php endif; ?>
 
 				<?php
 				if ( has_post_thumbnail() ) {
@@ -74,11 +81,11 @@ while ( have_posts() ) :
 			<?php if ( $fs_free ) : ?>
 				<a class="fs-product__sample" href="<?php echo esc_url( $fs_free ); ?>" target="_blank" rel="noopener">
 					<span class="fs-product__sample-icon">
-						<?php fs_the_icon( 'download', 17, array( 'stroke' => '#059669' ) ); ?>
+						<?php fs_the_icon( 'download', 17, array( 'stroke' => '#6d28d9' ) ); ?>
 					</span>
 					<span>
-						<span class="fs-product__sample-title">دانلود نمونه رایگان</span>
-						<span class="fs-product__sample-sub">پیش‌نمایش PDF بدون خرید</span>
+						<span class="fs-product__sample-title">دانلود پیش‌نمایش رایگان</span>
+						<span class="fs-product__sample-sub">بخشی از فایل، بدون خرید</span>
 					</span>
 				</a>
 			<?php endif; ?>
@@ -86,17 +93,41 @@ while ( have_posts() ) :
 
 		<div class="fs-product__main">
 
-			<span class="fs-product__badge">
-				<?php fs_the_icon( 'zap', 13, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>
-				ویژه آزمون <?php echo esc_html( $fs_year ); ?>
-			</span>
+			<?php if ( $fs_sales || $fs_satisf ) : ?>
+				<div class="fs-product__flags">
+					<?php if ( $fs_sales ) : ?>
+						<span class="fs-flag fs-flag--sales">
+							<?php fs_the_icon( 'trending', 13, array( 'stroke' => 'currentColor', 'width' => '2.2' ) ); ?>
+							<?php echo esc_html( fs_fa_num( number_format_i18n( $fs_sales ) ) ); ?> فروش موفق
+						</span>
+					<?php endif; ?>
+
+					<?php if ( $fs_satisf ) : ?>
+						<span class="fs-flag fs-flag--satisf">
+							<?php fs_the_icon( 'check', 13, array( 'stroke' => 'currentColor', 'width' => '2.6' ) ); ?>
+							<?php echo esc_html( fs_fa_num( $fs_satisf ) ); ?> رضایت مشتریان
+						</span>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
 
 			<h1 class="fs-product__title"><?php the_title(); ?></h1>
 
 			<div class="fs-product__codes">
 				<span class="fs-product__code">کد محصول: <b><?php echo esc_html( fs_fa_num( $fs_code ) ); ?></b></span>
-				<?php if ( $fs_code_pc ) : ?>
-					<span class="fs-product__code">کد رایانه‌کار: <b><?php echo esc_html( fs_fa_num( $fs_code_pc ) ); ?></b></span>
+
+				<?php if ( $fs_dates['published'] ) : ?>
+					<span class="fs-product__code">
+						<?php fs_the_icon( 'clock', 13, array( 'stroke' => '#94a3b8', 'width' => '2' ) ); ?>
+						درج: <b><?php echo esc_html( $fs_dates['published'] ); ?></b>
+						<?php if ( $fs_dates['updated'] ) : ?>
+							· بروزرسانی: <b><?php echo esc_html( $fs_dates['updated'] ); ?></b>
+						<?php endif; ?>
+					</span>
+				<?php endif; ?>
+
+				<?php if ( $fs_views ) : ?>
+					<span class="fs-product__code">بازدید: <b><?php echo esc_html( $fs_views ); ?></b></span>
 				<?php endif; ?>
 			</div>
 
@@ -146,10 +177,34 @@ while ( have_posts() ) :
 			<?php endif; ?>
 
 			<div class="fs-product__specs">
+				<?php if ( $fs_authors ) : ?>
+					<div class="fs-spec">
+						<span class="fs-spec__icon">
+							<?php fs_the_icon( 'user', 16, array( 'stroke' => '#6d28d9', 'width' => '2' ) ); ?>
+						</span>
+						<span>
+							<span class="fs-spec__k">نویسنده</span>
+							<span class="fs-spec__v">
+								<?php
+								$fs_author_html = array();
+
+								foreach ( $fs_authors as $fs_author ) {
+									$fs_author_html[] = $fs_author['link']
+										? '<a href="' . esc_url( $fs_author['link'] ) . '">' . esc_html( $fs_author['name'] ) . '</a>'
+										: esc_html( $fs_author['name'] );
+								}
+
+								echo wp_kses_post( implode( '، ', $fs_author_html ) );
+								?>
+							</span>
+						</span>
+					</div>
+				<?php endif; ?>
+
 				<?php foreach ( $fs_specs as $fs_spec ) : ?>
 					<div class="fs-spec">
 						<span class="fs-spec__icon">
-							<?php fs_the_icon( 'check', 16, array( 'stroke' => '#059669', 'width' => '2.6' ) ); ?>
+							<?php fs_the_icon( 'check', 16, array( 'stroke' => '#6d28d9', 'width' => '2.6' ) ); ?>
 						</span>
 						<span>
 							<span class="fs-spec__k"><?php echo esc_html( $fs_spec['k'] ); ?></span>
@@ -183,7 +238,7 @@ while ( have_posts() ) :
 
 					<?php if ( $fs_on_sale ) : ?>
 						<span class="fs-buybox__saved">
-							<?php fs_the_icon( 'zap', 13, array( 'stroke' => '#047857', 'width' => '2.2' ) ); ?>
+							<?php fs_the_icon( 'zap', 13, array( 'stroke' => '#5b21b6', 'width' => '2.2' ) ); ?>
 							<?php echo wp_kses_post( fs_fa_num_html( wc_price( $fs_regular - $fs_sale ) ) ); ?> تخفیف شما
 						</span>
 					<?php endif; ?>
@@ -191,87 +246,7 @@ while ( have_posts() ) :
 
 				<div class="fs-buybox__body">
 					<?php woocommerce_template_single_add_to_cart(); ?>
-
-					<?php if ( $fs_guarantees ) : ?>
-						<div class="fs-buybox__guarantees">
-							<?php foreach ( $fs_guarantees as $fs_g ) : ?>
-								<div class="fs-guarantee">
-									<span class="fs-guarantee__icon">
-										<?php fs_the_icon( 'check', 12, array( 'stroke' => '#059669', 'width' => '2.8' ) ); ?>
-									</span>
-									<span><?php echo esc_html( $fs_g ); ?></span>
-								</div>
-							<?php endforeach; ?>
-						</div>
-					<?php endif; ?>
 				</div>
-
-				<?php if ( $fs_trust['badges'] || $fs_trust['banks'] || $fs_trust['caption'] ) : ?>
-					<div class="fs-buybox__trust">
-
-						<?php if ( $fs_trust['badges'] ) : ?>
-							<div class="fs-trust-badges">
-								<?php
-								foreach ( $fs_trust['badges'] as $fs_badge ) :
-									$fs_img = wp_get_attachment_image(
-										$fs_badge['id'],
-										'medium',
-										false,
-										array(
-											'loading' => 'lazy',
-											'alt'     => $fs_badge['label'],
-										)
-									);
-
-									if ( ! $fs_img ) {
-										continue;
-									}
-
-									if ( $fs_badge['link'] ) :
-										?>
-										<a class="fs-trust-badge" href="<?php echo esc_url( $fs_badge['link'] ); ?>" target="_blank" rel="noopener nofollow">
-											<?php echo wp_kses_post( $fs_img ); ?>
-										</a>
-									<?php else : ?>
-										<span class="fs-trust-badge"><?php echo wp_kses_post( $fs_img ); ?></span>
-										<?php
-									endif;
-								endforeach;
-								?>
-							</div>
-						<?php endif; ?>
-
-						<?php if ( $fs_trust['banks'] ) : ?>
-							<div class="fs-banks">
-								<?php
-								foreach ( $fs_trust['banks'] as $fs_bank ) :
-									$fs_img = wp_get_attachment_image(
-										$fs_bank['id'],
-										'thumbnail',
-										false,
-										array(
-											'loading' => 'lazy',
-											'alt'     => $fs_bank['label'],
-										)
-									);
-
-									if ( ! $fs_img ) {
-										continue;
-									}
-									?>
-									<span class="fs-bank" <?php echo $fs_bank['label'] ? 'title="' . esc_attr( $fs_bank['label'] ) . '"' : ''; ?>>
-										<?php echo wp_kses_post( $fs_img ); ?>
-									</span>
-								<?php endforeach; ?>
-							</div>
-						<?php endif; ?>
-
-						<?php if ( $fs_trust['caption'] ) : ?>
-							<p class="fs-banks__caption"><?php echo esc_html( $fs_trust['caption'] ); ?></p>
-						<?php endif; ?>
-
-					</div>
-				<?php endif; ?>
 
 			</div>
 		</div>
@@ -304,34 +279,69 @@ while ( have_posts() ) :
 						<div class="fs-ptabs__pane" id="fs-ptab-desc" role="tabpanel">
 							<div class="fs-ptabs__grid">
 								<div>
+									<?php
+									// سرفصل‌ها خودکار از تیترهای خود متن ساخته می‌شوند و بالای محتوا
+									// می‌نشینند؛ هر سرفصل یک لینک لنگری به همان تیتر است. سرفصل‌های
+									// دستی فقط وقتی استفاده می‌شوند که متن هیچ تیتری نداشته باشد.
+									$fs_body      = fs_toc_from_content( wpautop( $product->get_description() ) );
+									$fs_toc_items = $fs_body['items'] ? $fs_body['items'] : fs_toc_lines_to_items( $fs_toc );
+									?>
+
 									<?php if ( $product->get_description() ) : ?>
 										<h2 class="fs-block__title">توضیحات کامل محصول</h2>
-										<div class="fs-rich"><?php echo wp_kses_post( wpautop( $product->get_description() ) ); ?></div>
 									<?php endif; ?>
 
-									<?php if ( $fs_toc ) : ?>
-										<h3 class="fs-toc__title">سرفصل سوالات</h3>
-										<div class="fs-toc">
-											<?php foreach ( $fs_toc as $fs_item ) : ?>
-												<div class="fs-toc__item">
-													<span class="fs-toc__icon">
-														<?php fs_the_icon( 'check', 11, array( 'stroke' => '#059669', 'width' => '2.8' ) ); ?>
+									<?php get_template_part( 'template-parts/product/toc', null, array( 'items' => $fs_toc_items ) ); ?>
+
+									<?php if ( $product->get_description() ) : ?>
+										<div class="fs-rich"><?php echo wp_kses_post( $fs_body['html'] ); ?></div>
+									<?php endif; ?>
+								</div>
+
+								<aside class="fs-pside">
+
+									<div class="fs-glance">
+										<div class="fs-glance__title">در یک نگاه</div>
+										<?php foreach ( $fs_specs as $fs_spec ) : ?>
+											<div class="fs-glance__row">
+												<span><?php echo esc_html( $fs_spec['k'] ); ?></span>
+												<b><?php echo esc_html( $fs_spec['v'] ); ?></b>
+											</div>
+										<?php endforeach; ?>
+									</div>
+
+									<?php if ( $fs_why ) : ?>
+										<div class="fs-why">
+											<div class="fs-why__title"><?php echo esc_html( $fs_why['title'] ); ?></div>
+											<?php foreach ( $fs_why['items'] as $fs_i => $fs_item ) : ?>
+												<div class="fs-why__row">
+													<span class="fs-why__icon">
+														<?php fs_the_icon( fs_why_icon( $fs_i ), 14, array( 'stroke' => 'currentColor', 'width' => '2' ) ); ?>
 													</span>
 													<span><?php echo esc_html( $fs_item ); ?></span>
 												</div>
 											<?php endforeach; ?>
+											<?php if ( $fs_why['foot'] ) : ?>
+												<div class="fs-why__foot"><?php echo esc_html( $fs_why['foot'] ); ?></div>
+											<?php endif; ?>
 										</div>
 									<?php endif; ?>
-								</div>
 
-								<aside class="fs-glance">
-									<div class="fs-glance__title">در یک نگاه</div>
-									<?php foreach ( $fs_specs as $fs_spec ) : ?>
-										<div class="fs-glance__row">
-											<span><?php echo esc_html( $fs_spec['k'] ); ?></span>
-											<b><?php echo esc_html( $fs_spec['v'] ); ?></b>
+									<?php if ( $fs_guarantees ) : ?>
+										<div class="fs-guarantees">
+											<?php foreach ( $fs_guarantees as $fs_g ) : ?>
+												<div class="fs-guarantee">
+													<span class="fs-guarantee__icon">
+														<?php fs_the_icon( 'check', 12, array( 'stroke' => '#6d28d9', 'width' => '2.8' ) ); ?>
+													</span>
+													<span><?php echo esc_html( $fs_g ); ?></span>
+												</div>
+											<?php endforeach; ?>
 										</div>
-									<?php endforeach; ?>
+									<?php endif; ?>
+
+									<?php get_template_part( 'template-parts/product/trust', null, array( 'trust' => $fs_trust ) ); ?>
+
 								</aside>
 							</div>
 						</div>
@@ -412,8 +422,8 @@ while ( have_posts() ) :
 		<section class="fs-section">
 			<div class="fs-section__head">
 				<div>
-					<h2 class="fs-section__title">نمونه سوالات مرتبط</h2>
-					<div class="fs-section__sub">هم‌رشته و هم‌سطح با این فایل</div>
+					<h2 class="fs-section__title"><?php echo esc_html( fs_copy( 'related_title' ) ); ?></h2>
+					<div class="fs-section__sub"><?php echo esc_html( fs_copy( 'related_sub' ) ); ?></div>
 				</div>
 				<div class="fs-arrows">
 					<button class="fs-arrow" type="button" data-rail="fs-related" data-dir="prev">

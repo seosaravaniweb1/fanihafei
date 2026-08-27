@@ -4,7 +4,7 @@
  *
  * هم با کد پیامکی و هم با رمز عبور کار می‌کند.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -22,16 +22,16 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 
 			<ul class="fs-auth__side-list">
 				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
+					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.6' ) ); ?></span>
 					دانلود فوری فایل‌ها بعد از پرداخت
 				</li>
 				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
+					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.6' ) ); ?></span>
 					دسترسی همیشگی به همه خریدها
 				</li>
 				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#6ee7b7', 'width' => '2.6' ) ); ?></span>
-					ذخیره نمونه سوال‌های مورد علاقه
+					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.6' ) ); ?></span>
+					ذخیره فایل‌های مورد علاقه
 				</li>
 			</ul>
 

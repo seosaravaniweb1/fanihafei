@@ -2,7 +2,7 @@
 /**
  * تسویه‌حساب یک‌مرحله‌ای، حذف فیلدهای نشانی و رفع مشکل دسترسی به دانلود.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -310,55 +310,13 @@ add_filter( 'woocommerce_cart_needs_shipping', 'fs_no_shipping' );
 add_filter( 'woocommerce_cart_needs_shipping_address', 'fs_no_shipping' );
 
 /**
- * خرید مستقیم، بدون سبد خرید واقعی — هر فایل جدا خریداری می‌شود، پس قبل از
- * افزودن محصول تازه، هر چیز قبلی از سبد پاک می‌شود تا تسویه‌حساب همیشه
- * دقیقاً همان یک فایلی باشد که کاربر همین الان انتخاب کرده.
- *
- * @param bool $passed آیا اعتبارسنجی رد شده است.
- * @return bool
- */
-function fs_buy_now_empty_cart( $passed ) {
-	if ( $passed && fs_has_woo() && function_exists( 'WC' ) && WC()->cart && ! WC()->cart->is_empty() ) {
-		WC()->cart->empty_cart( false );
-	}
-
-	return $passed;
-}
-add_filter( 'woocommerce_add_to_cart_validation', 'fs_buy_now_empty_cart', 20 );
-
-/**
- * متن دکمه‌ی خرید — «دانلود و خرید نمونه سوال»، نه «افزودن به سبد خرید»؛ اینجا
- * سبد خرید معمول وجود ندارد، هر کلیک یعنی خرید مستقیم همان یک فایل.
+ * متن دکمه‌ی خرید — حالا سبد خرید واقعی داریم (کشوی کناری سربرگ)، پس کاربر
+ * می‌تواند چند فایل را با هم بردارد و یک‌جا تسویه کند.
  *
  * @return string
  */
-function fs_buy_now_text() {
-	return 'دانلود و خرید نمونه سوال';
+function fs_add_to_cart_text() {
+	return 'افزودن به سبد خرید';
 }
-add_filter( 'woocommerce_product_single_add_to_cart_text', 'fs_buy_now_text' );
-add_filter( 'woocommerce_product_add_to_cart_text', 'fs_buy_now_text' );
-
-/**
- * پس از افزودن به سبد، مستقیم به تسویه‌حساب برو.
- *
- * @param string $url نشانی.
- * @return string
- */
-function fs_add_to_cart_redirect( $url ) {
-	if ( ! fs_has_woo() ) {
-		return $url;
-	}
-
-	return wc_get_checkout_url();
-}
-add_filter( 'woocommerce_add_to_cart_redirect', 'fs_add_to_cart_redirect', 20 );
-
-/**
- * پس از افزودن به سبد، به‌جای ماندن در صفحه، به تسویه‌حساب هدایت شود.
- *
- * @return string
- */
-function fs_redirect_after_add() {
-	return 'yes';
-}
-add_filter( 'pre_option_woocommerce_cart_redirect_after_add', 'fs_redirect_after_add' );
+add_filter( 'woocommerce_product_single_add_to_cart_text', 'fs_add_to_cart_text' );
+add_filter( 'woocommerce_product_add_to_cart_text', 'fs_add_to_cart_text' );

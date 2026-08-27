@@ -2,7 +2,7 @@
 /**
  * بخش «همه دسته‌بندی‌ها».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -39,7 +39,7 @@ $fs_visible = 8; // موبایل: هشت دسته‌ی اول، بقیه با د
 				</span>
 				<span class="fs-cat__text">
 					<span class="fs-cat__name"><?php echo esc_html( $fs_cat['name'] ); ?></span>
-					<span class="fs-cat__n"><?php echo esc_html( $fs_cat['count'] ); ?> نمونه سوال</span>
+					<span class="fs-cat__n"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
 				</span>
 			</a>
 		<?php endforeach; ?>

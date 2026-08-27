@@ -2,7 +2,7 @@
 /**
  * بخش «هزار فایل، آماده دانلود» — سه ستون متحرک.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

@@ -2,39 +2,39 @@
 /**
  * توابع کمکی قالب: آیکون‌های SVG، اعداد فارسی و رنگ‌بندی دسته‌ها.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * پالت رنگ آیکون دسته‌ها — دقیقاً همان TINTS طرح اصلی.
+ * پالت رنگ آیکون دسته‌ها — خانواده‌ی بنفش/نیلی هویت سی‌فایل.
  *
  * @return array<int, array{0:string,1:string}>
  */
 function fs_tints() {
 	return array(
-		array( 'rgba(16,185,129,.12)', '#059669' ),
-		array( 'rgba(249,115,22,.12)', '#ea580c' ),
-		array( 'rgba(59,130,246,.12)', '#2563eb' ),
-		array( 'rgba(168,85,247,.12)', '#7c3aed' ),
-		array( 'rgba(236,72,153,.12)', '#db2777' ),
-		array( 'rgba(20,184,166,.12)', '#0d9488' ),
+		array( 'rgba(124,58,237,.12)', '#6d28d9' ),
+		array( 'rgba(219,39,119,.12)', '#be185d' ),
+		array( 'rgba(79,70,229,.12)', '#4338ca' ),
+		array( 'rgba(192,38,211,.12)', '#a21caf' ),
+		array( 'rgba(139,92,246,.14)', '#7c3aed' ),
+		array( 'rgba(14,165,233,.12)', '#0369a1' ),
 	);
 }
 
 /**
- * گرادیان‌های تصویر شاخص — دقیقاً همان GRADS طرح اصلی.
+ * گرادیان‌های تصویر شاخص — هم‌خانواده با گرادیانت اصلی قالب.
  *
  * @return string[]
  */
 function fs_grads() {
 	return array(
-		'linear-gradient(135deg,#e0f2fe,#f0fdfa)',
-		'linear-gradient(135deg,#fef3c7,#ffedd5)',
 		'linear-gradient(135deg,#ede9fe,#faf5ff)',
-		'linear-gradient(135deg,#dcfce7,#f0fdf4)',
-		'linear-gradient(135deg,#fce7f3,#fef2f8)',
+		'linear-gradient(135deg,#fce7f3,#fdf4ff)',
+		'linear-gradient(135deg,#e0e7ff,#f5f3ff)',
+		'linear-gradient(135deg,#f3e8ff,#fdf2f8)',
+		'linear-gradient(135deg,#ddd6fe,#eef2ff)',
 		'linear-gradient(135deg,#e2e8f0,#f8fafc)',
 	);
 }
@@ -152,6 +152,8 @@ function fs_icon( $name, $size = 16, $args = array() ) {
 		'clock'       => '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
 		'trash'       => '<path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 13h10l1-13"></path><path d="M9 7V4h6v3"></path>',
 		'trending'    => '<path d="m3 17 5-5 4 4 8-8"></path><path d="M16 8h4v4"></path>',
+		'chat'        => '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"></path>',
+		'close'       => '<path d="M6 6 18 18"></path><path d="M18 6 6 18"></path>',
 	);
 
 	if ( ! isset( $paths[ $name ] ) ) {
@@ -178,4 +180,17 @@ function fs_icon( $name, $size = 16, $args = array() ) {
  */
 function fs_the_icon( $name, $size = 16, $args = array() ) {
 	echo fs_icon( $name, $size, $args ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- خروجی SVG ثابت و کنترل‌شده است.
+}
+
+/**
+ * آیکون هر ردیف جعبه‌ی «چرا ما؟» — چون متن ردیف‌ها از پنل مدیریت می‌آید،
+ * آیکون‌ها به‌ترتیب و چرخشی انتخاب می‌شوند تا جعبه یکنواخت نشود.
+ *
+ * @param int $i اندیس ردیف.
+ * @return string
+ */
+function fs_why_icon( $i ) {
+	$icons = apply_filters( 'fs_why_icons', array( 'zap', 'check', 'download', 'clock', 'file-lines', 'trending' ) );
+
+	return $icons[ $i % count( $icons ) ];
 }

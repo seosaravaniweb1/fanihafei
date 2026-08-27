@@ -2,7 +2,7 @@
 /**
  * بخش «این‌ها رو قبلاً دیدی».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -19,7 +19,7 @@ if ( ! $fs_recent ) {
 
 		<div>
 			<span class="fs-recent__badge">
-				<?php fs_the_icon( 'clock', 13, array( 'stroke' => '#c2410c', 'width' => '2.2' ) ); ?>
+				<?php fs_the_icon( 'clock', 13, array( 'stroke' => '#9d174d', 'width' => '2.2' ) ); ?>
 				<span class="fs-only-desktop"><?php echo esc_html( fs_copy( 'recent_badge' ) ); ?></span>
 				<span class="fs-only-mobile"><?php echo esc_html( fs_copy( 'recent_badge_m' ) ); ?></span>
 			</span>
@@ -37,7 +37,7 @@ if ( ! $fs_recent ) {
 		<div class="fs-recent__side">
 			<div class="fs-recent__price fs-only-desktop"><?php echo wp_kses_post( $fs_recent['price'] ); ?></div>
 
-			<a class="fs-btn-orange" href="<?php echo esc_url( fs_url( $fs_recent['link'] ) ); ?>">
+			<a class="fs-btn-accent" href="<?php echo esc_url( fs_url( $fs_recent['link'] ) ); ?>">
 				<?php fs_the_icon( 'download', 17, array( 'stroke' => '#fff' ) ); ?>
 				<?php echo esc_html( fs_copy( 'recent_cta' ) ); ?>
 			</a>

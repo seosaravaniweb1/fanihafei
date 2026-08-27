@@ -5,7 +5,7 @@
  * هیچ محتوای نمونه‌ای وجود ندارد: اگر ووکامرس نصب نباشد یا محصول/دسته/نوشته‌ای
  * ثبت نشده باشد، توابع آرایه‌ی خالی برمی‌گردانند و بخش مربوطه رندر نمی‌شود.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -20,7 +20,7 @@ function fs_has_woo() {
 }
 
 /**
- * تعداد سوال یک محصول.
+ * تعداد سوال یک محصول (فقط فایل‌های نمونه سوال).
  *
  * @param int $product_id شناسه محصول.
  * @return string
@@ -87,11 +87,14 @@ function fs_product_to_card( $product, $index = 0 ) {
 		'id'     => $id,
 		'title'  => $product->get_name(),
 		'link'   => get_permalink( $id ),
-		'q'      => fs_product_questions( $id ),
 		'price'  => fs_product_price( $product ),
 		'views'  => fs_product_views( $id ),
 		'thumb'  => get_the_post_thumbnail( $id, 'medium', array( 'loading' => 'lazy', 'decoding' => 'async' ) ),
 		'grad'   => fs_grad( $index ),
+		'fmt'    => fs_product_format( $id ),
+		'pages'  => fs_product_pages( $id ),
+		'cat'    => fs_get_product_leaf_cat( $id ),
+		'chips'  => fs_product_chips( $id ),
 		'badges' => fs_product_badges_line( $id ),
 	);
 }
@@ -106,7 +109,7 @@ function fs_get_categories() {
 		return array();
 	}
 
-	$cached = wp_cache_get( 'fs_categories', 'fanni-soal' );
+	$cached = wp_cache_get( 'fs_categories_v2', 'si-file' );
 
 	if ( false !== $cached ) {
 		return $cached;
@@ -148,6 +151,7 @@ function fs_get_categories() {
 
 			$out[] = array(
 				'name'  => $parent->name,
+				'slug'  => $parent->slug,
 				'count' => fs_fa_num( $parent->count ),
 				'link'  => get_term_link( $parent ),
 				'subs'  => $subs,
@@ -155,7 +159,7 @@ function fs_get_categories() {
 		}
 	}
 
-	wp_cache_set( 'fs_categories', $out, 'fanni-soal', HOUR_IN_SECONDS );
+	wp_cache_set( 'fs_categories_v2', $out, 'si-file', HOUR_IN_SECONDS );
 
 	return $out;
 }
@@ -332,23 +336,18 @@ function fs_get_stats() {
 		if ( $count ) {
 			$out[] = array(
 				'v' => fs_fa_num( number_format_i18n( $count ) ),
-				'k' => 'فایل نمونه سوال',
+				'k' => 'فایل افزوده شده',
 			);
 		}
+	}
 
-		$terms = wp_count_terms(
-			array(
-				'taxonomy'   => 'product_cat',
-				'hide_empty' => true,
-			)
+	$users = fs_active_users_count();
+
+	if ( $users ) {
+		$out[] = array(
+			'v' => fs_fa_num( number_format_i18n( $users ) ),
+			'k' => 'کاربران فعال',
 		);
-
-		if ( ! is_wp_error( $terms ) && (int) $terms ) {
-			$out[] = array(
-				'v' => fs_fa_num( number_format_i18n( (int) $terms ) ),
-				'k' => 'رشته و مهارت',
-			);
-		}
 	}
 
 	$satisfaction = fs_get_satisfaction();
@@ -361,6 +360,27 @@ function fs_get_stats() {
 	}
 
 	return $out;
+}
+
+/**
+ * تعداد کاربران فعال سایت — تعداد کل کاربران ثبت‌شده. برای اینکه روی
+ * سایت‌های پرکاربر هر بار شمارش سنگین انجام نشود، یک ساعت کش می‌شود.
+ *
+ * @return int
+ */
+function fs_active_users_count() {
+	$cached = get_transient( 'fs_active_users' );
+
+	if ( false !== $cached ) {
+		return (int) $cached;
+	}
+
+	$counts = count_users();
+	$total  = isset( $counts['total_users'] ) ? (int) $counts['total_users'] : 0;
+
+	set_transient( 'fs_active_users', $total, HOUR_IN_SECONDS );
+
+	return $total;
 }
 
 /**
@@ -386,15 +406,14 @@ function fs_get_recently_viewed() {
 		return null;
 	}
 
-	$id        = $product->get_id();
-	$questions = fs_product_questions( $id );
-	$badges    = fs_product_badges_line( $id );
+	$id     = $product->get_id();
+	$badges = fs_product_badges_line( $id );
 
 	return array(
 		'title'  => $product->get_name(),
 		'link'   => get_permalink( $id ),
-		'meta'   => $questions ? sprintf( '%s سوال · %s', $questions, $badges ) : $badges,
-		'meta_m' => $questions ? sprintf( '%s سوال · PDF', $questions ) : 'PDF',
+		'meta'   => $badges,
+		'meta_m' => fs_product_format( $id ),
 		'price'  => fs_product_price( $product ),
 	);
 }
@@ -424,4 +443,55 @@ function fs_account_label() {
  */
 function fs_shop_url() {
 	return fs_has_woo() ? wc_get_page_permalink( 'shop' ) : home_url( '/' );
+}
+
+/**
+ * دسته‌های مادر برای انتخابگر جست‌وجوی سربرگ — کاربر اول دسته را انتخاب
+ * می‌کند و جست‌وجو فقط داخل همان دسته انجام می‌شود.
+ *
+ * @return array<int, array{name:string,slug:string}>
+ */
+function fs_search_categories() {
+	if ( ! fs_has_woo() ) {
+		return array();
+	}
+
+	$out = array();
+
+	foreach ( fs_get_categories() as $cat ) {
+		if ( empty( $cat['slug'] ) ) {
+			continue;
+		}
+
+		$out[] = array(
+			'name' => $cat['name'],
+			'slug' => $cat['slug'],
+		);
+	}
+
+	return $out;
+}
+
+/**
+ * دسته‌ای که جست‌وجوی جاری در آن محدود شده است.
+ *
+ * @return string
+ */
+function fs_current_search_cat() {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- فقط خواندن پارامتر جست‌وجو.
+	$raw = isset( $_GET['product_cat'] ) ? sanitize_title( wp_unslash( $_GET['product_cat'] ) ) : '';
+
+	if ( $raw ) {
+		return $raw;
+	}
+
+	if ( is_tax( 'product_cat' ) ) {
+		$term = get_queried_object();
+
+		if ( $term instanceof WP_Term ) {
+			return $term->slug;
+		}
+	}
+
+	return '';
 }

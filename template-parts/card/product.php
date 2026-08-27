@@ -2,7 +2,7 @@
 /**
  * کارت محصول (ریل افقی).
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -33,14 +33,19 @@ $fs_is_new = ! empty( $args['badge'] );
 	<span class="fs-pcard__body">
 		<span class="fs-pcard__title"><?php echo esc_html( $fs_card['title'] ); ?></span>
 
-		<span class="fs-pcard__meta">
-			<?php echo $fs_card['q'] ? esc_html( $fs_card['q'] ) . ' سوال · ' . esc_html( $fs_card['badges'] ) : esc_html( $fs_card['badges'] ); ?>
+		<span class="fs-pcard__chips">
+			<?php foreach ( $fs_card['chips'] as $fs_chip ) : ?>
+				<span class="fs-chipmeta">
+					<?php fs_the_icon( $fs_chip['icon'], 12, array( 'stroke' => '#94a3b8' ) ); ?>
+					<?php echo esc_html( $fs_chip['text'] ); ?>
+				</span>
+			<?php endforeach; ?>
 		</span>
 
 		<span class="fs-pcard__foot">
 			<span class="fs-pcard__price"><?php echo wp_kses_post( $fs_card['price'] ); ?></span>
 			<span class="fs-pcard__dl">
-				<?php fs_the_icon( 'download', 16, array( 'stroke' => '#059669' ) ); ?>
+				<?php fs_the_icon( 'download', 16, array( 'stroke' => '#6d28d9' ) ); ?>
 			</span>
 		</span>
 	</span>

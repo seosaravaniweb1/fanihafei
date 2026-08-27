@@ -4,7 +4,7 @@
  *
  * نماد اعتماد، ساماندهی، آیکون بانک‌ها و متن زیر آن‌ها؛ ذخیره با اجاکس.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

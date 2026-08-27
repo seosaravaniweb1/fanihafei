@@ -2,7 +2,7 @@
 /**
  * قالب برگه — شامل برگه‌های ووکامرس (سبد خرید، تسویه‌حساب، حساب کاربری).
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;

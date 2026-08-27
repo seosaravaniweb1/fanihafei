@@ -2,7 +2,7 @@
 /**
  * مگامنوی دسته‌بندی (دسکتاپ).
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -43,9 +43,9 @@ if ( ! $fs_cats ) {
 				<div class="fs-mega__head">
 					<div>
 						<div class="fs-mega__title"><?php echo esc_html( $fs_cat['name'] ); ?></div>
-						<div class="fs-mega__count"><?php echo esc_html( $fs_cat['count'] ); ?> نمونه سوال در این دسته</div>
+						<div class="fs-mega__count"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?> در این دسته</div>
 					</div>
-					<a class="fs-btn-green-sm" href="<?php echo esc_url( fs_url( $fs_cat['link'] ) ); ?>">
+					<a class="fs-btn-brand-sm" href="<?php echo esc_url( fs_url( $fs_cat['link'] ) ); ?>">
 						مشاهده صفحه دسته
 						<?php fs_the_icon( 'chevron-prev', 14, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>
 					</a>
@@ -55,7 +55,7 @@ if ( ! $fs_cats ) {
 					<?php foreach ( $fs_cat['subs'] as $fs_sub ) : ?>
 						<a class="fs-mega__sub" href="<?php echo esc_url( fs_url( $fs_sub['link'] ) ); ?>">
 							<span class="fs-mega__sub-name"><?php echo esc_html( $fs_sub['name'] ); ?></span>
-							<span class="fs-mega__sub-n"><?php echo esc_html( $fs_sub['count'] ); ?> سوال</span>
+							<span class="fs-mega__sub-n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
 						</a>
 					<?php endforeach; ?>
 				</div>

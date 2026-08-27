@@ -4,7 +4,7 @@
  *
  * سبد خرید، اطلاعات دریافت فایل و انتخاب درگاه، همه در یک صفحه.
  *
- * @package FanniSoal
+ * @package SiFile
  *
  * @var WC_Checkout $checkout
  */
@@ -33,7 +33,7 @@ $fs_cart = WC()->cart;
 			<section class="fs-cbox">
 				<div class="fs-cbox__head">
 					<h2 class="fs-cbox__title">
-						<span class="fs-cbox__icon fs-cbox__icon--green"><?php fs_the_icon( 'file', 16, array( 'stroke' => '#059669' ) ); ?></span>
+						<span class="fs-cbox__icon fs-cbox__icon--brand"><?php fs_the_icon( 'file', 16, array( 'stroke' => '#6d28d9' ) ); ?></span>
 						۱ · فایل شما
 					</h2>
 				</div>
@@ -66,10 +66,7 @@ $fs_cart = WC()->cart;
 								</a>
 								<span class="fs-citem__pills">
 									<span class="fs-citem__pill">
-										<?php
-										$fs_q = fs_product_questions( $fs_pid );
-										echo $fs_q ? esc_html( $fs_q ) . ' سوال · PDF' : 'PDF';
-										?>
+										<?php echo esc_html( fs_product_badges_line( $fs_pid ) ); ?>
 									</span>
 									<span class="fs-citem__pill fs-citem__pill--muted">دانلود فوری</span>
 								</span>
@@ -105,7 +102,7 @@ $fs_cart = WC()->cart;
 					</h2>
 					<?php if ( is_user_logged_in() ) : ?>
 						<span class="fs-cbox__ok">
-							<?php fs_the_icon( 'check', 12, array( 'stroke' => '#059669', 'width' => '2.8' ) ); ?>
+							<?php fs_the_icon( 'check', 12, array( 'stroke' => '#6d28d9', 'width' => '2.8' ) ); ?>
 							وارد شده‌اید
 						</span>
 					<?php endif; ?>
@@ -126,7 +123,7 @@ $fs_cart = WC()->cart;
 			<section class="fs-cbox">
 				<div class="fs-cbox__head">
 					<h2 class="fs-cbox__title">
-						<span class="fs-cbox__icon fs-cbox__icon--orange"><?php fs_the_icon( 'file', 16, array( 'stroke' => '#ea580c' ) ); ?></span>
+						<span class="fs-cbox__icon fs-cbox__icon--accent"><?php fs_the_icon( 'file', 16, array( 'stroke' => '#be185d' ) ); ?></span>
 						۳ · انتخاب درگاه پرداخت
 					</h2>
 				</div>

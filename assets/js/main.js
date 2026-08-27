@@ -1,5 +1,5 @@
 /**
- * تعاملات قالب فنی‌سوال.
+ * تعاملات قالب سی‌فایل.
  *
  * معادل وضعیت‌های DCLogic در فایل طرح:
  * mega / drawer / menu / ci / pi / di / allCats
@@ -1018,8 +1018,201 @@
 		}
 	}
 
+
+	/* ------------------------------------------------------- سبد خرید کشویی */
+	function initCart() {
+		var drawer = document.getElementById( 'fs-cart' );
+
+		if ( ! drawer || 'undefined' === typeof window.fsData ) {
+			return;
+		}
+
+		var body = drawer.querySelector( '[data-cart-body]' );
+		var toast = drawer.querySelector( '[data-cart-toast]' );
+		var openers = document.querySelectorAll( '[data-cart-open]' );
+		var busy = false;
+		var toastTimer = null;
+
+		function open( state ) {
+			toggle( drawer, state );
+			drawer.classList.toggle( 'is-open', state );
+			document.body.classList.toggle( 'fs-noscroll', state );
+
+			Array.prototype.forEach.call( openers, function ( el ) {
+				el.setAttribute( 'aria-expanded', state ? 'true' : 'false' );
+			} );
+		}
+
+		function say( message, isError ) {
+			if ( ! toast || ! message ) {
+				return;
+			}
+
+			toast.textContent = message;
+			toast.classList.toggle( 'is-error', !! isError );
+			toggle( toast, true );
+
+			window.clearTimeout( toastTimer );
+			toastTimer = window.setTimeout( function () {
+				toggle( toast, false );
+			}, 3200 );
+		}
+
+		function paint( data ) {
+			if ( ! data ) {
+				return;
+			}
+
+			if ( body && 'string' === typeof data.body ) {
+				body.innerHTML = data.body;
+			}
+
+			Array.prototype.forEach.call( document.querySelectorAll( '[data-cart-count]' ), function ( el ) {
+				el.textContent = faNum( data.count );
+				toggle( el, data.count > 0 );
+			} );
+		}
+
+		function request( action, payload ) {
+			if ( busy ) {
+				return Promise.resolve( null );
+			}
+
+			busy = true;
+			drawer.classList.add( 'is-busy' );
+
+			var form = new FormData();
+			form.append( 'action', action );
+			form.append( 'nonce', window.fsData.cartNonce );
+
+			Object.keys( payload || {} ).forEach( function ( key ) {
+				form.append( key, payload[ key ] );
+			} );
+
+			return window.fetch( window.fsData.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: form
+			} ).then( function ( r ) {
+				return r.json();
+			} ).then( function ( res ) {
+				var data = res && res.data ? res.data : null;
+
+				paint( data );
+				say( data && data.message, ! ( res && res.success ) );
+
+				return data;
+			} ).catch( function () {
+				say( 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.', true );
+
+				return null;
+			} ).finally( function () {
+				busy = false;
+				drawer.classList.remove( 'is-busy' );
+			} );
+		}
+
+		Array.prototype.forEach.call( openers, function ( el ) {
+			el.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				open( true );
+			} );
+		} );
+
+		document.addEventListener( 'click', function ( e ) {
+			// بستن کشو.
+			if ( e.target.closest && e.target.closest( '[data-cart-close]' ) ) {
+				e.preventDefault();
+				open( false );
+
+				return;
+			}
+
+			// حذف یک قلم.
+			var del = e.target.closest ? e.target.closest( '[data-cart-remove]' ) : null;
+
+			if ( del ) {
+				e.preventDefault();
+				request( 'fs_cart_remove', { key: del.getAttribute( 'data-cart-remove' ) } );
+
+				return;
+			}
+
+			// افزودن به سبد از روی کارت‌ها یا نوار پایین موبایل.
+			var add = e.target.closest ? e.target.closest( '.add_to_cart_button, .fs-mobar__btn' ) : null;
+
+			if ( ! add || add.classList.contains( 'single_add_to_cart_button' ) ) {
+				return;
+			}
+
+			var id = add.getAttribute( 'data-product_id' );
+
+			if ( ! id ) {
+				return;
+			}
+
+			e.preventDefault();
+			add.classList.add( 'is-loading' );
+			open( true );
+
+			request( 'fs_cart_add', {
+				product_id: id,
+				quantity: add.getAttribute( 'data-quantity' ) || 1
+			} ).finally( function () {
+				add.classList.remove( 'is-loading' );
+			} );
+		} );
+
+		// دکمه‌ی خرید صفحه‌ی محصول — فرم استاندارد ووکامرس.
+		Array.prototype.forEach.call( document.querySelectorAll( 'form.cart' ), function ( form ) {
+			form.addEventListener( 'submit', function ( e ) {
+				var button = form.querySelector( '.single_add_to_cart_button' );
+				var id = form.querySelector( '[name="add-to-cart"]' );
+				var productId = id ? id.value : ( button ? button.value : '' );
+
+				// محصولات متغیر و هرچیزی که شناسه‌ی ساده ندارد، مسیر عادی ووکامرس را می‌روند.
+				if ( ! productId || form.querySelector( '.variations' ) ) {
+					return;
+				}
+
+				e.preventDefault();
+
+				var qty = form.querySelector( '[name="quantity"]' );
+
+				if ( button ) {
+					button.classList.add( 'is-loading' );
+				}
+
+				open( true );
+
+				request( 'fs_cart_add', {
+					product_id: productId,
+					quantity: qty ? qty.value : 1
+				} ).finally( function () {
+					if ( button ) {
+						button.classList.remove( 'is-loading' );
+					}
+				} );
+			} );
+		} );
+
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( 'Escape' === e.key && ! drawer.hasAttribute( 'hidden' ) ) {
+				open( false );
+			}
+		} );
+
+		// بازگشت با دکمه‌ی back مرورگر: صفحه از کش می‌آید و شمارنده کهنه است.
+		window.addEventListener( 'pageshow', function ( e ) {
+			if ( e.persisted ) {
+				request( 'fs_cart_fragment', {} );
+			}
+		} );
+	}
+
 	function init() {
 		initAuth();
+		initCart();
 		initWishlist();
 		initProfileForm();
 		initInfinite();

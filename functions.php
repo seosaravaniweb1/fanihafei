@@ -1,13 +1,13 @@
 <?php
 /**
- * راه‌اندازی قالب فنی‌سوال.
+ * راه‌اندازی قالب سی‌فایل (30file).
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '1.0.0' );
+define( 'FS_VERSION', '2.0.0' );
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );
@@ -17,6 +17,7 @@ require_once get_theme_file_path( 'inc/theme-settings.php' );
 require_once get_theme_file_path( 'inc/trust-settings.php' );
 require_once get_theme_file_path( 'inc/woocommerce.php' );
 require_once get_theme_file_path( 'inc/auth.php' );
+require_once get_theme_file_path( 'inc/cart.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
 require_once get_theme_file_path( 'inc/account.php' );
 require_once get_theme_file_path( 'inc/wishlist.php' );
@@ -38,7 +39,7 @@ add_action( 'after_switch_theme', 'fs_flush_rewrites' );
  * @return void
  */
 function fs_setup() {
-	load_theme_textdomain( 'fanni-soal', get_theme_file_path( 'languages' ) );
+	load_theme_textdomain( 'si-file', get_theme_file_path( 'languages' ) );
 
 	add_theme_support( 'title-tag' );
 	add_theme_support( 'post-thumbnails' );
@@ -109,9 +110,11 @@ function fs_assets() {
 		'fs-main',
 		'fsData',
 		array(
-			'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( 'fs_auth' ),
-			'loginUrl' => fs_account_url(),
+			'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+			'nonce'       => wp_create_nonce( 'fs_auth' ),
+			'cartNonce'   => wp_create_nonce( 'fs_cart' ),
+			'loginUrl'    => fs_account_url(),
+			'checkoutUrl' => fs_has_woo() ? wc_get_checkout_url() : '',
 		)
 	);
 }
@@ -170,6 +173,18 @@ function fs_dequeue_block_styles() {
 add_action( 'wp_enqueue_scripts', 'fs_dequeue_block_styles', 100 );
 
 /**
+ * اسکریپت افزودن‌به‌سبد ووکامرس لازم نیست — قالب خودش همین کار را با اجاکس
+ * و کشوی سبد انجام می‌دهد و اگر هر دو فعال باشند محصول دوبار افزوده می‌شود.
+ *
+ * @return void
+ */
+function fs_dequeue_woo_add_to_cart() {
+	wp_dequeue_script( 'wc-add-to-cart' );
+	wp_dequeue_script( 'wc-cart-fragments' );
+}
+add_action( 'wp_enqueue_scripts', 'fs_dequeue_woo_add_to_cart', 100 );
+
+/**
  * سرعت نوار متحرک به‌صورت متغیر CSS — معادل prop مقدار `mqSpeed` در طرح.
  *
  * @return void
@@ -188,7 +203,7 @@ add_action( 'wp_enqueue_scripts', 'fs_inline_vars', 20 );
  * @return void
  */
 function fs_flush_cat_cache() {
-	wp_cache_delete( 'fs_categories', 'fanni-soal' );
+	wp_cache_delete( 'fs_categories_v2', 'si-file' );
 }
 add_action( 'edited_product_cat', 'fs_flush_cat_cache' );
 add_action( 'created_product_cat', 'fs_flush_cat_cache' );

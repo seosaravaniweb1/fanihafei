@@ -2,13 +2,16 @@
 /**
  * سربرگ سایت.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
 
-$fs_cats = fs_get_categories();
-$fs_menu = fs_menu_items( 'primary' );
+$fs_cats        = fs_get_categories();
+$fs_menu        = fs_menu_items( 'primary' );
+$fs_support     = fs_support_url();
+$fs_search_cats = fs_has_woo() ? fs_search_categories() : array();
+$fs_cart_n      = fs_has_woo() ? fs_cart_count() : 0;
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?> dir="rtl">
@@ -33,6 +36,20 @@ $fs_menu = fs_menu_items( 'primary' );
 			</div>
 
 			<form class="fs-search" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
+				<?php if ( $fs_search_cats ) : ?>
+					<label class="fs-sr-only" for="fs-search-cat">دسته‌بندی جست‌وجو</label>
+					<select class="fs-search__cat" id="fs-search-cat" name="product_cat">
+						<option value=""><?php echo esc_html( fs_copy( 'search_all_cats' ) ); ?></option>
+						<?php foreach ( $fs_search_cats as $fs_scat ) : ?>
+							<option value="<?php echo esc_attr( $fs_scat['slug'] ); ?>"
+								<?php selected( fs_current_search_cat(), $fs_scat['slug'] ); ?>>
+								<?php echo esc_html( $fs_scat['name'] ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+					<span class="fs-search__split" aria-hidden="true"></span>
+				<?php endif; ?>
+
 				<?php fs_the_icon( 'search', 16, array( 'stroke' => '#94a3b8' ) ); ?>
 				<label class="fs-sr-only" for="fs-search-field">جست‌وجو</label>
 				<input class="fs-search__input" id="fs-search-field" type="search" name="s"
@@ -41,9 +58,30 @@ $fs_menu = fs_menu_items( 'primary' );
 				<?php if ( fs_has_woo() ) : ?>
 					<input type="hidden" name="post_type" value="product">
 				<?php endif; ?>
+				<button class="fs-search__go" type="submit">
+					<span class="fs-sr-only">جست‌وجو</span>
+					<?php fs_the_icon( 'search', 15, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>
+				</button>
 			</form>
 
 			<div class="fs-header__end">
+				<?php if ( fs_has_woo() ) : ?>
+					<button class="fs-btn-cart" type="button" data-cart-open aria-controls="fs-cart" aria-expanded="false">
+						<span class="fs-sr-only">سبد خرید</span>
+						<?php fs_the_icon( 'cart', 18, array( 'stroke' => 'currentColor', 'width' => '1.8' ) ); ?>
+						<span class="fs-btn-cart__n" data-cart-count<?php echo $fs_cart_n ? '' : ' hidden'; ?>>
+							<?php echo esc_html( fs_fa_num( $fs_cart_n ) ); ?>
+						</span>
+					</button>
+				<?php endif; ?>
+
+				<?php if ( $fs_support ) : ?>
+					<a class="fs-btn-support" href="<?php echo esc_url( $fs_support ); ?>" target="_blank" rel="noopener nofollow">
+						<?php fs_the_icon( 'chat', 16, array( 'stroke' => 'currentColor', 'width' => '1.9' ) ); ?>
+						<span class="fs-btn-support__label"><?php echo esc_html( fs_support_label() ); ?></span>
+					</a>
+				<?php endif; ?>
+
 				<a class="fs-btn-account" href="<?php echo esc_url( fs_account_url() ); ?>">
 					<?php fs_the_icon( 'user', 16, array( 'stroke' => '#fff', 'width' => '1.8' ) ); ?>
 					<?php echo esc_html( fs_account_label() ); ?>
@@ -81,6 +119,12 @@ $fs_menu = fs_menu_items( 'primary' );
 								دانلودهای من
 							</a>
 						<?php endif; ?>
+						<?php if ( $fs_support ) : ?>
+							<a href="<?php echo esc_url( $fs_support ); ?>" target="_blank" rel="noopener nofollow">
+								<?php fs_the_icon( 'chat', 15, array( 'width' => '1.9' ) ); ?>
+								<?php echo esc_html( fs_support_label() ); ?>
+							</a>
+						<?php endif; ?>
 					</div>
 				</div>
 			<?php endif; ?>
@@ -114,7 +158,7 @@ $fs_menu = fs_menu_items( 'primary' );
 					<button class="fs-drawer-trigger" type="button" aria-expanded="false" aria-controls="fs-drawer">
 						<?php fs_the_icon( 'menu', 16, array( 'stroke' => '#0f172a' ) ); ?>
 						<?php echo esc_html( fs_copy( 'cats_trigger' ) ); ?>
-						<?php fs_the_icon( 'chevron-down', 14, array( 'stroke' => '#059669', 'width' => '2.2' ) ); ?>
+						<?php fs_the_icon( 'chevron-down', 14, array( 'stroke' => '#6d28d9', 'width' => '2.2' ) ); ?>
 					</button>
 
 					<?php get_template_part( 'template-parts/header/mega', null, array( 'cats' => $fs_cats ) ); ?>
@@ -128,6 +172,10 @@ $fs_menu = fs_menu_items( 'primary' );
 	<?php
 	if ( $fs_cats ) {
 		get_template_part( 'template-parts/header/drawer', null, array( 'cats' => $fs_cats ) );
+	}
+
+	if ( fs_has_woo() ) {
+		get_template_part( 'template-parts/header/cart-drawer' );
 	}
 	?>
 

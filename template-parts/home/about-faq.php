@@ -4,7 +4,7 @@
  *
  * محتوای هر دو از پست‌تایپ «تنظیمات قالب» خوانده می‌شود.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -44,7 +44,7 @@ if ( ! $fs_about && ! $fs_faq ) {
 					<div class="fs-faq__item">
 						<button class="fs-faq__q" type="button" aria-expanded="false" aria-controls="fs-faq-a-<?php echo (int) $fs_i; ?>">
 							<span><?php echo esc_html( $fs_item['title'] ); ?></span>
-							<?php fs_the_icon( 'plus', 15, array( 'stroke' => '#059669', 'width' => '2.2' ) ); ?>
+							<?php fs_the_icon( 'plus', 15, array( 'stroke' => '#6d28d9', 'width' => '2.2' ) ); ?>
 						</button>
 
 						<?php if ( trim( wp_strip_all_tags( $fs_item['content'] ) ) ) : ?>

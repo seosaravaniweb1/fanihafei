@@ -6,7 +6,7 @@
  * تضمین‌های صفحه محصول، پیام پیشخوان مشتریان) در یک آپشن ذخیره می‌شود و از یک
  * صفحه با تب مدیریت می‌شود؛ به‌جای پراکنده‌بودن بین پست‌تایپ و سفارشی‌سازی.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -20,12 +20,18 @@ const FS_SETTINGS_OPTION = 'fs_theme_settings';
  */
 function fs_theme_settings_defaults() {
 	return array(
+		'support_url'       => '',
+		'support_label'     => '',
 		'satisfaction'      => '',
+		'product_satisf'    => '',
 		'trust_items'       => '',
 		'about_title'       => '',
 		'about_content'     => '',
 		'faq'               => array(),
 		'guarantees'        => '',
+		'why_title'         => '',
+		'why_items'         => '',
+		'why_foot'          => '',
 		'dashboard_title'   => '',
 		'dashboard_message' => '',
 	);
@@ -152,6 +158,67 @@ function fs_get_guarantees() {
 }
 
 /**
+ * نشانی چت پشتیبانی — دکمه‌ی کنار «پنل کاربری» در سربرگ.
+ *
+ * @return string
+ */
+function fs_support_url() {
+	return trim( fs_get_theme_settings()['support_url'] );
+}
+
+/**
+ * برچسب دکمه‌ی چت پشتیبانی.
+ *
+ * @return string
+ */
+function fs_support_label() {
+	$saved = trim( fs_get_theme_settings()['support_label'] );
+
+	return $saved ? $saved : fs_copy( 'support_label' );
+}
+
+/**
+ * درصد رضایت مشتریان — نشان کنار عنوان در صفحه محصول.
+ *
+ * @return string
+ */
+function fs_product_satisfaction() {
+	$saved = trim( fs_get_theme_settings()['product_satisf'] );
+
+	if ( ! $saved ) {
+		$saved = trim( fs_get_theme_settings()['satisfaction'] );
+	}
+
+	return $saved;
+}
+
+/**
+ * جعبه‌ی «چرا سی‌فایل» در نوار کناری توضیحات محصول.
+ *
+ * هر خط یک مورد است. اگر هیچ موردی ثبت نشده باشد، جعبه اصلاً رندر نمی‌شود.
+ *
+ * @return array{title:string,items:string[],foot:string}|null
+ */
+function fs_get_why_box() {
+	$settings = fs_get_theme_settings();
+	$items    = array();
+
+	if ( $settings['why_items'] ) {
+		$items = array_values( array_filter( array_map( 'trim', explode( "\n", $settings['why_items'] ) ) ) );
+	}
+
+	if ( ! $items ) {
+		return null;
+	}
+
+	return array(
+		'title' => $settings['why_title'] ? $settings['why_title'] : sprintf( 'چرا %s؟', get_bloginfo( 'name' ) ),
+		'items' => $items,
+		'foot'  => trim( $settings['why_foot'] ),
+	);
+}
+
+/**
  * ثبت منوی مدیریت.
  *
  * @return void
@@ -178,6 +245,7 @@ function fs_theme_settings_tabs() {
 	return array(
 		'home'      => 'صفحه اصلی',
 		'product'   => 'صفحه محصول',
+		'header'    => 'سربرگ و پشتیبانی',
 		'dashboard' => 'پیشخوان کاربری',
 	);
 }
@@ -224,7 +292,14 @@ function fs_theme_settings_save() {
 
 		$settings['faq'] = $faq;
 	} elseif ( 'product' === $tab ) {
-		$settings['guarantees'] = isset( $_POST['guarantees'] ) ? sanitize_textarea_field( wp_unslash( $_POST['guarantees'] ) ) : '';
+		$settings['guarantees']     = isset( $_POST['guarantees'] ) ? sanitize_textarea_field( wp_unslash( $_POST['guarantees'] ) ) : '';
+		$settings['product_satisf'] = isset( $_POST['product_satisf'] ) ? sanitize_text_field( wp_unslash( $_POST['product_satisf'] ) ) : '';
+		$settings['why_title']      = isset( $_POST['why_title'] ) ? sanitize_text_field( wp_unslash( $_POST['why_title'] ) ) : '';
+		$settings['why_items']      = isset( $_POST['why_items'] ) ? sanitize_textarea_field( wp_unslash( $_POST['why_items'] ) ) : '';
+		$settings['why_foot']       = isset( $_POST['why_foot'] ) ? sanitize_text_field( wp_unslash( $_POST['why_foot'] ) ) : '';
+	} elseif ( 'header' === $tab ) {
+		$settings['support_url']   = isset( $_POST['support_url'] ) ? esc_url_raw( wp_unslash( $_POST['support_url'] ) ) : '';
+		$settings['support_label'] = isset( $_POST['support_label'] ) ? sanitize_text_field( wp_unslash( $_POST['support_label'] ) ) : '';
 	} elseif ( 'dashboard' === $tab ) {
 		$settings['dashboard_title']   = isset( $_POST['dashboard_title'] ) ? sanitize_text_field( wp_unslash( $_POST['dashboard_title'] ) ) : '';
 		$settings['dashboard_message'] = isset( $_POST['dashboard_message'] ) ? wp_kses_post( wp_unslash( $_POST['dashboard_message'] ) ) : '';
@@ -361,13 +436,47 @@ function fs_theme_settings_page() {
 				<input type="hidden" name="action" value="fs_theme_settings_save">
 				<input type="hidden" name="fs_tab" value="product">
 
-				<h2 style="margin-top:24px">تضمین‌های کنار دکمه خرید</h2>
+				<h2 style="margin-top:24px">نشان بالای عنوان محصول</h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th><label for="fs-product-satisf">درصد رضایت مشتریان</label></th>
+						<td>
+							<input type="text" id="fs-product-satisf" name="product_satisf" class="regular-text" value="<?php echo esc_attr( $settings['product_satisf'] ); ?>" placeholder="مثلاً ۹۷٪">
+							<p class="description">کنار «تعداد فروش موفق» بالای عنوان محصول نمایش داده می‌شود. خالی بگذارید تا از مقدار «رضایت خریداران» تب صفحه اصلی استفاده شود؛ اگر هر دو خالی باشند نمایش داده نمی‌شود.</p>
+						</td>
+					</tr>
+				</table>
+
+				<h2 style="margin-top:8px">جعبه «چرا ما؟» در نوار کناری توضیحات</h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th><label for="fs-why-title">عنوان جعبه</label></th>
+						<td>
+							<input type="text" id="fs-why-title" name="why_title" class="regular-text" value="<?php echo esc_attr( $settings['why_title'] ); ?>" placeholder="<?php echo esc_attr( sprintf( 'چرا %s؟', get_bloginfo( 'name' ) ) ); ?>">
+						</td>
+					</tr>
+					<tr>
+						<th><label for="fs-why-items">موارد</label></th>
+						<td>
+							<textarea id="fs-why-items" name="why_items" rows="5" class="large-text"><?php echo esc_textarea( $settings['why_items'] ); ?></textarea>
+							<p class="description">هر خط یک مورد. اگر خالی بماند، این جعبه اصلاً نمایش داده نمی‌شود.</p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="fs-why-foot">متن پایین جعبه</label></th>
+						<td>
+							<input type="text" id="fs-why-foot" name="why_foot" class="regular-text" value="<?php echo esc_attr( $settings['why_foot'] ); ?>" placeholder="مثلاً قابل خرید با تمامی کارت‌های عضو شتاب">
+						</td>
+					</tr>
+				</table>
+
+				<h2 style="margin-top:8px">تضمین‌های زیر نوار کناری</h2>
 				<table class="form-table" role="presentation">
 					<tr>
 						<th><label for="fs-guarantees">تضمین‌ها</label></th>
 						<td>
 							<textarea id="fs-guarantees" name="guarantees" rows="4" class="large-text"><?php echo esc_textarea( $settings['guarantees'] ); ?></textarea>
-							<p class="description">هر خط یک مورد. خالی بگذارید تا نمایش داده نشود.</p>
+							<p class="description">هر خط یک مورد. این موارد به‌همراه نشان‌های اعتماد، زیر جعبه «چرا ما؟» در نوار کناری تب توضیحات نمایش داده می‌شوند. خالی بگذارید تا نمایش داده نشود.</p>
 						</td>
 					</tr>
 				</table>
@@ -380,6 +489,35 @@ function fs_theme_settings_page() {
 			<hr style="margin:32px 0">
 
 			<?php fs_trust_tab_content(); ?>
+
+		<?php elseif ( 'header' === $tab ) : ?>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'fs_theme_settings_save' ); ?>
+				<input type="hidden" name="action" value="fs_theme_settings_save">
+				<input type="hidden" name="fs_tab" value="header">
+
+				<h2 style="margin-top:24px">دکمه چت پشتیبانی</h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th><label for="fs-support-url">نشانی چت پشتیبانی</label></th>
+						<td>
+							<input type="url" id="fs-support-url" name="support_url" class="regular-text ltr" dir="ltr" value="<?php echo esc_attr( $settings['support_url'] ); ?>" placeholder="https://t.me/username">
+							<p class="description">نشانی تلگرام، واتس‌اپ، گفتینو، رایچت یا هر صفحه‌ای که پشتیبانی روی آن انجام می‌شود. خالی بگذارید تا دکمه در سربرگ نمایش داده نشود.</p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="fs-support-label">متن دکمه</label></th>
+						<td>
+							<input type="text" id="fs-support-label" name="support_label" class="regular-text" value="<?php echo esc_attr( $settings['support_label'] ); ?>" placeholder="چت پشتیبانی">
+						</td>
+					</tr>
+				</table>
+
+				<p style="margin-top:20px">
+					<button type="submit" class="button button-primary button-hero">ذخیره تنظیمات</button>
+				</p>
+			</form>
 
 		<?php elseif ( 'dashboard' === $tab ) : ?>
 

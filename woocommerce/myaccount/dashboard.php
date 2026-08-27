@@ -2,7 +2,7 @@
 /**
  * پیشخوان کاربری — برگردان دقیق طرح «Account Dashboard UI».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -27,10 +27,10 @@ $fs_downloads = fs_has_woo() ? wc_get_customer_available_downloads( $fs_user->ID
 			<div class="fs-greet__hi">سلام، <?php echo esc_html( $fs_name ); ?> عزیز</div>
 			<div class="fs-greet__meta">
 				<?php if ( $fs_user->user_email && ! preg_match( '/^09\d{9}@/', $fs_user->user_email ) ) : ?>
-					<span><?php fs_the_icon( 'file', 14, array( 'stroke' => '#6ee7b7', 'width' => '1.9' ) ); ?> <?php echo esc_html( $fs_user->user_email ); ?></span>
+					<span><?php fs_the_icon( 'file', 14, array( 'stroke' => '#c4b5fd', 'width' => '1.9' ) ); ?> <?php echo esc_html( $fs_user->user_email ); ?></span>
 				<?php endif; ?>
 				<?php if ( $fs_phone ) : ?>
-					<span><?php fs_the_icon( 'user', 14, array( 'stroke' => '#6ee7b7', 'width' => '1.9' ) ); ?> <?php echo esc_html( fs_fa_num( $fs_phone ) ); ?></span>
+					<span><?php fs_the_icon( 'user', 14, array( 'stroke' => '#c4b5fd', 'width' => '1.9' ) ); ?> <?php echo esc_html( fs_fa_num( $fs_phone ) ); ?></span>
 				<?php endif; ?>
 			</div>
 		</div>
@@ -69,7 +69,7 @@ $fs_downloads = fs_has_woo() ? wc_get_customer_available_downloads( $fs_user->ID
 <?php if ( $fs_percent < 100 ) : ?>
 	<div class="fs-quickform">
 		<div class="fs-quickform__head">
-			<span class="fs-quickform__icon"><?php fs_the_icon( 'file-lines', 17, array( 'stroke' => '#059669', 'width' => '1.9' ) ); ?></span>
+			<span class="fs-quickform__icon"><?php fs_the_icon( 'file-lines', 17, array( 'stroke' => '#6d28d9', 'width' => '1.9' ) ); ?></span>
 			<div>
 				<div class="fs-quickform__title">تکمیل سریع پروفایل کاربری</div>
 				<div class="fs-quickform__sub">برای ارسال لینک دانلود، مشخصات خود را کامل کنید. (سایت فایلی است — نیازی به آدرس پستی نیست.)</div>

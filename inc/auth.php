@@ -6,7 +6,7 @@
  * ساخته می‌شود (مثلاً 09121234567@example.com) تا ووکامرس همیشه ایمیل داشته باشد
  * و لینک دانلود بعد از خرید کار کند.
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -185,7 +185,7 @@ function fs_otp_send( $phone ) {
 
 	// اگر سرویس پیامکی وصل نشده باشد، در حالت اشکال‌زدایی کد را لاگ می‌کنیم.
 	if ( null === $sent && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-		error_log( sprintf( '[fanni-soal] OTP for %s: %s', $phone, $code ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		error_log( sprintf( '[si-file] OTP for %s: %s', $phone, $code ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
 	return true;

@@ -2,7 +2,7 @@
 /**
  * بخش «زیردسته‌ها را مرور کن».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -24,7 +24,7 @@ if ( ! $fs_cats ) {
 			</div>
 			<a class="fs-subcats__link" href="<?php echo esc_url( fs_url( $fs_cats[0]['link'] ) ); ?>">
 				مشاهده صفحه <span class="fs-subcats__linkname"><?php echo esc_html( $fs_cats[0]['name'] ); ?></span>
-				<?php fs_the_icon( 'chevron-prev', 15, array( 'stroke' => '#059669' ) ); ?>
+				<?php fs_the_icon( 'chevron-prev', 15, array( 'stroke' => '#6d28d9' ) ); ?>
 			</a>
 		</div>
 
@@ -59,7 +59,7 @@ if ( ! $fs_cats ) {
 					<?php foreach ( $fs_cat['subs'] as $fs_sub ) : ?>
 						<a class="fs-subcard" href="<?php echo esc_url( fs_url( $fs_sub['link'] ) ); ?>">
 							<span class="fs-subcard__name"><?php echo esc_html( $fs_sub['name'] ); ?></span>
-							<span class="fs-subcard__n"><?php echo esc_html( $fs_sub['count'] ); ?> سوال</span>
+							<span class="fs-subcard__n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
 						</a>
 					<?php endforeach; ?>
 				</div>

@@ -2,7 +2,7 @@
 /**
  * صفحه اصلی — برگردان دقیق «Homepage UI».
  *
- * @package FanniSoal
+ * @package SiFile
  */
 
 defined( 'ABSPATH' ) || exit;
