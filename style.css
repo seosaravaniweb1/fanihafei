@@ -189,7 +189,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 .fs-header__top {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 20px;
   padding: 16px var(--fs-pad);
 }
 
@@ -197,13 +197,15 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   display: flex;
   align-items: center;
   gap: 30px;
-  margin-left: auto;
+  flex: none;
 }
 
 .fs-header__end {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex: none;
+  margin-inline-start: auto;
 }
 
 .fs-brand {
@@ -230,34 +232,46 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   letter-spacing: -.3px;
 }
 
+/*
+ * نوار جست‌وجو فضای خالی وسط سربرگ را می‌گیرد؛ با عرض ثابت، انتخابگر دسته و
+ * دکمه‌ی ارسال جا را تنگ می‌کردند و برای خود کادر متن چیزی نمی‌ماند.
+ */
 .fs-search {
   display: flex;
   align-items: center;
-  gap: 9px;
-  width: 280px;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 620px;
   background: var(--fs-bg-2);
   border: 1px solid var(--fs-line);
   border-radius: 12px;
-  padding: 10px 13px;
+  padding: 5px 6px 5px 5px;
   margin: 0;
+  transition: border-color .2s, background .2s;
+}
+
+.fs-search:focus-within {
+  background: #fff;
+  border-color: var(--fs-brand-edge);
 }
 
 .fs-search__cat {
   flex: none;
-  max-width: 130px;
+  max-width: 150px;
   font: 600 11.5px var(--fs-font);
   color: var(--fs-ink-3);
   background: transparent;
   border: 0;
   outline: none;
-  padding: 0 2px;
+  padding: 0 6px 0 2px;
   cursor: pointer;
   text-overflow: ellipsis;
 }
 
 .fs-search__split {
   width: 1px;
-  height: 18px;
+  height: 20px;
   background: var(--fs-line);
   flex: none;
 }
@@ -267,9 +281,8 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 30px;
-  height: 30px;
-  margin: -6px -7px -6px 0;
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 9px;
   background: var(--fs-grad);
@@ -291,12 +304,14 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 .fs-btn-support {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  height: 44px;
   color: var(--fs-brand-d);
   background: var(--fs-brand-wash);
   border: 1px solid var(--fs-brand-edge);
   font: 700 12.5px var(--fs-font);
-  padding: 10px 15px;
+  padding: 0 15px;
   border-radius: 12px;
   transition: all .2s;
 }
@@ -313,8 +328,8 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   flex: none;
   color: var(--fs-ink);
   background: var(--fs-bg-2);
@@ -351,13 +366,16 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 .fs-btn-account {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  height: 44px;
   background: var(--fs-ink);
   color: #fff;
   font: 700 12.5px var(--fs-font);
-  padding: 11px 18px;
+  padding: 0 18px;
   border-radius: 12px;
   cursor: pointer;
+  white-space: nowrap;
   transition: all .2s;
 }
 
@@ -1607,6 +1625,14 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 /* =========================================================================
    ۱۵. حالت میانی — تبلت
    ========================================================================= */
+/* بین دسکتاپ و موبایل، نوار جست‌وجو اول کوچک می‌شود نه دکمه‌ها. */
+@media (max-width: 1240px) {
+  .fs-header__top { gap: 12px; }
+  .fs-search { max-width: none; }
+  .fs-btn-support__label { display: none; }
+  .fs-btn-support { padding: 0 12px; }
+}
+
 @media (max-width: 1100px) {
   .fs-cats { grid-template-columns: repeat(3, 1fr); }
   .fs-subcats__grid { grid-template-columns: repeat(3, 1fr); }
@@ -1752,15 +1778,21 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   /* جست‌وجو و لینک‌های سریع ----------------------------------------------- */
   .fs-search {
     width: 100%;
-    flex-basis: 100%;
+    flex: 0 0 100%;
+    max-width: none;
     gap: 8px;
     border-radius: 13px;
-    padding: 11px 13px;
+    padding: 5px 6px 5px 5px;
     margin-top: 12px;
     order: 5;
   }
 
-  .fs-search__cat { max-width: 92px; font-size: 10.5px; }
+  .fs-search__cat { max-width: 96px; font-size: 10.5px; }
+  .fs-search__go { width: 34px; height: 34px; }
+
+  .fs-header__end { gap: 6px; }
+  .fs-btn-cart { width: 40px; height: 40px; }
+  .fs-btn-account { height: 40px; padding: 0 14px; }
 
   .fs-btn-support { gap: 0; padding: 11px; }
 
@@ -2568,6 +2600,19 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 .fs-crumbs a { color: var(--fs-muted); }
 .fs-crumbs a:hover { color: var(--fs-brand); }
 
+/*
+ * ووکامرس مسیر را بدون جداکننده چاپ می‌کند و نام دسته‌ها به‌هم می‌چسبند
+ * («خانهجزوهجزوات دانش آموزشی»). آخرین تکه لینک نیست، پس گذاشتن جداکننده
+ * بعد از هر لینک دقیقاً همان تعداد لازم را می‌دهد.
+ */
+.fs-crumbs .woocommerce-breadcrumb a::after {
+  content: "/";
+  display: inline-block;
+  margin: 0 9px;
+  color: var(--fs-muted-2);
+  font-weight: 400;
+}
+
 .fs-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2821,31 +2866,35 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   margin-top: 18px;
 }
 
+/*
+ * مشخصات فایل به‌صورت ردیف‌های فشرده: کلید و مقدار در یک خط کنار هم، بدون
+ * کارت‌های بزرگ و سایه‌دار. با auto-fill هر تعداد که در عرض جا شود کنار هم
+ * می‌نشیند، پس چند مشخصه‌ی کوتاه دیگر ارتفاع صفحه را نمی‌بلعد.
+ */
 .fs-product__specs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 11px;
-  margin-top: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .fs-spec {
-  background: #fff;
+  background: var(--fs-bg);
   border: 1px solid var(--fs-line-2);
-  border-radius: 15px;
-  padding: 14px;
+  border-radius: 11px;
+  padding: 9px 12px;
   display: flex;
-  gap: 12px;
+  gap: 9px;
   align-items: center;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
-  transition: all .22s;
+  transition: border-color .2s, background .2s;
 }
 
-.fs-spec:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(15, 23, 42, .1); }
+.fs-spec:hover { background: var(--fs-brand-wash); border-color: var(--fs-brand-edge); }
 
 .fs-spec__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 11px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
   background: rgba(var(--fs-brand-l-rgb), .12);
   display: flex;
   align-items: center;
@@ -2853,17 +2902,27 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   flex: none;
 }
 
+/* کلید و مقدار در یک خط، با نقطه‌چین بینشان تا چشم راحت دنبالشان کند. */
+.fs-spec > span:last-child {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
 .fs-spec__k {
-  display: block;
-  font: 500 10px var(--fs-font);
-  color: var(--fs-muted-2);
+  font: 500 10.5px var(--fs-font);
+  color: var(--fs-muted);
+  white-space: nowrap;
 }
 
 .fs-spec__v {
-  display: block;
-  font: 700 12.5px/1.5 var(--fs-font);
+  font: 700 11.5px/1.7 var(--fs-font);
   color: var(--fs-ink);
-  margin-top: 4px;
+  margin-inline-start: auto;
+  text-align: start;
+  min-width: 0;
 }
 
 /* جعبه خرید ---------------------------------------------------------------- */
@@ -3453,7 +3512,11 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   .fs-product__update { font-size: 10px; padding: 7px 11px; }
   .fs-product__thumb { height: 50px; border-radius: 11px; }
   .fs-product__title { font-size: 21px; line-height: 1.55; }
-  .fs-product__specs { grid-template-columns: 1fr; }
+  .fs-product__specs { grid-template-columns: 1fr 1fr; gap: 7px; }
+  .fs-spec { padding: 8px 10px; gap: 7px; }
+  .fs-spec__icon { width: 21px; height: 21px; border-radius: 7px; }
+  .fs-spec__k { font-size: 9.5px; }
+  .fs-spec__v { font-size: 10.5px; }
 
   .fs-buybox__price { font-size: 26px; }
 

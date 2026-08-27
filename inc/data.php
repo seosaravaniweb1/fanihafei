@@ -92,7 +92,7 @@ function fs_product_to_card( $product, $index = 0 ) {
 		'thumb'  => get_the_post_thumbnail( $id, 'medium', array( 'loading' => 'lazy', 'decoding' => 'async' ) ),
 		'grad'   => fs_grad( $index ),
 		'fmt'    => fs_product_format( $id ),
-		'pages'  => fs_product_pages( $id ),
+		'amount' => fs_product_amount( $id ),
 		'cat'    => fs_get_product_leaf_cat( $id ),
 		'chips'  => fs_product_chips( $id ),
 		'badges' => fs_product_badges_line( $id ),

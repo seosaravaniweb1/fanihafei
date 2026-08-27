@@ -50,17 +50,18 @@ $fs_cart_n      = fs_has_woo() ? fs_cart_count() : 0;
 					<span class="fs-search__split" aria-hidden="true"></span>
 				<?php endif; ?>
 
-				<?php fs_the_icon( 'search', 16, array( 'stroke' => '#94a3b8' ) ); ?>
 				<label class="fs-sr-only" for="fs-search-field">جست‌وجو</label>
 				<input class="fs-search__input" id="fs-search-field" type="search" name="s"
 					value="<?php echo esc_attr( get_search_query() ); ?>"
 					placeholder="<?php echo esc_attr( fs_copy( 'search_ph' ) ); ?>">
+
 				<?php if ( fs_has_woo() ) : ?>
 					<input type="hidden" name="post_type" value="product">
 				<?php endif; ?>
+
 				<button class="fs-search__go" type="submit">
 					<span class="fs-sr-only">جست‌وجو</span>
-					<?php fs_the_icon( 'search', 15, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>
+					<?php fs_the_icon( 'search', 16, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>
 				</button>
 			</form>
 

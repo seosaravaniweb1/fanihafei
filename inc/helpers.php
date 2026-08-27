@@ -98,14 +98,17 @@ function fs_en_num( $value ) {
  * @return string
  */
 function fs_fa_num_html( $html ) {
-	$parts = preg_split( '/(<[^>]*>)/', (string) $html, -1, PREG_SPLIT_DELIM_CAPTURE );
+	// تگ‌ها و موجودیت‌های HTML هر دو دست‌نخورده می‌مانند؛ اگر ارقام داخل یک
+	// موجودیت مثل &#36; فارسی شوند، به &#۳۶; تبدیل می‌شود و مرورگر همان متن
+	// خام را چاپ می‌کند — علامت واحد پول این‌طور خراب می‌شد.
+	$parts = preg_split( '/(<[^>]*>|&[#a-zA-Z0-9]+;)/', (string) $html, -1, PREG_SPLIT_DELIM_CAPTURE );
 
 	if ( ! is_array( $parts ) ) {
 		return $html;
 	}
 
 	foreach ( $parts as $i => $part ) {
-		if ( '' === $part || '<' === $part[0] ) {
+		if ( '' === $part || '<' === $part[0] || '&' === $part[0] ) {
 			continue;
 		}
 		$parts[ $i ] = fs_fa_num( $part );

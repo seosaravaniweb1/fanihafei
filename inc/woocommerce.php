@@ -8,11 +8,30 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * واحدهای شمارش یک فایل.
+ *
+ * به‌جای سه فیلد جدا برای تعداد صفحه، تعداد سوال و تعداد فایل، یک عدد ثبت
+ * می‌شود و همین‌جا مشخص می‌شود که آن عدد چه چیزی را می‌شمارد.
+ *
+ * @return array<string, string>
+ */
+function fs_amount_units() {
+	return apply_filters(
+		'fs_amount_units',
+		array(
+			'page'     => 'صفحه',
+			'question' => 'سوال',
+			'file'     => 'فایل',
+		)
+	);
+}
+
+/**
  * فیلدهای اختصاصی محصول.
  *
- * type: text | url | checkbox | textarea
+ * type: text | url | checkbox | textarea | select
  *
- * @return array<string, array{label:string,type:string,desc:string}>
+ * @return array<string, array{label:string,type:string,desc:string,options?:array}>
  */
 function fs_product_fields() {
 	return apply_filters(
@@ -23,20 +42,21 @@ function fs_product_fields() {
 				'type'  => 'text',
 				'desc'  => 'مثلاً PDF یا «PDF + Word». اگر خالی بماند PDF در نظر گرفته می‌شود.',
 			),
-			'page_count'        => array(
-				'label' => 'تعداد صفحه',
-				'type'  => 'text',
-				'desc'  => 'فقط عدد. مثلاً ۱۲۰',
-			),
 			'file_size'         => array(
 				'label' => 'حجم فایل',
 				'type'  => 'text',
 				'desc'  => 'مثلاً ۱۲ مگابایت. خالی بگذارید تا نمایش داده نشود.',
 			),
-			'language'          => array(
-				'label' => 'زبان فایل',
+			'amount'            => array(
+				'label' => 'مقدار',
 				'type'  => 'text',
-				'desc'  => 'مثلاً فارسی یا انگلیسی. خالی بگذارید تا نمایش داده نشود.',
+				'desc'  => 'فقط عدد. بسته به واحدی که در فیلد بعدی انتخاب می‌کنید، تعداد صفحه یا تعداد سوال یا تعداد فایل است.',
+			),
+			'amount_unit'       => array(
+				'label'   => 'واحد مقدار',
+				'type'    => 'select',
+				'desc'    => 'این عدد چه چیزی را می‌شمارد؟ برای کتاب و جزوه «صفحه»، برای نمونه سوال «سوال» و برای بسته‌های تصویری و چندفایلی «فایل».',
+				'options' => fs_amount_units(),
 			),
 			'author_name'       => array(
 				'label' => 'نویسنده / پدیدآورنده',
@@ -46,22 +66,7 @@ function fs_product_fields() {
 			'translator_name'   => array(
 				'label' => 'مترجم',
 				'type'  => 'text',
-				'desc'  => 'برای کتاب‌های ترجمه‌شده. خالی بگذارید تا نمایش داده نشود.',
-			),
-			'publisher'         => array(
-				'label' => 'ناشر',
-				'type'  => 'text',
-				'desc'  => 'خالی بگذارید تا نمایش داده نشود.',
-			),
-			'publish_year'      => array(
-				'label' => 'سال انتشار',
-				'type'  => 'text',
-				'desc'  => 'مثلاً ۱۴۰۳. خالی بگذارید تا نمایش داده نشود.',
-			),
-			'question_count'    => array(
-				'label' => 'تعداد سوال',
-				'type'  => 'text',
-				'desc'  => 'فقط برای فایل‌های نمونه سوال و آزمون. فقط عدد.',
+				'desc'  => 'فقط برای کتاب‌های ترجمه‌شده. خالی بگذارید تا نمایش داده نشود.',
 			),
 			'has_answers'       => array(
 				'label' => 'دارای پاسخنامه',
@@ -87,11 +92,6 @@ function fs_product_fields() {
 				'label' => 'لینک پیش‌نمایش رایگان',
 				'type'  => 'url',
 				'desc'  => 'بخشی از فایل برای پیش‌نمایش. خالی بگذارید تا نمایش داده نشود.',
-			),
-			'view_count'        => array(
-				'label' => 'تعداد بازدید',
-				'type'  => 'text',
-				'desc'  => 'برای نمایش روی کارت‌ها. خالی بگذارید تا نمایش داده نشود.',
 			),
 			'toc'               => array(
 				'label' => 'سرفصل‌های دستی',
@@ -154,6 +154,18 @@ function fs_product_data_panel() {
 				);
 				break;
 
+			case 'select':
+				woocommerce_wp_select(
+					array(
+						'id'          => $key,
+						'label'       => $field['label'],
+						'description' => $field['desc'],
+						'desc_tip'    => true,
+						'options'     => isset( $field['options'] ) ? $field['options'] : array(),
+					)
+				);
+				break;
+
 			default:
 				woocommerce_wp_text_input(
 					array(
@@ -200,6 +212,13 @@ function fs_save_product_fields( $post_id ) {
 			$value = sanitize_textarea_field( $raw );
 		} elseif ( 'url' === $field['type'] ) {
 			$value = esc_url_raw( $raw );
+		} elseif ( 'select' === $field['type'] ) {
+			$value   = sanitize_key( $raw );
+			$allowed = isset( $field['options'] ) ? $field['options'] : array();
+
+			if ( ! isset( $allowed[ $value ] ) ) {
+				$value = '';
+			}
 		} else {
 			$value = sanitize_text_field( $raw );
 		}
@@ -267,15 +286,50 @@ function fs_product_format( $product_id ) {
 }
 
 /**
- * تعداد صفحه‌ی فایل با ارقام فارسی.
+ * مقدار فایل به‌همراه واحدش — «۱۲۳ صفحه»، «۲۵۰ سوال» یا «۱۰ فایل».
+ *
+ * محصولاتی که پیش از یکی‌شدن این فیلدها ثبت شده‌اند هنوز مقدارشان در
+ * page_count یا question_count است؛ آن‌ها هم خوانده می‌شوند تا داده‌ای از
+ * دست نرود و نیازی به ویرایش دستی تک‌تک محصولات نباشد.
  *
  * @param int $product_id شناسه محصول.
- * @return string
+ * @return array{n:string,unit:string,text:string}|null
  */
-function fs_product_pages( $product_id ) {
-	$value = fs_product_field( $product_id, 'page_count' );
+function fs_product_amount( $product_id ) {
+	$units = fs_amount_units();
+	$value = fs_product_field( $product_id, 'amount' );
+	$unit  = fs_product_field( $product_id, 'amount_unit' );
 
-	return $value ? fs_fa_num( $value ) : '';
+	// سازگاری با فیلدهای قدیمیِ جدا.
+	if ( '' === $value ) {
+		$legacy_page = fs_product_field( $product_id, 'page_count' );
+
+		if ( '' !== $legacy_page ) {
+			$value = $legacy_page;
+			$unit  = 'page';
+		} else {
+			$legacy_q = fs_product_field( $product_id, 'question_count' );
+
+			if ( '' !== $legacy_q ) {
+				$value = $legacy_q;
+				$unit  = 'question';
+			}
+		}
+	}
+
+	if ( '' === $value ) {
+		return null;
+	}
+
+	if ( ! isset( $units[ $unit ] ) ) {
+		$unit = 'page';
+	}
+
+	return array(
+		'n'    => fs_fa_num( $value ),
+		'unit' => $units[ $unit ],
+		'text' => fs_fa_num( $value ) . ' ' . $units[ $unit ],
+	);
 }
 
 /**
@@ -393,40 +447,30 @@ function fs_get_product_specs( $product_id ) {
 		'v' => fs_product_format( $product_id ),
 	);
 
-	$pages = fs_product_pages( $product_id );
+	$amount = fs_product_amount( $product_id );
 
-	if ( $pages ) {
+	if ( $amount ) {
 		$out[] = array(
-			'k' => 'تعداد صفحه',
-			'v' => $pages . ' صفحه',
+			'k' => 'تعداد ' . $amount['unit'],
+			'v' => $amount['text'],
 		);
 	}
 
-	$simple = array(
-		'file_size'       => 'حجم فایل',
-		'language'        => 'زبان فایل',
-		'translator_name' => 'مترجم',
-		'publisher'       => 'ناشر',
-		'publish_year'    => 'سال انتشار',
-	);
+	$size = fs_product_field( $product_id, 'file_size' );
 
-	foreach ( $simple as $key => $label ) {
-		$value = fs_product_field( $product_id, $key );
-
-		if ( $value ) {
-			$out[] = array(
-				'k' => $label,
-				'v' => fs_fa_num( $value ),
-			);
-		}
+	if ( $size ) {
+		$out[] = array(
+			'k' => 'حجم فایل',
+			'v' => fs_fa_num( $size ),
+		);
 	}
 
-	$questions = fs_product_field( $product_id, 'question_count' );
+	$translator = fs_product_field( $product_id, 'translator_name' );
 
-	if ( $questions ) {
+	if ( $translator ) {
 		$out[] = array(
-			'k' => 'تعداد سوال',
-			'v' => fs_fa_num( $questions ) . ' سوال',
+			'k' => 'مترجم',
+			'v' => $translator,
 		);
 	}
 
@@ -472,12 +516,12 @@ function fs_product_chips( $product_id ) {
 		'text' => fs_product_format( $product_id ),
 	);
 
-	$pages = fs_product_pages( $product_id );
+	$amount = fs_product_amount( $product_id );
 
-	if ( $pages ) {
+	if ( $amount ) {
 		$chips[] = array(
 			'icon' => 'file-lines',
-			'text' => $pages . ' صفحه',
+			'text' => $amount['text'],
 		);
 	}
 
@@ -719,8 +763,98 @@ function fs_track_product_view() {
 	$viewed   = array_slice( $viewed, -15 );
 
 	wc_setcookie( 'woocommerce_recently_viewed', implode( '|', $viewed ) );
+
+	fs_bump_product_views( $post->ID );
 }
 add_action( 'template_redirect', 'fs_track_product_view', 20 );
+
+/**
+ * آستانه‌ای که پس از آن بازدید هر آی‌پی فقط یک بار شمرده می‌شود.
+ *
+ * @return int
+ */
+function fs_views_unique_after() {
+	return (int) apply_filters( 'fs_views_unique_after', 100 );
+}
+
+/**
+ * نشانی آی‌پی بازدیدکننده — فقط برای یکتاسازی شمارش، هش‌شده ذخیره می‌شود.
+ *
+ * @return string
+ */
+function fs_visitor_ip() {
+	$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+
+	// پشت کش یا پراکسی، آی‌پی واقعی در سرآیند فوروارد می‌آید.
+	foreach ( array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR' ) as $header ) {
+		if ( empty( $_SERVER[ $header ] ) ) {
+			continue;
+		}
+
+		$forwarded = explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) );
+		$candidate = trim( $forwarded[0] );
+
+		if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+			$ip = $candidate;
+			break;
+		}
+	}
+
+	return $ip;
+}
+
+/**
+ * شمارش خودکار بازدید محصول.
+ *
+ * تا وقتی شمارنده به آستانه نرسیده، هر بار باز شدن صفحه یک بازدید می‌خورد تا
+ * محصول تازه سریع جان بگیرد. بعد از آن شمارش واقع‌بینانه می‌شود و هر آی‌پی
+ * فقط یک بار شمرده می‌شود؛ نشانی آی‌پی هم خام ذخیره نمی‌شود، فقط هشِ آن.
+ *
+ * ربات‌ها و مدیرِ در حال ویرایش شمرده نمی‌شوند.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return void
+ */
+function fs_bump_product_views( $product_id ) {
+	$product_id = (int) $product_id;
+
+	if ( ! $product_id || is_preview() ) {
+		return;
+	}
+
+	// خزنده‌ها شمارنده را باد می‌کنند.
+	if ( ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+		$agent = strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) );
+
+		foreach ( array( 'bot', 'crawl', 'spider', 'slurp', 'preview', 'headless' ) as $needle ) {
+			if ( false !== strpos( $agent, $needle ) ) {
+				return;
+			}
+		}
+	}
+
+	$key   = apply_filters( 'fs_views_meta_key', 'view_count' );
+	$count = (int) get_post_meta( $product_id, $key, true );
+
+	// از آستانه به بعد: هر آی‌پی فقط یک بازدید.
+	if ( $count >= fs_views_unique_after() ) {
+		$ip = fs_visitor_ip();
+
+		if ( ! $ip ) {
+			return;
+		}
+
+		$seen_key = 'fs_seen_' . md5( $product_id . '|' . $ip );
+
+		if ( false !== get_transient( $seen_key ) ) {
+			return;
+		}
+
+		set_transient( $seen_key, 1, (int) apply_filters( 'fs_views_ip_ttl', MONTH_IN_SECONDS ) );
+	}
+
+	update_post_meta( $product_id, $key, $count + 1 );
+}
 
 /**
  * تعداد محصول در هر صفحه آرشیو.

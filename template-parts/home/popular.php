@@ -87,10 +87,10 @@ if ( ! $fs_popular ) {
 												<?php echo esc_html( $fs_item['cat']['name'] ); ?>
 											</span>
 										<?php endif; ?>
-										<?php if ( $fs_item['pages'] ) : ?>
+										<?php if ( $fs_item['amount'] ) : ?>
 											<span class="fs-chipmeta">
 												<?php fs_the_icon( 'file-lines', 11, array( 'stroke' => '#94a3b8' ) ); ?>
-												<?php echo esc_html( $fs_item['pages'] ); ?> صفحه
+												<?php echo esc_html( $fs_item['amount']['text'] ); ?>
 											</span>
 										<?php endif; ?>
 									</span>
