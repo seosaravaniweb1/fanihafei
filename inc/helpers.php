@@ -186,14 +186,43 @@ function fs_the_icon( $name, $size = 16, $args = array() ) {
 }
 
 /**
- * آیکون هر ردیف جعبه‌ی «چرا ما؟» — چون متن ردیف‌ها از پنل مدیریت می‌آید،
- * آیکون‌ها به‌ترتیب و چرخشی انتخاب می‌شوند تا جعبه یکنواخت نشود.
+ * آیکون‌هایی که مدیر می‌تواند برای ردیف‌های جعبه‌ی «چرا ما؟» انتخاب کند.
  *
- * @param int $i اندیس ردیف.
+ * کلید = نام آیکون در fs_icon()، مقدار = برچسب فارسی برای منوی انتخاب.
+ *
+ * @return array<string, string>
+ */
+function fs_selectable_icons() {
+	return apply_filters(
+		'fs_selectable_icons',
+		array(
+			'zap'        => 'صاعقه (سرعت)',
+			'check'      => 'تیک (تأیید)',
+			'download'   => 'دانلود',
+			'clock'      => 'ساعت (زمان)',
+			'file'       => 'فایل',
+			'file-lines' => 'سند',
+			'book'       => 'کتاب',
+			'trending'   => 'نمودار رشد',
+			'user'       => 'کاربر',
+			'chat'       => 'پشتیبانی',
+			'cart'       => 'سبد خرید',
+			'grid'       => 'دسته‌بندی',
+			'search'     => 'جست‌وجو',
+			'plus'       => 'به‌علاوه',
+		)
+	);
+}
+
+/**
+ * آیکون معتبر — اگر نام ذخیره‌شده در فهرست نباشد، به آیکون پیش‌فرض برمی‌گردد.
+ *
+ * @param string $name نام آیکون.
  * @return string
  */
-function fs_why_icon( $i ) {
-	$icons = apply_filters( 'fs_why_icons', array( 'zap', 'check', 'download', 'clock', 'file-lines', 'trending' ) );
+function fs_valid_icon( $name ) {
+	$icons = fs_selectable_icons();
+	$name  = (string) $name;
 
-	return $icons[ $i % count( $icons ) ];
+	return isset( $icons[ $name ] ) ? $name : 'check';
 }

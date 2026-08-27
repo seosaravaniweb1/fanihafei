@@ -3,7 +3,7 @@
  * صفحه یکپارچه «تنظیمات قالب» — با تب‌های صفحه اصلی، صفحه محصول و پیشخوان کاربری.
  *
  * همه‌ی محتوای قابل‌ویرایش قالب (درباره سایت، پرسش‌های متداول، نشانه‌های اعتماد،
- * تضمین‌های صفحه محصول، پیام پیشخوان مشتریان) در یک آپشن ذخیره می‌شود و از یک
+ * جعبه‌ی «چرا ما؟» صفحه محصول، پیام پیشخوان مشتریان) در یک آپشن ذخیره می‌شود و از یک
  * صفحه با تب مدیریت می‌شود؛ به‌جای پراکنده‌بودن بین پست‌تایپ و سفارشی‌سازی.
  *
  * @package SiFile
@@ -28,9 +28,8 @@ function fs_theme_settings_defaults() {
 		'about_title'       => '',
 		'about_content'     => '',
 		'faq'               => array(),
-		'guarantees'        => '',
 		'why_title'         => '',
-		'why_items'         => '',
+		'why_items'         => array(),
 		'why_foot'          => '',
 		'dashboard_title'   => '',
 		'dashboard_message' => '',
@@ -143,21 +142,6 @@ function fs_get_trust_items() {
 }
 
 /**
- * تضمین‌های کنار دکمه خرید در صفحه محصول.
- *
- * @return string[]
- */
-function fs_get_guarantees() {
-	$saved = fs_get_theme_settings()['guarantees'];
-
-	if ( ! $saved ) {
-		return array();
-	}
-
-	return array_values( array_filter( array_map( 'trim', explode( "\n", $saved ) ) ) );
-}
-
-/**
  * نشانی چت پشتیبانی — دکمه‌ی کنار «پنل کاربری» در سربرگ.
  *
  * @return string
@@ -195,16 +179,37 @@ function fs_product_satisfaction() {
 /**
  * جعبه‌ی «چرا ما؟» در نوار کناری توضیحات محصول.
  *
- * هر خط یک مورد است. اگر هیچ موردی ثبت نشده باشد، جعبه اصلاً رندر نمی‌شود.
+ * هر ردیف یک آیکونِ انتخابیِ مدیر دارد و یک متن. مقدارهای نسخه‌ی قبلی که یک
+ * متن چندخطی بودند هم خوانده می‌شوند تا محتوای ثبت‌شده از دست نرود.
  *
- * @return array{title:string,items:string[],foot:string}|null
+ * @return array{title:string,items:array<int, array{icon:string,text:string}>,foot:string}|null
  */
 function fs_get_why_box() {
 	$settings = fs_get_theme_settings();
+	$saved    = $settings['why_items'];
 	$items    = array();
 
-	if ( $settings['why_items'] ) {
-		$items = array_values( array_filter( array_map( 'trim', explode( "\n", $settings['why_items'] ) ) ) );
+	if ( is_string( $saved ) ) {
+		// سازگاری با نسخه‌ی متنی قدیمی.
+		foreach ( array_filter( array_map( 'trim', explode( "\n", $saved ) ) ) as $line ) {
+			$items[] = array(
+				'icon' => 'check',
+				'text' => $line,
+			);
+		}
+	} elseif ( is_array( $saved ) ) {
+		foreach ( $saved as $row ) {
+			$text = isset( $row['text'] ) ? trim( $row['text'] ) : '';
+
+			if ( '' === $text ) {
+				continue;
+			}
+
+			$items[] = array(
+				'icon' => fs_valid_icon( isset( $row['icon'] ) ? $row['icon'] : '' ),
+				'text' => $text,
+			);
+		}
 	}
 
 	if ( ! $items ) {
@@ -292,11 +297,28 @@ function fs_theme_settings_save() {
 
 		$settings['faq'] = $faq;
 	} elseif ( 'product' === $tab ) {
-		$settings['guarantees']     = isset( $_POST['guarantees'] ) ? sanitize_textarea_field( wp_unslash( $_POST['guarantees'] ) ) : '';
 		$settings['product_satisf'] = isset( $_POST['product_satisf'] ) ? sanitize_text_field( wp_unslash( $_POST['product_satisf'] ) ) : '';
 		$settings['why_title']      = isset( $_POST['why_title'] ) ? sanitize_text_field( wp_unslash( $_POST['why_title'] ) ) : '';
-		$settings['why_items']      = isset( $_POST['why_items'] ) ? sanitize_textarea_field( wp_unslash( $_POST['why_items'] ) ) : '';
 		$settings['why_foot']       = isset( $_POST['why_foot'] ) ? sanitize_text_field( wp_unslash( $_POST['why_foot'] ) ) : '';
+
+		$why   = array();
+		$texts = isset( $_POST['why_text'] ) ? (array) wp_unslash( $_POST['why_text'] ) : array();
+		$icons = isset( $_POST['why_icon'] ) ? (array) wp_unslash( $_POST['why_icon'] ) : array();
+
+		foreach ( $texts as $i => $text ) {
+			$text = sanitize_text_field( $text );
+
+			if ( '' === $text ) {
+				continue;
+			}
+
+			$why[] = array(
+				'icon' => fs_valid_icon( isset( $icons[ $i ] ) ? sanitize_key( $icons[ $i ] ) : '' ),
+				'text' => $text,
+			);
+		}
+
+		$settings['why_items'] = $why;
 	} elseif ( 'header' === $tab ) {
 		$settings['support_url']   = isset( $_POST['support_url'] ) ? esc_url_raw( wp_unslash( $_POST['support_url'] ) ) : '';
 		$settings['support_label'] = isset( $_POST['support_label'] ) ? sanitize_text_field( wp_unslash( $_POST['support_label'] ) ) : '';
@@ -327,6 +349,36 @@ function fs_faq_row( $q = '', $a = '' ) {
 			<textarea name="faq_a[]" rows="2" placeholder="متن پاسخ"><?php echo esc_textarea( $a ); ?></textarea>
 		</div>
 		<button type="button" class="button-link fs-faq-row__del">حذف</button>
+	</div>
+	<?php
+}
+
+/**
+ * چاپ یک ردیف «چرا ما؟» — انتخاب آیکون به‌همراه پیش‌نمایش زنده و متن مورد.
+ *
+ * @param string $icon نام آیکون.
+ * @param string $text متن مورد.
+ * @return void
+ */
+function fs_why_row( $icon = 'check', $text = '' ) {
+	$icon = fs_valid_icon( $icon );
+	?>
+	<div class="fs-why-row">
+		<span class="fs-why-row__preview" data-icon-preview>
+			<?php fs_the_icon( $icon, 17, array( 'stroke' => '#6d28d9', 'width' => '2' ) ); ?>
+		</span>
+
+		<select name="why_icon[]" class="fs-why-row__icon" data-icon-select>
+			<?php foreach ( fs_selectable_icons() as $fs_key => $fs_label ) : ?>
+				<option value="<?php echo esc_attr( $fs_key ); ?>" <?php selected( $icon, $fs_key ); ?>>
+					<?php echo esc_html( $fs_label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+
+		<input type="text" name="why_text[]" class="fs-why-row__text" placeholder="متن این مورد" value="<?php echo esc_attr( $text ); ?>">
+
+		<button type="button" class="button-link fs-why-row__del">حذف</button>
 	</div>
 	<?php
 }
@@ -456,27 +508,27 @@ function fs_theme_settings_page() {
 						</td>
 					</tr>
 					<tr>
-						<th><label for="fs-why-items">موارد</label></th>
+						<th>موارد</th>
 						<td>
-							<textarea id="fs-why-items" name="why_items" rows="5" class="large-text"><?php echo esc_textarea( $settings['why_items'] ); ?></textarea>
-							<p class="description">هر خط یک مورد. اگر خالی بماند، این جعبه اصلاً نمایش داده نمی‌شود.</p>
+							<div id="fs-why-rows">
+								<?php
+								$fs_why_saved = fs_get_why_box();
+								$fs_why_rows  = $fs_why_saved ? $fs_why_saved['items'] : array( array( 'icon' => 'check', 'text' => '' ) );
+
+								foreach ( $fs_why_rows as $fs_row ) {
+									fs_why_row( $fs_row['icon'], $fs_row['text'] );
+								}
+								?>
+							</div>
+							<button type="button" class="button" id="fs-why-add">افزودن مورد</button>
+							<template id="fs-why-row-tpl"><?php fs_why_row(); ?></template>
+							<p class="description">برای هر مورد یک آیکون انتخاب کنید و متنش را بنویسید. مورد بدون متن ذخیره نمی‌شود؛ اگر هیچ موردی نماند، کل جعبه در صفحه محصول نمایش داده نمی‌شود.</p>
 						</td>
 					</tr>
 					<tr>
 						<th><label for="fs-why-foot">متن پایین جعبه</label></th>
 						<td>
 							<input type="text" id="fs-why-foot" name="why_foot" class="regular-text" value="<?php echo esc_attr( $settings['why_foot'] ); ?>" placeholder="مثلاً قابل خرید با تمامی کارت‌های عضو شتاب">
-						</td>
-					</tr>
-				</table>
-
-				<h2 style="margin-top:8px">تضمین‌های زیر نوار کناری</h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th><label for="fs-guarantees">تضمین‌ها</label></th>
-						<td>
-							<textarea id="fs-guarantees" name="guarantees" rows="4" class="large-text"><?php echo esc_textarea( $settings['guarantees'] ); ?></textarea>
-							<p class="description">هر خط یک مورد. این موارد به‌همراه نشان‌های اعتماد، زیر جعبه «چرا ما؟» در نوار کناری تب توضیحات نمایش داده می‌شوند. خالی بگذارید تا نمایش داده نشود.</p>
 						</td>
 					</tr>
 				</table>
@@ -560,8 +612,58 @@ function fs_theme_settings_page() {
 		.fs-faq-row__fields { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 		.fs-faq-row__fields input, .fs-faq-row__fields textarea { width: 100%; }
 		.fs-faq-row__del { color: #b32d2e; flex: none; margin-top: 6px; }
+
+		.fs-why-row { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #dcdcde; border-radius: 8px; padding: 10px; margin-bottom: 8px; max-width: 760px; }
+		.fs-why-row__preview { flex: none; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #f5f3ff; border: 1px solid #ddd6fe; }
+		.fs-why-row__icon { flex: none; width: 170px; }
+		.fs-why-row__text { flex: 1; }
+		.fs-why-row__del { color: #b32d2e; flex: none; }
 	</style>
 	<script>
+	// هر آیکون یک بار سمت سرور رندر می‌شود تا پیش‌نمایش بدون درخواست شبکه عوض شود.
+	var fsIcons = <?php
+		$fs_sprite = array();
+
+		foreach ( array_keys( fs_selectable_icons() ) as $fs_key ) {
+			$fs_sprite[ $fs_key ] = fs_icon( $fs_key, 17, array( 'stroke' => '#6d28d9', 'width' => '2' ) );
+		}
+
+		echo wp_json_encode( $fs_sprite );
+	?>;
+
+	(function () {
+		var whyWrap = document.getElementById( 'fs-why-rows' );
+		var whyTpl  = document.getElementById( 'fs-why-row-tpl' );
+		var whyAdd  = document.getElementById( 'fs-why-add' );
+
+		function paintIcon( row ) {
+			var select  = row.querySelector( '[data-icon-select]' );
+			var preview = row.querySelector( '[data-icon-preview]' );
+
+			if ( select && preview && fsIcons[ select.value ] ) {
+				preview.innerHTML = fsIcons[ select.value ];
+			}
+		}
+
+		if ( whyWrap && whyTpl && whyAdd ) {
+			whyAdd.addEventListener( 'click', function () {
+				whyWrap.appendChild( whyTpl.content.cloneNode( true ) );
+			} );
+
+			whyWrap.addEventListener( 'change', function ( e ) {
+				if ( e.target && e.target.hasAttribute( 'data-icon-select' ) ) {
+					paintIcon( e.target.closest( '.fs-why-row' ) );
+				}
+			} );
+
+			whyWrap.addEventListener( 'click', function ( e ) {
+				if ( e.target && e.target.classList.contains( 'fs-why-row__del' ) ) {
+					e.target.closest( '.fs-why-row' ).remove();
+				}
+			} );
+		}
+	})();
+
 	(function () {
 		var wrap = document.getElementById( 'fs-faq-rows' );
 		var tpl  = document.getElementById( 'fs-faq-row-tpl' );

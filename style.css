@@ -2980,25 +2980,6 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 
 .fs-buybox__body { padding: 18px; }
 
-.fs-guarantee {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  font: 600 11.5px var(--fs-font);
-  color: var(--fs-ink-2);
-}
-
-.fs-guarantee__icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 8px;
-  background: rgba(var(--fs-brand-l-rgb), .12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-
 /* تب‌های محصول ------------------------------------------------------------- */
 .fs-section--tabs { padding: 8px var(--fs-pad) 26px; }
 
@@ -3161,16 +3142,6 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   font: 600 10.5px var(--fs-font);
   color: rgba(255, 255, 255, .6);
   text-align: center;
-}
-
-.fs-guarantees {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: #fff;
-  border: 1px solid var(--fs-line-2);
-  border-radius: 16px;
-  padding: 16px 18px;
 }
 
 .fs-ptrust {

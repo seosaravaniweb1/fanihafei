@@ -21,7 +21,6 @@ while ( have_posts() ) :
 	$fs_id         = $product->get_id();
 	$fs_specs      = fs_get_product_specs( $fs_id );
 	$fs_toc        = fs_get_product_toc( $fs_id );
-	$fs_guarantees = fs_get_guarantees();
 	$fs_trust      = fs_get_trust_settings();
 	$fs_rev_summary = fs_get_review_summary( $product );
 	$fs_reviews     = $fs_rev_summary ? fs_get_product_reviews( $fs_id ) : array();
@@ -329,30 +328,17 @@ while ( have_posts() ) :
 									<?php if ( $fs_why ) : ?>
 										<div class="fs-why">
 											<div class="fs-why__title"><?php echo esc_html( $fs_why['title'] ); ?></div>
-											<?php foreach ( $fs_why['items'] as $fs_i => $fs_item ) : ?>
+											<?php foreach ( $fs_why['items'] as $fs_item ) : ?>
 												<div class="fs-why__row">
 													<span class="fs-why__icon">
-														<?php fs_the_icon( fs_why_icon( $fs_i ), 14, array( 'stroke' => 'currentColor', 'width' => '2' ) ); ?>
+														<?php fs_the_icon( $fs_item['icon'], 14, array( 'stroke' => 'currentColor', 'width' => '2' ) ); ?>
 													</span>
-													<span><?php echo esc_html( $fs_item ); ?></span>
+													<span><?php echo esc_html( $fs_item['text'] ); ?></span>
 												</div>
 											<?php endforeach; ?>
 											<?php if ( $fs_why['foot'] ) : ?>
 												<div class="fs-why__foot"><?php echo esc_html( $fs_why['foot'] ); ?></div>
 											<?php endif; ?>
-										</div>
-									<?php endif; ?>
-
-									<?php if ( $fs_guarantees ) : ?>
-										<div class="fs-guarantees">
-											<?php foreach ( $fs_guarantees as $fs_g ) : ?>
-												<div class="fs-guarantee">
-													<span class="fs-guarantee__icon">
-														<?php fs_the_icon( 'check', 12, array( 'stroke' => '#6d28d9', 'width' => '2.8' ) ); ?>
-													</span>
-													<span><?php echo esc_html( $fs_g ); ?></span>
-												</div>
-											<?php endforeach; ?>
 										</div>
 									<?php endif; ?>
 

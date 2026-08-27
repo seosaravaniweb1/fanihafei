@@ -907,8 +907,9 @@ function fs_products_per_page() {
 }
 add_filter( 'loop_shop_per_page', 'fs_products_per_page', 20 );
 
-// «تضمین‌های کنار دکمه خرید» اکنون در تب «صفحه محصول» تنظیمات قالب مدیریت می‌شود؛
-// نگاه کنید به fs_get_guarantees() در inc/theme-settings.php.
+
+// جعبه‌ی «چرا ما؟» صفحه محصول در تب «صفحه محصول» تنظیمات قالب مدیریت می‌شود؛
+// نگاه کنید به fs_get_why_box() در inc/theme-settings.php.
 
 /**
  * شناسه‌ی لنگر برای یک تیتر فارسی.
