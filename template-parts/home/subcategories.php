@@ -59,9 +59,7 @@ if ( ! $fs_cats ) {
 					<?php foreach ( $fs_cat['subs'] as $fs_sub ) : ?>
 						<a class="fs-subcard" href="<?php echo esc_url( fs_url( $fs_sub['link'] ) ); ?>">
 							<span class="fs-subcard__name"><?php echo esc_html( $fs_sub['name'] ); ?></span>
-							<?php if ( $fs_sub['n'] ) : ?>
-								<span class="fs-subcard__n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
-							<?php endif; ?>
+							<span class="fs-subcard__n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
 						</a>
 					<?php endforeach; ?>
 				</div>

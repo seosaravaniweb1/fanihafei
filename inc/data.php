@@ -167,10 +167,10 @@ function fs_cat_product_count( $term ) {
 /**
  * دسته‌بندی‌های محصول به‌همراه زیردسته‌ها.
  *
- * هر دسته دو شمارنده دارد: «n» عدد خام برای شرط‌گذاشتن و «count» همان عدد با
- * ارقام فارسی برای نمایش. دسته‌های خالی شمارنده‌شان نمایش داده نمی‌شود.
+ * شمارنده‌ی هر دسته شامل فایل‌های زیردسته‌هایش هم هست و همیشه نمایش داده
+ * می‌شود، حتی وقتی صفر است.
  *
- * @return array<int, array{name:string,slug:string,n:int,count:string,link:string,subs:array}>
+ * @return array<int, array{name:string,slug:string,count:string,link:string,subs:array}>
  */
 function fs_get_categories() {
 	if ( ! fs_has_woo() ) {
@@ -210,24 +210,18 @@ function fs_get_categories() {
 
 			if ( ! is_wp_error( $children ) && $children ) {
 				foreach ( $children as $child ) {
-					$child_n = fs_cat_product_count( $child );
-
 					$subs[] = array(
 						'name'  => $child->name,
-						'n'     => $child_n,
-						'count' => fs_fa_num( $child_n ),
+						'count' => fs_fa_num( fs_cat_product_count( $child ) ),
 						'link'  => get_term_link( $child ),
 					);
 				}
 			}
 
-			$parent_n = fs_cat_product_count( $parent );
-
 			$out[] = array(
 				'name'  => $parent->name,
 				'slug'  => $parent->slug,
-				'n'     => $parent_n,
-				'count' => fs_fa_num( $parent_n ),
+				'count' => fs_fa_num( fs_cat_product_count( $parent ) ),
 				'link'  => get_term_link( $parent ),
 				'subs'  => $subs,
 			);
