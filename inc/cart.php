@@ -1,9 +1,10 @@
 <?php
 /**
- * سبد خرید کشویی.
+ * سبد خرید تک‌فروشی.
  *
- * سبد به‌صورت یک کشوی کناری باز می‌شود؛ افزودن، حذف و به‌روزرسانی همه با
- * درخواست اجاکس انجام می‌شود تا کاربر از صفحه‌ی محصول بیرون نرود.
+ * فروشگاه تک‌فروشی است: هر خرید دقیقاً یک فایل است، پس افزودن فایل تازه جای
+ * فایل قبلی را می‌گیرد و کاربر مستقیم به مراحل خرید می‌رود. کشوی کناری برای
+ * دیدن و حذف همان یک فایلِ در انتظار پرداخت باقی مانده است.
  *
  * @package SiFile
  */
@@ -128,7 +129,6 @@ function fs_ajax_cart_add() {
 	fs_cart_check_nonce();
 
 	$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
-	$quantity   = isset( $_POST['quantity'] ) ? max( 1, absint( $_POST['quantity'] ) ) : 1;
 
 	if ( ! $product_id ) {
 		wp_send_json_error( array( 'message' => 'محصول پیدا نشد.' ), 400 );
@@ -140,30 +140,19 @@ function fs_ajax_cart_add() {
 		wp_send_json_error( array( 'message' => 'این فایل در حال حاضر قابل خرید نیست.' ), 400 );
 	}
 
-	// فایل دانلودی است؛ هر فایل فقط یک بار در سبد معنا دارد.
-	if ( $product->is_downloadable() ) {
-		$existing = WC()->cart->generate_cart_id( $product_id );
-
-		if ( WC()->cart->find_product_in_cart( $existing ) ) {
-			wp_send_json_success(
-				array_merge(
-					fs_cart_payload(),
-					array( 'message' => 'این فایل از قبل در سبد خرید شماست.' )
-				)
-			);
-		}
-
-		$quantity = 1;
+	// تک‌فروشی: فایل قبلی کنار می‌رود و همیشه یک نسخه خریداری می‌شود.
+	if ( ! WC()->cart->is_empty() ) {
+		WC()->cart->empty_cart( false );
 	}
 
-	$added = WC()->cart->add_to_cart( $product_id, $quantity );
+	$added = WC()->cart->add_to_cart( $product_id, 1 );
 
 	if ( ! $added ) {
 		$notice = wc_get_notices( 'error' );
 		wc_clear_notices();
 
 		wp_send_json_error(
-			array( 'message' => $notice ? wp_strip_all_tags( $notice[0]['notice'] ) : 'افزودن به سبد خرید انجام نشد.' ),
+			array( 'message' => $notice ? wp_strip_all_tags( $notice[0]['notice'] ) : 'خرید این فایل انجام نشد.' ),
 			400
 		);
 	}
@@ -171,7 +160,10 @@ function fs_ajax_cart_add() {
 	wp_send_json_success(
 		array_merge(
 			fs_cart_payload(),
-			array( 'message' => 'به سبد خرید اضافه شد.' )
+			array(
+				'message'  => 'در حال انتقال به مراحل خرید…',
+				'redirect' => wc_get_checkout_url(),
+			)
 		)
 	);
 }

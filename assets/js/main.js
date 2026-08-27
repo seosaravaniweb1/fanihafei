@@ -1101,6 +1101,11 @@
 				paint( data );
 				say( data && data.message, ! ( res && res.success ) );
 
+				// تک‌فروشی: بعد از انتخاب فایل مستقیم به مراحل خرید می‌رویم.
+				if ( res && res.success && data && data.redirect ) {
+					window.location.href = data.redirect;
+				}
+
 				return data;
 			} ).catch( function () {
 				say( 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.', true );
@@ -1153,12 +1158,8 @@
 
 			e.preventDefault();
 			add.classList.add( 'is-loading' );
-			open( true );
 
-			request( 'fs_cart_add', {
-				product_id: id,
-				quantity: add.getAttribute( 'data-quantity' ) || 1
-			} ).finally( function () {
+			request( 'fs_cart_add', { product_id: id } ).finally( function () {
 				add.classList.remove( 'is-loading' );
 			} );
 		} );
@@ -1177,18 +1178,11 @@
 
 				e.preventDefault();
 
-				var qty = form.querySelector( '[name="quantity"]' );
-
 				if ( button ) {
 					button.classList.add( 'is-loading' );
 				}
 
-				open( true );
-
-				request( 'fs_cart_add', {
-					product_id: productId,
-					quantity: qty ? qty.value : 1
-				} ).finally( function () {
+				request( 'fs_cart_add', { product_id: productId } ).finally( function () {
 					if ( button ) {
 						button.classList.remove( 'is-loading' );
 					}

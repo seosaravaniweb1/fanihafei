@@ -179,37 +179,27 @@ while ( have_posts() ) :
 			<div class="fs-product__specs">
 				<?php if ( $fs_authors ) : ?>
 					<div class="fs-spec">
-						<span class="fs-spec__icon">
-							<?php fs_the_icon( 'user', 16, array( 'stroke' => '#6d28d9', 'width' => '2' ) ); ?>
-						</span>
-						<span>
-							<span class="fs-spec__k">نویسنده</span>
-							<span class="fs-spec__v">
-								<?php
-								$fs_author_html = array();
+						<span class="fs-spec__k">نویسنده</span>
+						<span class="fs-spec__v">
+							<?php
+							$fs_author_html = array();
 
-								foreach ( $fs_authors as $fs_author ) {
-									$fs_author_html[] = $fs_author['link']
-										? '<a href="' . esc_url( $fs_author['link'] ) . '">' . esc_html( $fs_author['name'] ) . '</a>'
-										: esc_html( $fs_author['name'] );
-								}
+							foreach ( $fs_authors as $fs_author ) {
+								$fs_author_html[] = $fs_author['link']
+									? '<a href="' . esc_url( $fs_author['link'] ) . '">' . esc_html( $fs_author['name'] ) . '</a>'
+									: esc_html( $fs_author['name'] );
+							}
 
-								echo wp_kses_post( implode( '، ', $fs_author_html ) );
-								?>
-							</span>
+							echo wp_kses_post( implode( '، ', $fs_author_html ) );
+							?>
 						</span>
 					</div>
 				<?php endif; ?>
 
 				<?php foreach ( $fs_specs as $fs_spec ) : ?>
 					<div class="fs-spec">
-						<span class="fs-spec__icon">
-							<?php fs_the_icon( 'check', 16, array( 'stroke' => '#6d28d9', 'width' => '2.6' ) ); ?>
-						</span>
-						<span>
-							<span class="fs-spec__k"><?php echo esc_html( $fs_spec['k'] ); ?></span>
-							<span class="fs-spec__v"><?php echo esc_html( $fs_spec['v'] ); ?></span>
-						</span>
+						<span class="fs-spec__k"><?php echo esc_html( $fs_spec['k'] ); ?></span>
+						<span class="fs-spec__v"><?php echo esc_html( $fs_spec['v'] ); ?></span>
 					</div>
 				<?php endforeach; ?>
 			</div>

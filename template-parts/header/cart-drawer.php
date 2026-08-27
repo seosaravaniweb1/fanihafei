@@ -11,14 +11,14 @@ defined( 'ABSPATH' ) || exit;
 
 	<div class="fs-cart__backdrop" data-cart-close></div>
 
-	<aside class="fs-cart__panel" role="dialog" aria-modal="true" aria-label="سبد خرید">
+	<aside class="fs-cart__panel" role="dialog" aria-modal="true" aria-label="فایل انتخاب‌شده">
 
 		<header class="fs-cart__head">
 			<span class="fs-cart__head-title">
 				<?php fs_the_icon( 'cart', 17, array( 'stroke' => 'currentColor', 'width' => '1.9' ) ); ?>
-				سبد خرید
+				فایل انتخاب‌شده
 			</span>
-			<button class="fs-cart__close" type="button" data-cart-close aria-label="بستن سبد خرید">&times;</button>
+			<button class="fs-cart__close" type="button" data-cart-close aria-label="بستن">&times;</button>
 		</header>
 
 		<div class="fs-cart__body" data-cart-body>

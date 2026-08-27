@@ -2867,49 +2867,29 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 }
 
 /*
- * مشخصات فایل به‌صورت ردیف‌های فشرده: کلید و مقدار در یک خط کنار هم، بدون
- * کارت‌های بزرگ و سایه‌دار. با auto-fill هر تعداد که در عرض جا شود کنار هم
- * می‌نشیند، پس چند مشخصه‌ی کوتاه دیگر ارتفاع صفحه را نمی‌بلعد.
+ * مشخصات فایل: ردیف‌های تک‌خطیِ «کلید ← مقدار» بدون آیکون و بدون کارت.
+ * آیکون تیک برای هر ردیف حدود ۳۳ پیکسل عرض می‌گرفت بی‌آنکه چیزی به معنا
+ * اضافه کند، پس برداشته شد و ردیف‌ها باریک‌تر و بیشتری در هر سطر جا می‌شوند.
  */
 .fs-product__specs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 8px;
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(166px, 1fr));
+  gap: 6px;
+  margin-top: 14px;
 }
 
 .fs-spec {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 11px;
   background: var(--fs-bg);
   border: 1px solid var(--fs-line-2);
-  border-radius: 11px;
-  padding: 9px 12px;
-  display: flex;
-  gap: 9px;
-  align-items: center;
+  border-radius: 9px;
   transition: border-color .2s, background .2s;
 }
 
 .fs-spec:hover { background: var(--fs-brand-wash); border-color: var(--fs-brand-edge); }
-
-.fs-spec__icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: rgba(var(--fs-brand-l-rgb), .12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-
-/* کلید و مقدار در یک خط، با نقطه‌چین بینشان تا چشم راحت دنبالشان کند. */
-.fs-spec > span:last-child {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
 
 .fs-spec__k {
   font: 500 10.5px var(--fs-font);
@@ -2918,14 +2898,16 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 }
 
 .fs-spec__v {
-  font: 700 11.5px/1.7 var(--fs-font);
+  font: 700 11px/1.6 var(--fs-font);
   color: var(--fs-ink);
   margin-inline-start: auto;
   text-align: start;
   min-width: 0;
 }
 
-/* جعبه خرید ---------------------------------------------------------------- */
+.fs-spec__v a { color: var(--fs-brand-d); }
+.fs-spec__v a:hover { text-decoration: underline; }
+
 .fs-buybox {
   position: sticky;
   top: 16px;
@@ -3512,11 +3494,10 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   .fs-product__update { font-size: 10px; padding: 7px 11px; }
   .fs-product__thumb { height: 50px; border-radius: 11px; }
   .fs-product__title { font-size: 21px; line-height: 1.55; }
-  .fs-product__specs { grid-template-columns: 1fr 1fr; gap: 7px; }
-  .fs-spec { padding: 8px 10px; gap: 7px; }
-  .fs-spec__icon { width: 21px; height: 21px; border-radius: 7px; }
+  .fs-product__specs { grid-template-columns: 1fr 1fr; gap: 5px; }
+  .fs-spec { padding: 6px 9px; gap: 6px; }
   .fs-spec__k { font-size: 9.5px; }
-  .fs-spec__v { font-size: 10.5px; }
+  .fs-spec__v { font-size: 10px; }
 
   .fs-buybox__price { font-size: 26px; }
 

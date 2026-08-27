@@ -14,8 +14,8 @@ if ( ! $fs_items ) :
 	?>
 	<div class="fs-cart__empty">
 		<span class="fs-cart__empty-icon"><?php fs_the_icon( 'cart', 26, array( 'stroke' => '#94a3b8', 'width' => '1.6' ) ); ?></span>
-		<p class="fs-cart__empty-title">سبد خرید شما خالی است</p>
-		<p class="fs-cart__empty-sub">فایل‌ها را از فروشگاه انتخاب کنید تا اینجا نمایش داده شوند.</p>
+		<p class="fs-cart__empty-title">هنوز فایلی انتخاب نکرده‌اید</p>
+		<p class="fs-cart__empty-sub">هر فایل جداگانه خریداری می‌شود؛ فایلی را که می‌خواهید از فروشگاه انتخاب کنید.</p>
 		<a class="fs-cart__empty-btn" href="<?php echo esc_url( fs_shop_url() ); ?>">مشاهده فایل‌ها</a>
 	</div>
 	<?php
@@ -61,13 +61,13 @@ endif;
 
 <div class="fs-cart__foot">
 	<div class="fs-cart__sum">
-		<span>جمع سبد خرید</span>
+		<span>مبلغ قابل پرداخت</span>
 		<b><?php echo wp_kses_post( fs_cart_total() ); ?></b>
 	</div>
 
 	<a class="fs-cart__checkout" href="<?php echo esc_url( wc_get_checkout_url() ); ?>">
-		تسویه حساب و دانلود
+		ادامه‌ی خرید و دانلود
 	</a>
 
-	<button class="fs-cart__continue" type="button" data-cart-close>ادامه خرید</button>
+	<button class="fs-cart__continue" type="button" data-cart-close>انتخاب فایل دیگر</button>
 </div>

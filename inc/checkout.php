@@ -310,13 +310,61 @@ add_filter( 'woocommerce_cart_needs_shipping', 'fs_no_shipping' );
 add_filter( 'woocommerce_cart_needs_shipping_address', 'fs_no_shipping' );
 
 /**
- * متن دکمه‌ی خرید — حالا سبد خرید واقعی داریم (کشوی کناری سربرگ)، پس کاربر
- * می‌تواند چند فایل را با هم بردارد و یک‌جا تسویه کند.
+ * متن همه‌ی دکمه‌های خرید — فروشگاه تک‌فروشی است و هر کلیک یعنی خرید همان
+ * یک فایل، نه انباشتن سبد؛ پس «افزودن به سبد خرید» گمراه‌کننده است.
  *
  * @return string
  */
 function fs_add_to_cart_text() {
-	return 'افزودن به سبد خرید';
+	return apply_filters( 'fs_buy_button_text', 'خرید و دانلود' );
 }
 add_filter( 'woocommerce_product_single_add_to_cart_text', 'fs_add_to_cart_text' );
 add_filter( 'woocommerce_product_add_to_cart_text', 'fs_add_to_cart_text' );
+
+/**
+ * هر فایل فقط یک نسخه — با این فیلتر خود ووکامرس کادر «تعداد» را حذف می‌کند
+ * و دیگر جایی برای سفارش دو نسخه از یک فایل دانلودی نمی‌ماند.
+ *
+ * @return bool
+ */
+function fs_sold_individually() {
+	return true;
+}
+add_filter( 'woocommerce_is_sold_individually', 'fs_sold_individually', 20 );
+
+/**
+ * تک‌فروشی: پیش از افزودن فایل تازه، هرچه در سبد بوده پاک می‌شود تا
+ * تسویه‌حساب همیشه دقیقاً همان یک فایلی باشد که کاربر همین حالا انتخاب کرده.
+ *
+ * @param bool $passed آیا اعتبارسنجی رد شده است.
+ * @return bool
+ */
+function fs_single_item_cart( $passed ) {
+	if ( $passed && fs_has_woo() && function_exists( 'WC' ) && WC()->cart && ! WC()->cart->is_empty() ) {
+		WC()->cart->empty_cart( false );
+	}
+
+	return $passed;
+}
+add_filter( 'woocommerce_add_to_cart_validation', 'fs_single_item_cart', 20 );
+
+/**
+ * بعد از انتخاب فایل، مستقیم به مراحل خرید برود.
+ *
+ * @param string $url نشانی پیشنهادی ووکامرس.
+ * @return string
+ */
+function fs_add_to_cart_redirect( $url ) {
+	return fs_has_woo() ? wc_get_checkout_url() : $url;
+}
+add_filter( 'woocommerce_add_to_cart_redirect', 'fs_add_to_cart_redirect', 20 );
+
+/**
+ * همان رفتار برای فرم‌های بدون اجاکس.
+ *
+ * @return string
+ */
+function fs_redirect_after_add() {
+	return 'yes';
+}
+add_filter( 'pre_option_woocommerce_cart_redirect_after_add', 'fs_redirect_after_add' );
