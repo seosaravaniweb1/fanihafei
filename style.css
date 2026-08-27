@@ -1,8 +1,8 @@
 /*
-Theme Name: سی‌فایل
+Theme Name: لوکسو فایل
 Theme URI: https://github.com/seosaravaniweb1/fanihafei
 Author: Saravani Web
-Description: قالب فروشگاه فایل «سی‌فایل / 30file» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
+Description: قالب فروشگاه فایل «لوکسو فایل» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
 Version: 2.0.0
 Requires at least: 6.0
 Requires PHP: 7.4
@@ -27,7 +27,7 @@ Tags: rtl-language-support, e-commerce, custom-menu, translation-ready
   --fs-line-3: #f1f5f9;
   --fs-bg: #f8fafc;
   --fs-bg-2: #f1f5f9;
-  /* رنگ اصلی سی‌فایل — بنفش نیلی */
+  /* رنگ اصلی لوکسو فایل — بنفش نیلی */
   --fs-brand: #6d28d9;
   --fs-brand-d: #5b21b6;
   --fs-brand-l: #8b5cf6;
@@ -50,7 +50,7 @@ Tags: rtl-language-support, e-commerce, custom-menu, translation-ready
   --fs-grad: linear-gradient(135deg, #4f46e5 0%, #7c3aed 52%, #c026d3 100%);
   --fs-grad-soft: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 50%, #fdf4ff 100%);
   --fs-grad-dark: linear-gradient(140deg, #1e1b4b 0%, #4c1d95 60%, #701a75 100%);
-  --fs-container: 1320px;
+  --fs-container: 1680px;
   --fs-pad: 32px;
   --fs-mq-speed: 26s;
 }
@@ -93,6 +93,14 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   max-width: var(--fs-container);
   margin-inline: auto;
   width: 100%;
+}
+
+/*
+ * روی نمایشگرهای پهن، حاشیه‌ی کناری کمی بازتر می‌شود تا محتوا به لبه‌ی صفحه
+ * نچسبد؛ عرض ظرف خودش از قبل بیشترین فضای ممکن را گرفته است.
+ */
+@media (min-width: 1500px) {
+  :root { --fs-pad: 44px; }
 }
 
 .fs-sr-only {
