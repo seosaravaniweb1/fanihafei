@@ -403,6 +403,54 @@ function fs_handle_create_page() {
 add_action( 'admin_post_fs_create_page', 'fs_handle_create_page' );
 
 /**
+ * بازنشانی یک برگه به نسخه‌ی اولیه.
+ *
+ * محتوای فعلی دور ریخته نمی‌شود: وردپرس پیش از جایگزینی یک نسخه‌ی بازبینی
+ * ذخیره می‌کند، پس اگر پشیمان شدید از بخش «بازبینی‌ها»ی همان برگه قابل
+ * برگرداندن است.
+ *
+ * @return void
+ */
+function fs_handle_reset_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'دسترسی ندارید.' );
+	}
+
+	check_admin_referer( 'fs_reset_page' );
+
+	$key   = isset( $_POST['page_key'] ) ? sanitize_key( wp_unslash( $_POST['page_key'] ) ) : '';
+	$pages = fs_starter_pages();
+	$id    = fs_starter_page_id( $key );
+
+	$status = 'error';
+
+	if ( $id && isset( $pages[ $key ] ) ) {
+		$updated = wp_update_post(
+			array(
+				'ID'           => $id,
+				'post_content' => call_user_func( $pages[ $key ]['callback'] ),
+			),
+			true
+		);
+
+		$status = is_wp_error( $updated ) ? 'error' : 'reset';
+	}
+
+	wp_safe_redirect(
+		add_query_arg(
+			array(
+				'page'    => 'fs-theme-settings',
+				'tab'     => 'pages',
+				'fs_page' => $status,
+			),
+			admin_url( 'admin.php' )
+		)
+	);
+	exit;
+}
+add_action( 'admin_post_fs_reset_page', 'fs_handle_reset_page' );
+
+/**
  * محتوای تب «برگه‌ها».
  *
  * @return void
@@ -416,9 +464,18 @@ function fs_pages_tab_content() {
 	</p>
 
 	<?php if ( isset( $_GET['fs_page'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
-		<?php $fs_ok = 'created' === $_GET['fs_page']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
-		<div class="notice notice-<?php echo $fs_ok ? 'success' : 'warning'; ?> is-dismissible">
-			<p><?php echo $fs_ok ? 'برگه ساخته شد.' : 'برگه ساخته نشد؛ احتمالاً از قبل وجود دارد.'; ?></p>
+		<?php
+		$fs_state = sanitize_key( wp_unslash( $_GET['fs_page'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		$fs_messages = array(
+			'created' => array( 'success', 'برگه ساخته شد.' ),
+			'reset'   => array( 'success', 'برگه به نسخه‌ی اولیه برگشت. محتوای قبلی در «بازبینی‌ها»ی همان برگه باقی است.' ),
+		);
+
+		$fs_msg = isset( $fs_messages[ $fs_state ] ) ? $fs_messages[ $fs_state ] : array( 'warning', 'کار انجام نشد؛ احتمالاً برگه از قبل وجود دارد.' );
+		?>
+		<div class="notice notice-<?php echo esc_attr( $fs_msg[0] ); ?> is-dismissible">
+			<p><?php echo esc_html( $fs_msg[1] ); ?></p>
 		</div>
 	<?php endif; ?>
 
@@ -438,8 +495,15 @@ function fs_pages_tab_content() {
 					<td><?php echo esc_html( $fs_page['desc'] ); ?></td>
 					<td>
 						<?php if ( $fs_id ) : ?>
-							<a class="button" href="<?php echo esc_url( get_edit_post_link( $fs_id ) ); ?>">ویرایش</a>
-							<a class="button-link" href="<?php echo esc_url( get_permalink( $fs_id ) ); ?>" target="_blank" rel="noopener">مشاهده</a>
+							<a class="button button-primary" href="<?php echo esc_url( get_edit_post_link( $fs_id ) ); ?>">ویرایش متن</a>
+							<a class="button" href="<?php echo esc_url( get_permalink( $fs_id ) ); ?>" target="_blank" rel="noopener">مشاهده</a>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:6px 0 0"
+								onsubmit="return confirm('محتوای فعلی این برگه با نسخه‌ی اولیه جایگزین می‌شود. ادامه می‌دهید؟');">
+								<?php wp_nonce_field( 'fs_reset_page' ); ?>
+								<input type="hidden" name="action" value="fs_reset_page">
+								<input type="hidden" name="page_key" value="<?php echo esc_attr( $fs_key ); ?>">
+								<button type="submit" class="button-link" style="color:#b32d2e">بازنشانی به نسخه اولیه</button>
+							</form>
 						<?php else : ?>
 							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0">
 								<?php wp_nonce_field( 'fs_create_page' ); ?>
@@ -454,10 +518,13 @@ function fs_pages_tab_content() {
 		</tbody>
 	</table>
 
-	<p class="description" style="margin-top:16px">
-		برگه‌ی ساخته‌شده دوباره ساخته نمی‌شود تا ویرایش‌های شما از بین نرود. اگر می‌خواهید نسخه‌ی تازه بگیرید،
-		اول برگه‌ی قبلی را حذف کنید و از زباله‌دان هم پاک کنید.
-	</p>
+	<div class="notice notice-info inline" style="max-width:900px;margin:16px 0 0;padding:4px 12px">
+		<p><strong>ویرایش متن برگه‌ها:</strong> بعد از ساخت، هر برگه یک برگه‌ی عادی وردپرس است.
+		روی «ویرایش متن» بزنید (یا از منوی <strong>برگه‌ها</strong> بازش کنید) و مثل هر برگه‌ی دیگری
+		متن‌ها را در گوتنبرگ عوض کنید و «به‌روزرسانی» بزنید. تغییرات بلافاصله روی سایت اعمال می‌شود.</p>
+		<p>محتوای اولیه فقط یک نقطه‌ی شروع است؛ به‌روزرسانی قالب هیچ‌وقت متن برگه‌های شما را
+		بازنویسی نمی‌کند. اگر خواستید به نسخه‌ی اول برگردید، دکمه‌ی «بازنشانی» همین جدول را بزنید.</p>
+	</div>
 
 	<h2 style="margin-top:30px">الگوهای آماده در گوتنبرگ</h2>
 	<p class="description">
