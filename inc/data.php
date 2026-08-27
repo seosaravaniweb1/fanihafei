@@ -100,18 +100,87 @@ function fs_product_to_card( $product, $index = 0 ) {
 }
 
 /**
+ * نسخه‌ی کش دسته‌بندی‌ها.
+ *
+ * به‌جای پاک‌کردن تک‌تک ترنزیت‌ها هنگام تغییر دسته یا محصول، این عدد یک واحد
+ * بالا می‌رود و کلیدهای قدیمی خودبه‌خود بی‌استفاده می‌مانند و منقضی می‌شوند.
+ *
+ * @return int
+ */
+function fs_cat_cache_version() {
+	return (int) get_option( 'fs_cat_cache_v', 1 );
+}
+
+/**
+ * تعداد فایل‌های یک دسته، شامل همه‌ی زیردسته‌هایش.
+ *
+ * شمارنده‌ی خود ترم فقط محصولاتی را می‌شمارد که مستقیماً به همان دسته وصل
+ * شده‌اند؛ برای دسته‌های مادر که محصولاتشان در زیردسته‌ها هستند این عدد صفر
+ * می‌شود و «۰ فایل در این دسته» نمایش داده می‌شود. اینجا با یک پرس‌وجوی
+ * include_children عدد درست به‌دست می‌آید و یک ساعت در ترنزیت می‌ماند.
+ *
+ * @param WP_Term $term ترم دسته.
+ * @return int
+ */
+function fs_cat_product_count( $term ) {
+	$children = get_term_children( $term->term_id, 'product_cat' );
+
+	// بدون زیردسته، شمارنده‌ی خود ترم دقیق است و هیچ پرس‌وجویی لازم نیست.
+	if ( is_wp_error( $children ) || ! $children ) {
+		return (int) $term->count;
+	}
+
+	$key    = sprintf( 'fs_cat_n_%d_%d', fs_cat_cache_version(), $term->term_id );
+	$cached = get_transient( $key );
+
+	if ( false !== $cached ) {
+		return (int) $cached;
+	}
+
+	$query = new WP_Query(
+		array(
+			'post_type'              => 'product',
+			'post_status'            => 'publish',
+			'posts_per_page'         => 1,
+			'fields'                 => 'ids',
+			'ignore_sticky_posts'    => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+			'tax_query'              => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+				array(
+					'taxonomy'         => 'product_cat',
+					'field'            => 'term_id',
+					'terms'            => $term->term_id,
+					'include_children' => true,
+				),
+			),
+		)
+	);
+
+	$count = (int) $query->found_posts;
+
+	set_transient( $key, $count, HOUR_IN_SECONDS );
+
+	return $count;
+}
+
+/**
  * دسته‌بندی‌های محصول به‌همراه زیردسته‌ها.
  *
- * @return array<int, array{name:string,count:string,link:string,subs:array}>
+ * هر دسته دو شمارنده دارد: «n» عدد خام برای شرط‌گذاشتن و «count» همان عدد با
+ * ارقام فارسی برای نمایش. دسته‌های خالی شمارنده‌شان نمایش داده نمی‌شود.
+ *
+ * @return array<int, array{name:string,slug:string,n:int,count:string,link:string,subs:array}>
  */
 function fs_get_categories() {
 	if ( ! fs_has_woo() ) {
 		return array();
 	}
 
-	$cached = wp_cache_get( 'fs_categories_v2', 'si-file' );
+	$key    = 'fs_cats_' . fs_cat_cache_version();
+	$cached = get_transient( $key );
 
-	if ( false !== $cached ) {
+	if ( is_array( $cached ) ) {
 		return $cached;
 	}
 
@@ -141,25 +210,31 @@ function fs_get_categories() {
 
 			if ( ! is_wp_error( $children ) && $children ) {
 				foreach ( $children as $child ) {
+					$child_n = fs_cat_product_count( $child );
+
 					$subs[] = array(
 						'name'  => $child->name,
-						'count' => fs_fa_num( $child->count ),
+						'n'     => $child_n,
+						'count' => fs_fa_num( $child_n ),
 						'link'  => get_term_link( $child ),
 					);
 				}
 			}
 
+			$parent_n = fs_cat_product_count( $parent );
+
 			$out[] = array(
 				'name'  => $parent->name,
 				'slug'  => $parent->slug,
-				'count' => fs_fa_num( $parent->count ),
+				'n'     => $parent_n,
+				'count' => fs_fa_num( $parent_n ),
 				'link'  => get_term_link( $parent ),
 				'subs'  => $subs,
 			);
 		}
 	}
 
-	wp_cache_set( 'fs_categories_v2', $out, 'si-file', HOUR_IN_SECONDS );
+	set_transient( $key, $out, HOUR_IN_SECONDS );
 
 	return $out;
 }

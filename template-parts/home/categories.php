@@ -39,7 +39,9 @@ $fs_visible = 8; // موبایل: هشت دسته‌ی اول، بقیه با د
 				</span>
 				<span class="fs-cat__text">
 					<span class="fs-cat__name"><?php echo esc_html( $fs_cat['name'] ); ?></span>
-					<span class="fs-cat__n"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+					<?php if ( $fs_cat['n'] ) : ?>
+						<span class="fs-cat__n"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+					<?php endif; ?>
 				</span>
 			</a>
 		<?php endforeach; ?>

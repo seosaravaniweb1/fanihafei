@@ -198,16 +198,35 @@ function fs_inline_vars() {
 add_action( 'wp_enqueue_scripts', 'fs_inline_vars', 20 );
 
 /**
- * پاک‌سازی کش دسته‌بندی‌ها هنگام تغییر ترم‌ها.
+ * تازه‌کردن کش دسته‌بندی‌ها و شمارنده‌هایشان.
+ *
+ * با یک واحد بالابردن شماره‌ی نسخه، همه‌ی کلیدهای قبلی بی‌اثر می‌شوند؛ خودشان
+ * هم حداکثر یک ساعت بعد منقضی می‌شوند. علاوه بر تغییر دسته‌ها، انتشار یا حذف
+ * محصول هم باید کش را تازه کند وگرنه شمارنده‌ها عقب می‌مانند.
  *
  * @return void
  */
 function fs_flush_cat_cache() {
-	wp_cache_delete( 'fs_categories_v2', 'si-file' );
+	update_option( 'fs_cat_cache_v', fs_cat_cache_version() + 1, false );
 }
 add_action( 'edited_product_cat', 'fs_flush_cat_cache' );
 add_action( 'created_product_cat', 'fs_flush_cat_cache' );
 add_action( 'delete_product_cat', 'fs_flush_cat_cache' );
+
+/**
+ * همان تازه‌سازی، وقتی وضعیت یک محصول عوض می‌شود.
+ *
+ * @param string  $new    وضعیت جدید.
+ * @param string  $old    وضعیت قبلی.
+ * @param WP_Post $post   نوشته.
+ * @return void
+ */
+function fs_flush_cat_cache_on_product( $new, $old, $post ) {
+	if ( $post instanceof WP_Post && 'product' === $post->post_type && $new !== $old ) {
+		fs_flush_cat_cache();
+	}
+}
+add_action( 'transition_post_status', 'fs_flush_cat_cache_on_product', 10, 3 );
 
 /**
  * لینک‌های یک محل منو. اگر منویی تعیین نشده باشد آرایه‌ی خالی برمی‌گردد

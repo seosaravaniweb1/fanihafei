@@ -43,7 +43,9 @@ if ( ! $fs_cats ) {
 				<div class="fs-mega__head">
 					<div>
 						<div class="fs-mega__title"><?php echo esc_html( $fs_cat['name'] ); ?></div>
-						<div class="fs-mega__count"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?> در این دسته</div>
+						<?php if ( $fs_cat['n'] ) : ?>
+							<div class="fs-mega__count"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?> در این دسته</div>
+						<?php endif; ?>
 					</div>
 					<a class="fs-btn-brand-sm" href="<?php echo esc_url( fs_url( $fs_cat['link'] ) ); ?>">
 						مشاهده صفحه دسته
@@ -55,7 +57,9 @@ if ( ! $fs_cats ) {
 					<?php foreach ( $fs_cat['subs'] as $fs_sub ) : ?>
 						<a class="fs-mega__sub" href="<?php echo esc_url( fs_url( $fs_sub['link'] ) ); ?>">
 							<span class="fs-mega__sub-name"><?php echo esc_html( $fs_sub['name'] ); ?></span>
-							<span class="fs-mega__sub-n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+							<?php if ( $fs_sub['n'] ) : ?>
+								<span class="fs-mega__sub-n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+							<?php endif; ?>
 						</a>
 					<?php endforeach; ?>
 				</div>

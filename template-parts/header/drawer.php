@@ -27,7 +27,9 @@ if ( ! $fs_cats ) {
 
 				<a class="fs-drawer__link" href="<?php echo esc_url( fs_url( $fs_cat['link'] ) ); ?>">
 					<span class="fs-drawer__name"><?php echo esc_html( $fs_cat['name'] ); ?></span>
-					<span class="fs-drawer__n"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+					<?php if ( $fs_cat['n'] ) : ?>
+						<span class="fs-drawer__n"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+					<?php endif; ?>
 				</a>
 
 				<button class="fs-drawer__caret"
@@ -44,7 +46,9 @@ if ( ! $fs_cats ) {
 					<?php foreach ( $fs_cat['subs'] as $fs_sub ) : ?>
 						<a class="fs-drawer__sub" href="<?php echo esc_url( fs_url( $fs_sub['link'] ) ); ?>">
 							<span class="fs-drawer__sub-name"><?php echo esc_html( $fs_sub['name'] ); ?></span>
-							<span class="fs-drawer__sub-n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+							<?php if ( $fs_sub['n'] ) : ?>
+								<span class="fs-drawer__sub-n"><?php echo esc_html( $fs_sub['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+							<?php endif; ?>
 						</a>
 					<?php endforeach; ?>
 				</div>

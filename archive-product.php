@@ -102,7 +102,13 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 						<?php fs_the_icon( 'grid', 26, array( 'width' => '1.7' ) ); ?>
 					</span>
 					<span class="fs-subtile__name"><?php echo esc_html( $fs_sub->name ); ?></span>
-					<span class="fs-subtile__n"><?php echo esc_html( fs_fa_num( $fs_sub->count ) ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+					<?php
+					// شمارنده شامل زیردسته‌ها؛ دسته‌ی خالی اصلاً عدد نشان نمی‌دهد.
+					$fs_sub_n = fs_cat_product_count( $fs_sub );
+					?>
+					<?php if ( $fs_sub_n ) : ?>
+						<span class="fs-subtile__n"><?php echo esc_html( fs_fa_num( $fs_sub_n ) ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
+					<?php endif; ?>
 				</a>
 			<?php endforeach; ?>
 		</div>
