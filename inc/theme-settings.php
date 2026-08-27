@@ -251,6 +251,7 @@ function fs_theme_settings_tabs() {
 		'home'      => 'صفحه اصلی',
 		'product'   => 'صفحه محصول',
 		'header'    => 'سربرگ و پشتیبانی',
+		'footer'    => 'فوتر',
 		'dashboard' => 'پیشخوان کاربری',
 	);
 }
@@ -570,6 +571,10 @@ function fs_theme_settings_page() {
 					<button type="submit" class="button button-primary button-hero">ذخیره تنظیمات</button>
 				</p>
 			</form>
+
+		<?php elseif ( 'footer' === $tab ) : ?>
+
+			<?php fs_footer_tab_content(); ?>
 
 		<?php elseif ( 'dashboard' === $tab ) : ?>
 

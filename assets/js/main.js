@@ -1229,8 +1229,31 @@
 		} );
 	}
 
+	/* ------------------------------------------- تب‌های محصولات پاورقی */
+	function initFooterTabs() {
+		var wrap = document.querySelector( '.fs-fprods' );
+
+		if ( ! wrap ) {
+			return;
+		}
+
+		var tabs = wrap.querySelectorAll( '.fs-fprods__tab' );
+		var panes = wrap.querySelectorAll( '.fs-fprods__pane' );
+
+		if ( tabs.length < 2 ) {
+			return;
+		}
+
+		Array.prototype.forEach.call( tabs, function ( tab, i ) {
+			tab.addEventListener( 'click', function () {
+				activate( tabs, panes, i, 'is-active' );
+			} );
+		} );
+	}
+
 	function init() {
 		initAuth();
+		initFooterTabs();
 		initCart();
 		initWishlist();
 		initProfileForm();
