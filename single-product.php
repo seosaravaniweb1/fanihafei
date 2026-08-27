@@ -42,9 +42,21 @@ while ( have_posts() ) :
 	$fs_updated  = $fs_dates['updated'] ? $fs_dates['updated'] : $fs_dates['published'];
 	?>
 
+	<?php
+	/*
+	 * قلاب‌های استاندارد ووکامرس. کال‌بک‌های پیش‌فرضی که خروجی‌شان با چیدمان این
+	 * قالب تکراری می‌شد در fs_woo_unhook() برداشته شده‌اند، ولی خود قلاب‌ها
+	 * اجرا می‌شوند تا افزونه‌ها (پیام‌های ووکامرس، نشان‌ها، لیست علاقه‌مندی و…)
+	 * جای همیشگی‌شان را داشته باشند.
+	 */
+	do_action( 'woocommerce_before_main_content' );
+	?>
+
 	<nav class="fs-crumbs" aria-label="مسیر">
 		<?php woocommerce_breadcrumb( array( 'delimiter' => '' ) ); ?>
 	</nav>
+
+	<?php do_action( 'woocommerce_before_single_product' ); ?>
 
 	<div class="fs-product" id="product-<?php the_ID(); ?>">
 
@@ -59,7 +71,17 @@ while ( have_posts() ) :
 
 				<?php
 				if ( has_post_thumbnail() ) {
-					the_post_thumbnail( 'large', array( 'loading' => 'eager' ) );
+					// تصویر شاخص محصول تقریباً همیشه همان عنصر LCP صفحه است.
+					// fetchpriority=high به مرورگر می‌گوید پیش از بقیه‌ی تصاویر
+					// سراغش برود؛ بدون آن در صف با تصاویر تنبل رقابت می‌کند.
+					the_post_thumbnail(
+						'large',
+						array(
+							'loading'       => 'eager',
+							'fetchpriority' => 'high',
+							'decoding'      => 'sync',
+						)
+					);
 				} else {
 					fs_the_icon( 'file-lines', 72, array( 'stroke' => 'rgba(15,23,42,.28)', 'width' => '1.3' ) );
 				}
@@ -204,6 +226,8 @@ while ( have_posts() ) :
 				<?php endforeach; ?>
 			</div>
 
+			<?php do_action( 'woocommerce_single_product_summary' ); ?>
+
 		</div>
 
 		<div class="fs-product__buy">
@@ -242,6 +266,8 @@ while ( have_posts() ) :
 		</div>
 
 	</div>
+
+	<?php do_action( 'woocommerce_after_single_product_summary' ); ?>
 
 	<?php if ( $product->get_description() || $fs_toc || $fs_rev_summary || comments_open() ) : ?>
 		<?php
@@ -467,7 +493,11 @@ while ( have_posts() ) :
 	</div>
 
 	<?php
+	do_action( 'woocommerce_after_single_product' );
+
 endwhile;
+
+do_action( 'woocommerce_after_main_content' );
 ?>
 
 <div class="fs-modal" id="fs-video-modal" hidden>

@@ -16,6 +16,7 @@ require_once get_theme_file_path( 'inc/data.php' );
 require_once get_theme_file_path( 'inc/theme-settings.php' );
 require_once get_theme_file_path( 'inc/trust-settings.php' );
 require_once get_theme_file_path( 'inc/woocommerce.php' );
+require_once get_theme_file_path( 'inc/seo.php' );
 require_once get_theme_file_path( 'inc/auth.php' );
 require_once get_theme_file_path( 'inc/cart.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
@@ -85,15 +86,16 @@ add_action( 'after_setup_theme', 'fs_setup' );
  * @return void
  */
 function fs_assets() {
-	// فونت وزیرمتن — همان وزن‌های طرح.
-	wp_enqueue_style(
-		'fs-vazirmatn',
-		'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap',
-		array(),
-		null // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- نسخه در URL گوگل مدیریت می‌شود.
-	);
-
-	wp_enqueue_style( 'fs-style', get_stylesheet_uri(), array( 'fs-vazirmatn' ), FS_VERSION );
+	/*
+	 * فونت از روی همین دامنه سرو می‌شود، نه فونت‌های گوگل.
+	 *
+	 * چرا: درخواست به fonts.googleapis.com از داخل ایران هم تأخیر DNS و مسیریابی
+	 * دارد و هم اغلب اصلاً برنمی‌گردد. استایلی که آنجا لود می‌شد render-blocking
+	 * بود، یعنی مرورگر تا تعیین‌تکلیفش هیچ چیزی رنگ نمی‌کرد و LCP قربانی می‌شد.
+	 * حالا یک فایل متغیر (وزن ۱۰۰ تا ۹۰۰) روی خود سرور است: یک درخواست، بدون
+	 * DNS خارجی، و با preload قبل از رسیدن به CSS شروع به دانلود می‌کند.
+	 */
+	wp_enqueue_style( 'fs-style', get_stylesheet_uri(), array(), FS_VERSION );
 
 	wp_enqueue_script(
 		'fs-main',
@@ -121,26 +123,52 @@ function fs_assets() {
 add_action( 'wp_enqueue_scripts', 'fs_assets' );
 
 /**
- * preconnect برای فونت گوگل — دقیقاً مثل طرح.
+ * پیش‌بارگذاری فونت متغیر قالب.
  *
- * @param array  $urls           نشانی‌ها.
- * @param string $relation_type  نوع رابطه.
- * @return array
+ * چرا این‌قدر زود: مرورگر فونت را تازه وقتی کشف می‌کند که CSS را گرفته و
+ * پارس کرده باشد؛ آن‌وقت یک رفت‌وبرگشت دیگر لازم است و متن تا آمدن فونت با
+ * فونت جایگزین رندر می‌شود (پرش چیدمان و LCP دیرتر). با preload، دانلود فونت
+ * هم‌زمان با CSS شروع می‌شود.
+ *
+ * نکته: هرچند فایل روی همان دامنه است، اتریبیوت crossorigin برای فونت الزامی
+ * است — درخواست فونت همیشه در حالت CORS انجام می‌شود و بدون آن مرورگر فایل را
+ * دوباره دانلود می‌کند.
+ *
+ * @return void
  */
-function fs_resource_hints( $urls, $relation_type ) {
-	if ( 'preconnect' === $relation_type ) {
-		$urls[] = array(
-			'href' => 'https://fonts.googleapis.com',
-		);
-		$urls[] = array(
-			'href'        => 'https://fonts.gstatic.com',
-			'crossorigin' => 'anonymous',
-		);
-	}
-
-	return $urls;
+function fs_preload_font() {
+	printf(
+		'<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n",
+		esc_url( fs_font_url() )
+	);
 }
-add_filter( 'wp_resource_hints', 'fs_resource_hints', 10, 2 );
+add_action( 'wp_head', 'fs_preload_font', 1 );
+
+/**
+ * نشانی فایل فونت — یک جا تعریف شده تا preload و ‎@font-face‎ هرگز از هم جدا نیفتند.
+ *
+ * @return string
+ */
+function fs_font_url() {
+	return add_query_arg( 'v', FS_VERSION, get_theme_file_uri( 'assets/fonts/vazirmatn-var.woff2' ) );
+}
+
+/**
+ * تعریف ‎@font-face‎ به‌صورت درون‌خطی، پیش از استایل اصلی.
+ *
+ * چرا درون‌خطی: اگر داخل style.css بماند، مرورگر باید اول کل شیت را بگیرد.
+ * چند خط درون‌خطی یعنی تعریف فونت از همان بایت‌های اول HTML در دسترس است.
+ * font-display:swap هم جلوی متن نامرئی (FOIT) را می‌گیرد.
+ *
+ * @return void
+ */
+function fs_font_face() {
+	printf(
+		'<style id="fs-font-face">@font-face{font-family:Vazirmatn;src:url(%s) format("woff2-variations");font-weight:100 900;font-style:normal;font-display:swap;}</style>' . "\n",
+		esc_url( fs_font_url() )
+	);
+}
+add_action( 'wp_head', 'fs_font_face', 2 );
 
 /**
  * سبک‌سازی خروجی: حذف اموجی، نسخه وردپرس و استایل‌های بلااستفاده.
@@ -157,32 +185,78 @@ function fs_trim_head() {
 add_action( 'init', 'fs_trim_head' );
 
 /**
- * حذف CSS بلوک‌های گوتنبرگ در فرانت — قالب استایل خودش را دارد.
+ * حذف استایل‌ها و اسکریپت‌های بلااستفاده‌ی هسته و ووکامرس از فرانت.
+ *
+ * چرا: قالب استایل کامل خودش را دارد و هیچ‌کدام از این شیت‌ها استفاده نمی‌شوند،
+ * ولی هر کدام یک درخواست render-blocking اضافه می‌کنند. نسخه‌ی قبلی این تابع
+ * روی is_singular() زودهنگام برمی‌گشت — یعنی دقیقاً روی صفحه‌ی محصول و نوشته،
+ * که مهم‌ترین صفحات ورودی گوگل‌اند، همه‌ی این‌ها لود می‌ماندند.
+ *
+ * برای اینکه محتوایی که واقعاً با بلوک‌های گوتنبرگ ساخته شده نشکند، شیت بلوک‌ها
+ * فقط وقتی حذف می‌شود که متن همان صفحه هیچ بلوکی نداشته باشد.
  *
  * @return void
  */
-function fs_dequeue_block_styles() {
-	if ( is_admin() || is_singular() ) {
+function fs_dequeue_bloat() {
+	if ( is_admin() ) {
 		return;
 	}
 
-	wp_dequeue_style( 'wp-block-library' );
-	wp_dequeue_style( 'wc-blocks-style' );
-	wp_dequeue_style( 'classic-theme-styles' );
+	// استایل‌هایی که قالب هیچ‌جا از آن‌ها استفاده نمی‌کند.
+	foreach ( array( 'classic-theme-styles', 'global-styles', 'wp-block-library-theme' ) as $handle ) {
+		wp_dequeue_style( $handle );
+		wp_deregister_style( $handle );
+	}
+
+	// شیت بلوک‌ها فقط وقتی محتوای صفحه بلوکی نباشد.
+	if ( ! fs_page_has_blocks() ) {
+		foreach ( array( 'wp-block-library', 'wc-blocks-style', 'wc-blocks-packages-style' ) as $handle ) {
+			wp_dequeue_style( $handle );
+		}
+	}
+
+	// اموجی هسته: یک اسکریپت و یک شیت که این قالب لازمشان ندارد.
+	wp_dequeue_style( 'wp-emoji-styles' );
 }
-add_action( 'wp_enqueue_scripts', 'fs_dequeue_block_styles', 100 );
+add_action( 'wp_enqueue_scripts', 'fs_dequeue_bloat', 100 );
 
 /**
- * اسکریپت افزودن‌به‌سبد ووکامرس لازم نیست — قالب خودش همین کار را با اجاکس
- * و کشوی سبد انجام می‌دهد و اگر هر دو فعال باشند محصول دوبار افزوده می‌شود.
+ * آیا محتوای همین درخواست بلوک گوتنبرگ دارد؟
+ *
+ * @return bool
+ */
+function fs_page_has_blocks() {
+	if ( ! is_singular() || ! function_exists( 'has_blocks' ) ) {
+		return false;
+	}
+
+	return has_blocks( get_queried_object_id() );
+}
+
+/**
+ * اسکریپت‌های سبد ووکامرس که این قالب لازم ندارد.
+ *
+ * wc-add-to-cart: قالب خودش افزودن به سبد را با اجاکس انجام می‌دهد؛ اگر هر دو
+ * فعال باشند هر کلیک دو بار پردازش می‌شود.
+ *
+ * wc-cart-fragments: روی هر بارگذاری صفحه یک درخواست admin-ajax می‌زند تا
+ * شمارنده‌ی سبد را تازه کند. این درخواست هم کش صفحه را بی‌اثر می‌کند و هم روی
+ * INP اثر مستقیم دارد، چون در همان لحظه‌ی تعامل اولیه‌ی کاربر نخ اصلی را
+ * مشغول می‌کند. قالب شمارنده را سمت سرور رندر می‌کند و فقط جایی که واقعاً
+ * لازم است (سبد و تسویه‌حساب) اجازه می‌دهد قطعه‌ها بمانند.
  *
  * @return void
  */
-function fs_dequeue_woo_add_to_cart() {
+function fs_dequeue_woo_scripts() {
 	wp_dequeue_script( 'wc-add-to-cart' );
-	wp_dequeue_script( 'wc-cart-fragments' );
+
+	$needs_fragments = fs_has_woo() && ( is_cart() || is_checkout() );
+
+	if ( ! $needs_fragments ) {
+		wp_dequeue_script( 'wc-cart-fragments' );
+	}
 }
-add_action( 'wp_enqueue_scripts', 'fs_dequeue_woo_add_to_cart', 100 );
+add_action( 'wp_enqueue_scripts', 'fs_dequeue_woo_scripts', 100 );
 
 /**
  * سرعت نوار متحرک به‌صورت متغیر CSS — معادل prop مقدار `mqSpeed` در طرح.

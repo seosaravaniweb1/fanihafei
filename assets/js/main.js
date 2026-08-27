@@ -31,6 +31,34 @@
 	}
 
 	/**
+	 * فقط یک بار در هر بازه‌ی زمانی اجرا شود.
+	 *
+	 * چرا: دکمه‌ی خرید و دکمه‌ی حذف، هر کدام یک درخواست شبکه راه می‌اندازند.
+	 * دابل‌کلیک یا کلیک عصبی کاربر روی موبایل، چند درخواست هم‌زمان می‌سازد که
+	 * نخ اصلی را قفل می‌کند و INP را بالا می‌برد. با این محافظ، کلیک‌های پشت‌سرهم
+	 * در همان بازه نادیده گرفته می‌شوند.
+	 *
+	 * @param {Function} fn   تابع اصلی.
+	 * @param {number}   wait بازه بر حسب میلی‌ثانیه.
+	 * @return {Function} تابع محافظت‌شده.
+	 */
+	function throttle( fn, wait ) {
+		var last = 0;
+
+		return function () {
+			var now = Date.now();
+
+			if ( now - last < wait ) {
+				return;
+			}
+
+			last = now;
+
+			return fn.apply( this, arguments );
+		};
+	}
+
+	/**
 	 * فعال‌سازی یک تب از میان مجموعه‌ای از تب‌ها و پنل‌ها.
 	 *
 	 * @param {NodeList} tabs     دکمه‌های تب.
@@ -1117,6 +1145,15 @@
 			} );
 		}
 
+		// فقط مسیر شبکه محدود می‌شود؛ باز و بسته‌کردن کشو باید آنی بماند.
+		var buyThrottled = throttle( function ( button, productId ) {
+			button.classList.add( 'is-loading' );
+
+			request( 'fs_cart_add', { product_id: productId } ).finally( function () {
+				button.classList.remove( 'is-loading' );
+			} );
+		}, 400 );
+
 		Array.prototype.forEach.call( openers, function ( el ) {
 			el.addEventListener( 'click', function ( e ) {
 				e.preventDefault();
@@ -1157,11 +1194,7 @@
 			}
 
 			e.preventDefault();
-			add.classList.add( 'is-loading' );
-
-			request( 'fs_cart_add', { product_id: id } ).finally( function () {
-				add.classList.remove( 'is-loading' );
-			} );
+			buyThrottled( add, id );
 		} );
 
 		// دکمه‌ی خرید صفحه‌ی محصول — فرم استاندارد ووکامرس.
@@ -1178,15 +1211,7 @@
 
 				e.preventDefault();
 
-				if ( button ) {
-					button.classList.add( 'is-loading' );
-				}
-
-				request( 'fs_cart_add', { product_id: productId } ).finally( function () {
-					if ( button ) {
-						button.classList.remove( 'is-loading' );
-					}
-				} );
+				buyThrottled( button || form, productId );
 			} );
 		} );
 

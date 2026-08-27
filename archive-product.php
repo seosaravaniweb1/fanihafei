@@ -47,6 +47,15 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 }
 ?>
 
+<?php
+/*
+ * قلاب‌های استاندارد آرشیو. کال‌بک‌های تکراری (شمارنده و مرتب‌سازی پیش‌فرض) در
+ * fs_woo_unhook() برداشته شده‌اند؛ خود قلاب‌ها می‌مانند تا پیام‌های ووکامرس و
+ * افزونه‌های فیلتر/نشان‌گذاری کار کنند.
+ */
+do_action( 'woocommerce_before_main_content' );
+?>
+
 <nav class="fs-crumbs" aria-label="مسیر">
 	<?php woocommerce_breadcrumb( array( 'delimiter' => '' ) ); ?>
 </nav>
@@ -157,6 +166,11 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 
 	<section class="fs-section fs-section--grid">
 
+		<?php
+		do_action( 'woocommerce_archive_description' );
+		do_action( 'woocommerce_before_shop_loop' );
+		?>
+
 		<div class="fs-cgrid" id="fs-archive-grid">
 			<?php
 			$fs_i = 0;
@@ -184,6 +198,8 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 			?>
 		</div>
 
+		<?php do_action( 'woocommerce_after_shop_loop' ); ?>
+
 		<?php if ( $fs_next ) : ?>
 			<div class="fs-infinite" data-infinite data-next="<?php echo esc_url( $fs_next ); ?>" data-target="fs-archive-grid">
 				<span class="fs-infinite__spinner" aria-hidden="true"></span>
@@ -197,9 +213,12 @@ if ( ! isset( $fs_sorts[ $fs_current_sort ] ) ) {
 
 	<section class="fs-section">
 		<p class="fs-empty">در این دسته هنوز فایلی ثبت نشده است.</p>
+		<?php do_action( 'woocommerce_no_products_found' ); ?>
 	</section>
 
 <?php endif; ?>
 
 <?php
+do_action( 'woocommerce_after_main_content' );
+
 get_footer();

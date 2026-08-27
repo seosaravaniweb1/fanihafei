@@ -1011,7 +1011,13 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 }
 
 .fs-pcard__thumb {
-  height: 118px;
+  /*
+   * نسبت ثابت به‌جای ارتفاع ثابت: عرض کارت با گرید سیال تغییر می‌کند، پس
+   * ارتفاع پیکسلی یعنی نسبت تصویر در هر عرضی فرق می‌کند و جعبه‌ی رزروشده با
+   * تصویر واقعی نمی‌خواند. با aspect-ratio مرورگر فضا را پیش از رسیدن تصویر
+   * دقیقاً رزرو می‌کند و CLS صفر می‌ماند.
+   */
+  aspect-ratio: 4 / 3;
   position: relative;
   display: flex;
   align-items: center;
@@ -1023,6 +1029,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .fs-pcard__badge {
@@ -2146,7 +2153,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 
   .fs-pcard:hover { transform: none; box-shadow: 0 5px 18px rgba(15, 23, 42, .06); }
 
-  .fs-pcard__thumb { height: 86px; }
+  .fs-pcard__thumb { aspect-ratio: 4 / 3; }
 
   .fs-pcard__badge {
     top: 9px;
@@ -2684,7 +2691,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
 .fs-product__cover {
   position: relative;
   border-radius: 20px;
-  height: 352px;
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3490,7 +3497,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
     padding: 16px;
   }
 
-  .fs-product__cover { height: 240px; border-radius: 18px; }
+  .fs-product__cover { aspect-ratio: 1 / 1; border-radius: 18px; }
   .fs-product__update { font-size: 10px; padding: 7px 11px; }
   .fs-product__thumb { height: 50px; border-radius: 11px; }
   .fs-product__title { font-size: 21px; line-height: 1.55; }
@@ -5145,7 +5152,7 @@ a.fs-otable__row:last-child { border-bottom: 0; }
 .fs-gcard__link { display: flex; flex-direction: column; flex: 1; }
 
 .fs-gcard__thumb {
-  height: 148px;
+  aspect-ratio: 4 / 3;
   position: relative;
   display: flex;
   align-items: center;
@@ -5385,7 +5392,7 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   .fs-cgrid { grid-template-columns: 1fr 1fr; gap: 11px; }
   .fs-gcard { border-radius: 16px; }
   .fs-gcard:hover { transform: none; box-shadow: 0 6px 20px rgba(15, 23, 42, .06); }
-  .fs-gcard__thumb { height: 104px; }
+  .fs-gcard__thumb { aspect-ratio: 4 / 3; }
   .fs-gcard__body { padding: 12px 12px 0; gap: 7px; }
   .fs-gcard__fmt { font-size: 8.5px; }
   .fs-gcard__title { font-size: 11px; }

@@ -729,10 +729,51 @@ function fs_get_product_reviews( $product_id, $limit = 20 ) {
  * @return void
  */
 function fs_woo_unhook() {
+	/*
+	 * نکته‌ی مهم معماری:
+	 *
+	 * قالب چیدمان خودش را دارد، ولی حق ندارد قلاب‌های استاندارد ووکامرس را
+	 * حذف کند — افزونه‌ها (نشان تخفیف، مقایسه، لیست علاقه‌مندی، راهنمای سایز،
+	 * نظرسنجی، پیکسل‌های تبلیغاتی) دقیقاً روی همین قلاب‌ها می‌نشینند و اگر قلاب
+	 * اجرا نشود بی‌صدا از کار می‌افتند.
+	 *
+	 * پس راه‌حل درست این است: فقط کال‌بک‌های پیش‌فرضِ خودِ ووکامرس که خروجی‌شان
+	 * با چیدمان قالب تکراری می‌شود برداشته شوند، اما خود do_action سر جایش
+	 * اجرا شود تا هر افزونه‌ی دیگری که روی آن نشسته کار کند.
+	 */
+
+	// پوشش‌ها و سایدبار پیش‌فرض — قالب ساختار خودش را دارد.
 	remove_action( 'woocommerce_before_main_content', 'woocommerce_output_content_wrapper', 10 );
 	remove_action( 'woocommerce_after_main_content', 'woocommerce_output_content_wrapper_end', 10 );
 	remove_action( 'woocommerce_sidebar', 'woocommerce_get_sidebar', 10 );
 	remove_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );
+
+	// خلاصه‌ی محصول: عنوان، قیمت، توضیح کوتاه و دکمه‌ی خرید را خود قالب می‌چیند.
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_title', 5 );
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_rating', 10 );
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_price', 10 );
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_excerpt', 20 );
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_meta', 40 );
+	remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_sharing', 50 );
+
+	// تب‌ها، آپسل و محصولات مرتبط را قالب با طرح خودش رندر می‌کند.
+	remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_product_data_tabs', 10 );
+	remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_upsell_display', 15 );
+	remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
+
+	// نوار مرتب‌سازی و شمارنده‌ی آرشیو، جای خودش در طرح قالب هست.
+	remove_action( 'woocommerce_before_shop_loop', 'woocommerce_result_count', 20 );
+	remove_action( 'woocommerce_before_shop_loop', 'woocommerce_catalog_ordering', 30 );
+
+	// کارت محصول: تصویر، عنوان، قیمت و دکمه در قالب کارت خود ما هستند.
+	remove_action( 'woocommerce_before_shop_loop_item', 'woocommerce_template_loop_product_link_open', 10 );
+	remove_action( 'woocommerce_before_shop_loop_item_title', 'woocommerce_template_loop_product_thumbnail', 10 );
+	remove_action( 'woocommerce_shop_loop_item_title', 'woocommerce_template_loop_product_title', 10 );
+	remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_rating', 5 );
+	remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_price', 10 );
+	remove_action( 'woocommerce_after_shop_loop_item', 'woocommerce_template_loop_product_link_close', 5 );
+	remove_action( 'woocommerce_after_shop_loop_item', 'woocommerce_template_loop_add_to_cart', 10 );
 }
 add_action( 'init', 'fs_woo_unhook' );
 

@@ -26,6 +26,21 @@ $fs_is_new  = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY
 ?>
 <div class="fs-gcard">
 
+	<?php
+	/*
+	 * قلاب‌های کارت محصول. کال‌بک‌های پیش‌فرض (تصویر، عنوان، قیمت، دکمه) در
+	 * fs_woo_unhook() برداشته شده‌اند چون کارت خودمان همه را دارد؛ اما قلاب‌ها
+	 * اجرا می‌شوند تا نشان تخفیف، مقایسه، پیش‌نمایش سریع و مانند این‌ها که
+	 * افزونه‌ها روی همین نقطه‌ها می‌نشینند از کار نیفتند.
+	 */
+	global $product;
+	$fs_prev_product = $product;
+	$product         = $fs_product; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- قلاب‌های ووکامرس به این متغیر سراسری وابسته‌اند.
+
+	do_action( 'woocommerce_before_shop_loop_item' );
+	do_action( 'woocommerce_before_shop_loop_item_title' );
+	?>
+
 	<?php if ( is_user_logged_in() ) : ?>
 		<span class="fs-gcard__heart"><?php fs_the_wishlist_button( $fs_id ); ?></span>
 	<?php endif; ?>
@@ -46,6 +61,11 @@ $fs_is_new  = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY
 
 		<span class="fs-gcard__body">
 			<span class="fs-gcard__title"><?php echo esc_html( $fs_product->get_name() ); ?></span>
+
+			<?php
+			do_action( 'woocommerce_shop_loop_item_title' );
+			do_action( 'woocommerce_after_shop_loop_item_title' );
+			?>
 
 			<span class="fs-gcard__chips">
 				<?php foreach ( $fs_chips as $fs_chip ) : ?>
@@ -83,5 +103,11 @@ $fs_is_new  = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY
 		);
 		?>
 	</div>
+
+	<?php
+	do_action( 'woocommerce_after_shop_loop_item' );
+
+	$product = $fs_prev_product; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- بازگرداندن مقدار قبلی.
+	?>
 
 </div>
