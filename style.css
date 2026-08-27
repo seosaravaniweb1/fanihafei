@@ -6522,3 +6522,179 @@ body.fs-noscroll { overflow: hidden; }
 
   .fs-page__body .is-style-fs-steps p { padding-inline-start: 0; }
 }
+
+/* =========================================================================
+   اجزای طراحی برگه‌ها — بخش‌های بزرگ صفحات محتوایی
+   ========================================================================= */
+
+/* عنوان بخش با خط تزئینی دو طرف ------------------------------------------- */
+.fs-page__body .fs-sectitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  font: 800 19px/1.7 var(--fs-font);
+  color: var(--fs-ink);
+  margin: 2.2em 0 1.3em;
+}
+
+.fs-page__body .fs-sectitle::before,
+.fs-page__body .fs-sectitle::after {
+  content: "";
+  flex: 1;
+  max-width: 130px;
+  height: 6px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--fs-brand-edge) 0 3px,
+    transparent 3px 7px
+  );
+}
+
+/* هیروی دوستونه: متن کنار تصویر ------------------------------------------- */
+.fs-page__body .fs-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: center;
+  margin: 0 0 2em;
+}
+
+.fs-page__body .fs-split .wp-block-image { margin: 0; }
+
+.fs-page__body .fs-split .wp-block-image img {
+  width: 100%;
+  border-radius: 18px;
+  display: block;
+}
+
+/* شبکه‌ی کارت‌های ویژگی ---------------------------------------------------- */
+/*
+ * سه ستون ثابت به‌جای auto-fit: با auto-fit تعداد ستون‌ها به عرض صفحه بستگی
+ * داشت و شش کارت گاهی ۵+۱ می‌شکست و یک کارت تنها می‌ماند. سه ستون همیشه
+ * متوازن است.
+ */
+.fs-page__body .fs-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0 0 2em;
+}
+
+.fs-page__body .fs-features > .wp-block-group {
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 16px;
+  padding: 20px 18px;
+  margin: 0;
+  text-align: center;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+
+.fs-page__body .fs-features > .wp-block-group:hover {
+  transform: translateY(-3px);
+  border-color: var(--fs-brand-edge);
+  box-shadow: 0 12px 26px rgba(var(--fs-brand-rgb), .12);
+}
+
+.fs-page__body .fs-features h3 {
+  font-size: 13.5px;
+  margin: 0 0 8px;
+}
+
+.fs-page__body .fs-features p {
+  font-size: 11.5px;
+  line-height: 2;
+  margin: 0;
+}
+
+/* آیکون بالای هر کارت: تصویر یا اموجی هر دو کار می‌کنند. */
+.fs-page__body .fs-features .wp-block-image {
+  margin: 0 auto 12px;
+  width: 52px;
+}
+
+.fs-page__body .fs-features .wp-block-image img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+.fs-page__body .fs-features .fs-emoji {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+/* مراحل بزرگ شماره‌دار ----------------------------------------------------- */
+.fs-page__body .fs-bigsteps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  counter-reset: fsbig;
+  margin: 0 0 2em;
+  text-align: center;
+}
+
+.fs-page__body .fs-bigsteps > .wp-block-group {
+  counter-increment: fsbig;
+  margin: 0;
+  padding: 0;
+}
+
+.fs-page__body .fs-bigsteps > .wp-block-group::before {
+  content: counter(fsbig);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 14px;
+  border-radius: 20px;
+  background: var(--fs-grad);
+  color: #fff;
+  font: 900 26px var(--fs-font);
+  box-shadow: 0 10px 24px rgba(var(--fs-brand-rgb), .3);
+}
+
+.fs-page__body .fs-bigsteps h3 { font-size: 13.5px; margin: 0 0 6px; }
+.fs-page__body .fs-bigsteps p { font-size: 11.5px; margin: 0; }
+
+/* جعبه‌ی تماس/پیام‌رسان ---------------------------------------------------- */
+.fs-page__body .fs-contactbox {
+  background: #fff;
+  border: 1px solid var(--fs-brand-edge);
+  border-radius: 18px;
+  padding: 22px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+  margin: 2em 0;
+}
+
+.fs-page__body .fs-contactbox h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--fs-brand-d);
+  direction: ltr;
+}
+
+.fs-page__body .fs-contactbox p { margin: 0 0 6px; }
+
+@media (max-width: 1023px) {
+  .fs-page__body .fs-features { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .fs-page__body .fs-split { grid-template-columns: 1fr; gap: 16px; }
+  .fs-page__body .fs-sectitle { font-size: 15px; gap: 10px; margin: 1.8em 0 1em; }
+  .fs-page__body .fs-sectitle::before,
+  .fs-page__body .fs-sectitle::after { max-width: 40px; }
+  .fs-page__body .fs-features { grid-template-columns: 1fr 1fr; gap: 9px; }
+  .fs-page__body .fs-bigsteps { grid-template-columns: 1fr; gap: 14px; }
+  .fs-page__body .fs-features > .wp-block-group { padding: 15px 12px; }
+  .fs-page__body .fs-bigsteps > .wp-block-group::before { width: 48px; height: 48px; font-size: 21px; }
+}
