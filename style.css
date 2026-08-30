@@ -4017,6 +4017,10 @@ a.fs-fcontact:hover {
   display: flex;
   justify-content: center;
   padding: 40px var(--fs-pad) 60px;
+
+  /* ظرف پرسش — پایین توضیحش هست. */
+  container-type: inline-size;
+  container-name: fsauth;
 }
 
 .fs-auth__wrap {
@@ -4128,6 +4132,41 @@ a.fs-fcontact:hover {
   }
 
   .fs-auth__side-foot span { color: #c4b5fd; }
+}
+
+/*
+ * چیدمان کارت ورود باید به عرض «ظرف» واکنش نشان دهد، نه عرض پنجره.
+ *
+ * مدیاکوئری زیر عرض پنجره را می‌سنجد، ولی این کارت داخل محتوای برگه‌ی
+ * «حساب کاربری» می‌نشیند و عرض واقعی‌اش را از والدش می‌گیرد. اگر والد به هر
+ * دلیلی باریک باشد — بلوک گوتنبرگ با عرض محدود، ستون یک افزونه، یا استایل
+ * سفارشی — پنجره همچنان دسکتاپ است، گرید دوستونی فعال می‌ماند و ستون فرم به
+ * چند ده پیکسل له می‌شود؛ همان چیزی که روی نصب ویندوز دیده شد.
+ *
+ * این قانون هر وقت ظرف کمتر از ۷۲۰ پیکسل باشد به همان چیدمان تک‌ستونیِ
+ * موبایل برمی‌گردد که همیشه خواناست. مرورگرهای بدون پشتیبانی از @container
+ * دقیقاً مثل قبل رفتار می‌کنند.
+ */
+@container fsauth (max-width: 719px) {
+  .fs-auth__wrap {
+    width: min(430px, 100%);
+    display: block;
+    background: transparent;
+    border-radius: 0;
+    overflow: visible;
+    box-shadow: none;
+  }
+
+  .fs-auth__side { display: none; }
+
+  .fs-auth__card {
+    border: 1px solid var(--fs-line-2);
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .12);
+    padding: 26px;
+  }
+
+  .fs-auth__card .fs-auth__brand { display: block; }
 }
 
 .fs-auth__tabs {
@@ -4824,11 +4863,26 @@ a.fs-otable__row:last-child { border-bottom: 0; }
 /* =========================================================================
    ۲۶. تسویه‌حساب
    ========================================================================= */
+/* همان دلیل کارت ورود: این گرید هم داخل محتوای برگه می‌نشیند و عرضش را از
+   والد می‌گیرد، نه از پنجره. ستون فرم minmax(0,1fr) است و در والد باریک تا
+   صفر جمع می‌شود در حالی که ستون ۳۳۶ پیکسلی سر جایش می‌ماند. */
+/* ظرف روی .fs-checkout (فرم) است نه روی خود گرید: یک عنصر نمی‌تواند با
+   کوئریِ ظرفِ خودش، خودش را استایل بدهد — کوئری فقط روی فرزندان اثر دارد. */
+.fs-checkout {
+  container-type: inline-size;
+  container-name: fscheckout;
+}
+
 .fs-checkout__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 336px;
   gap: 24px;
   align-items: start;
+}
+
+@container fscheckout (max-width: 719px) {
+  .fs-checkout__grid { grid-template-columns: 1fr; }
+  .fs-checkout__side { position: static; }
 }
 
 .fs-checkout__main {
