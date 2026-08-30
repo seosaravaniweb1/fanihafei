@@ -361,7 +361,7 @@ function fs_footer_product_chip( $id ) {
 	?>
 	<div class="fs-fchip" data-product-id="<?php echo esc_attr( $id ); ?>">
 		<?php if ( $thumb ) : ?>
-			<img src="<?php echo esc_url( $thumb ); ?>" alt="">
+			<img src="<?php echo esc_url( $thumb ); ?>" alt="" width="40" height="40">
 		<?php endif; ?>
 		<span class="fs-fchip__title"><?php echo esc_html( $title ); ?></span>
 		<button type="button" class="fs-fchip__del" aria-label="حذف">&times;</button>
@@ -380,7 +380,7 @@ function fs_footer_bank_row( $id = 0 ) {
 	$src = $id ? wp_get_attachment_image_url( $id, 'thumbnail' ) : '';
 	?>
 	<div class="fs-fbank" data-bank-id="<?php echo esc_attr( $id ); ?>">
-		<img src="<?php echo esc_url( $src ); ?>" alt="" <?php echo $src ? '' : 'hidden'; ?>>
+		<img src="<?php echo esc_url( $src ); ?>" alt="" width="40" height="40" <?php echo $src ? '' : 'hidden'; ?>>
 		<button type="button" class="fs-fbank__del" aria-label="حذف">&times;</button>
 	</div>
 	<?php

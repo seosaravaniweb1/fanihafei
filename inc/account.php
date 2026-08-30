@@ -152,6 +152,22 @@ function fs_ajax_update_profile() {
 
 	$user_id = get_current_user_id();
 
+	/*
+	 * شماره موبایل هم باید یکتا بماند، دقیقاً مثل ایمیل.
+	 *
+	 * ورود با کد پیامکی از روی billing_phone کاربر را پیدا می‌کند
+	 * (fs_find_user_by_phone). اگر کاربری شماره‌ی کاربر دیگری را روی حساب
+	 * خودش ذخیره کند، دو حساب یک شماره پیدا می‌کنند و کد پیامکی می‌تواند
+	 * حساب اشتباه را وارد کند — یعنی تصاحب حساب.
+	 */
+	if ( $phone ) {
+		$owner = fs_find_user_by_phone( $phone );
+
+		if ( $owner && (int) $owner->ID !== (int) $user_id ) {
+			wp_send_json_error( array( 'message' => 'این شماره موبایل قبلاً برای حساب دیگری ثبت شده است.' ) );
+		}
+	}
+
 	if ( $email && is_email( $email ) ) {
 		$existing = get_user_by( 'email', $email );
 

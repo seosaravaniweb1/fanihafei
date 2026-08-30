@@ -88,7 +88,7 @@ function fs_trust_row( $group, $item = array() ) {
 	?>
 	<div class="fs-trow" data-group="<?php echo esc_attr( $group ); ?>">
 		<div class="fs-trow__img">
-			<img src="<?php echo esc_url( $src ); ?>" alt="" <?php echo $src ? '' : 'hidden'; ?>>
+			<img src="<?php echo esc_url( $src ); ?>" alt="" width="40" height="40" <?php echo $src ? '' : 'hidden'; ?>>
 			<span class="fs-trow__ph" <?php echo $src ? 'hidden' : ''; ?>>بدون تصویر</span>
 		</div>
 		<div class="fs-trow__fields">

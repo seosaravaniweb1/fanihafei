@@ -136,7 +136,18 @@ function fs_ajax_cart_add() {
 
 	$product = wc_get_product( $product_id );
 
-	if ( ! $product || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
+	/*
+	 * وضعیت انتشار، جدا از is_purchasable().
+	 *
+	 * is_purchasable() خودش وضعیت را می‌سنجد، ولی از راه فیلتر
+	 * woocommerce_is_purchasable که هر افزونه‌ای می‌تواند بازنویسی‌اش کند.
+	 * این بررسی مستقل، همان قاعده‌ی خود ووکامرس را تکرار می‌کند: محصول
+	 * منتشرشده، یا کسی که اجازه‌ی ویرایش همان محصول را دارد — تا پیش‌نمایشِ
+	 * پیش از انتشار برای مدیر فروشگاه از کار نیفتد.
+	 */
+	$published = 'publish' === $product->get_status() || current_user_can( 'edit_post', $product_id );
+
+	if ( ! $product || ! $published || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
 		wp_send_json_error( array( 'message' => 'این فایل در حال حاضر قابل خرید نیست.' ), 400 );
 	}
 

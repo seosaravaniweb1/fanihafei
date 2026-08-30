@@ -105,6 +105,168 @@ function fs_default_address_fields( $fields ) {
 	return $fields;
 }
 
+/* -------------------------------------------------------------------------
+   سازگاری با درگاه‌های پرداخت ایرانی
+   -------------------------------------------------------------------------
+   فرم تسویه‌حساب این فروشگاه فیلدهای نشانی را نشان نمی‌دهد — برای فروش فایل
+   دانلودی هیچ‌کدامشان معنا ندارند. ولی «نشان‌ندادن» با «نداشتن» یکی نیست:
+
+   ووکامرس هنوز بر اساس قواعد محلیِ کشور (woocommerce_get_country_locale)
+   کدپستی و استان را الزامی می‌داند و در اعتبارسنجی رد می‌کند، و افزونه‌های
+   درگاه ایرانی (زیبال، زرین‌پال) هنگام ساخت درخواست پرداخت کشور صورتحساب را
+   می‌خوانند. نتیجه‌ی حذف کامل فیلدها این بود که کاربر دکمه‌ی پرداخت را می‌زد و
+   هیچ اتفاقی نمی‌افتاد؛ خطا در پاسخ اجاکس می‌ماند و به چشم نمی‌آمد.
+
+   پس فیلدها از فرم بیرون می‌مانند ولی مقدارشان سمت سرور پر می‌شود.
+   ------------------------------------------------------------------------- */
+
+/**
+ * مقدار پیش‌فرض فیلدهای نشانی که در فرم نیستند.
+ *
+ * @return array<string, string>
+ */
+function fs_billing_defaults() {
+	return apply_filters(
+		'fs_billing_defaults',
+		array(
+			'billing_country'   => 'IR',
+			'billing_state'     => '',
+			'billing_city'      => '-',
+			'billing_address_1' => '-',
+			'billing_address_2' => '',
+			'billing_postcode'  => '0000000000',
+			'billing_company'   => '',
+		)
+	);
+}
+
+/**
+ * پرکردن فیلدهای نشانی در داده‌های ارسالی تسویه‌حساب.
+ *
+ * اولویت ۵ تا پیش از هر دستکاری دیگری روی همین داده اجرا شود.
+ *
+ * @param array $data داده‌های ارسالی.
+ * @return array
+ */
+function fs_checkout_posted_defaults( $data ) {
+	foreach ( fs_billing_defaults() as $key => $value ) {
+		if ( empty( $data[ $key ] ) ) {
+			$data[ $key ] = $value;
+		}
+	}
+
+	return $data;
+}
+add_filter( 'woocommerce_checkout_posted_data', 'fs_checkout_posted_defaults', 5 );
+
+/**
+ * برداشتن الزام فیلدهای نشانی از قواعد محلی کشورها.
+ *
+ * بدون این، ووکامرس برای ایران کدپستی را الزامی می‌داند و چون فیلدش در فرم
+ * نیست، اعتبارسنجی همیشه رد می‌شود.
+ *
+ * @param array $locale قواعد محلی.
+ * @return array
+ */
+function fs_address_locale_optional( $locale ) {
+	$optional = array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'company' );
+
+	foreach ( $locale as $country => $fields ) {
+		foreach ( $optional as $field ) {
+			if ( isset( $locale[ $country ][ $field ] ) ) {
+				$locale[ $country ][ $field ]['required'] = false;
+				$locale[ $country ][ $field ]['hidden']   = true;
+			}
+		}
+	}
+
+	return $locale;
+}
+add_filter( 'woocommerce_get_country_locale', 'fs_address_locale_optional' );
+
+// قالبِ کدپستی و استان هم نباید سنجیده شود؛ مقدارشان ساختگی و بی‌استفاده است.
+add_filter( 'woocommerce_validate_postcode', '__return_true', 10, 3 );
+add_filter( 'woocommerce_validate_state', '__return_true', 10, 3 );
+
+// کادر «یادداشت سفارش» در فروش فایل کاربردی ندارد و در فرم هم جا نگرفته بود.
+add_filter( 'woocommerce_enable_order_notes_field', '__return_false' );
+
+/**
+ * نشانی صورتحساب در پیشخوان و ایمیل‌ها — فقط چیزی که واقعاً داریم.
+ *
+ * وگرنه «تهران، -، ۰۰۰۰۰۰۰۰۰۰» به مدیر و مشتری نشان داده می‌شود.
+ *
+ * @param string   $address نشانی قالب‌بندی‌شده.
+ * @param array    $raw     مقادیر خام.
+ * @param WC_Order $order   سفارش.
+ * @return string
+ */
+function fs_formatted_billing_address( $address, $raw, $order = null ) {
+	unset( $order );
+
+	$parts = array_filter(
+		array(
+			trim( ( isset( $raw['first_name'] ) ? $raw['first_name'] : '' ) . ' ' . ( isset( $raw['last_name'] ) ? $raw['last_name'] : '' ) ),
+			isset( $raw['phone'] ) ? $raw['phone'] : '',
+			isset( $raw['email'] ) ? $raw['email'] : '',
+		)
+	);
+
+	return $parts ? implode( '<br/>', array_map( 'esc_html', $parts ) ) : $address;
+}
+add_filter( 'woocommerce_order_get_formatted_billing_address', 'fs_formatted_billing_address', 10, 3 );
+
+/**
+ * ست‌کردن نشانی پیش‌فرض روی خود مشتری، به‌محض رسیدن به تسویه‌حساب.
+ *
+ * فقط پرکردن داده‌های ارسالی کافی نیست: ووکامرس فهرست درگاه‌های در دسترس را
+ * بر اساس کشور مشتری می‌سازد و اگر کشور خالی باشد ممکن است هیچ درگاهی نمایش
+ * داده نشود. این مقدار در سشن ووکامرس می‌ماند و در ثبت سفارش هم به کار می‌آید.
+ *
+ * @return void
+ */
+function fs_seed_customer_address() {
+	if ( ! fs_has_woo() || ! is_checkout() || is_order_received_page() || ! WC()->customer ) {
+		return;
+	}
+
+	if ( WC()->customer->get_billing_country() ) {
+		return;
+	}
+
+	$defaults = fs_billing_defaults();
+
+	WC()->customer->set_billing_country( $defaults['billing_country'] );
+	WC()->customer->set_billing_city( $defaults['billing_city'] );
+	WC()->customer->set_billing_address_1( $defaults['billing_address_1'] );
+	WC()->customer->set_billing_postcode( $defaults['billing_postcode'] );
+	WC()->customer->save();
+}
+add_action( 'template_redirect', 'fs_seed_customer_address', 20 );
+
+/**
+ * ثبت سفارش با ارسال واقعی فرم، نه اجاکس.
+ *
+ * مسیر اجاکس ووکامرس پاسخ را به‌صورت JSON برمی‌گرداند و جاوااسکریپت باید
+ * ریدایرکت به درگاه را خودش انجام دهد. هر خطای کوچکی در آن مسیر — یک خطای
+ * جاوااسکریپت، پاسخ ناقص، یا افزونه‌ای که خروجی اضافه چاپ کند — به این ختم
+ * می‌شود که دکمه‌ی پرداخت هیچ کاری نمی‌کند و کاربر هیچ پیامی نمی‌بیند.
+ *
+ * ارسال معمولی فرم مسیر پشتیبان خود ووکامرس است: سرور ریدایرکت واقعی به درگاه
+ * می‌دهد و اگر خطایی باشد روی همان صفحه دیده می‌شود.
+ *
+ * @return void
+ */
+function fs_non_ajax_checkout() {
+	if ( ! fs_has_woo() || ! is_checkout() || is_order_received_page() ) {
+		return;
+	}
+
+	wp_dequeue_script( 'wc-checkout' );
+	wp_deregister_script( 'wc-checkout' );
+}
+add_action( 'wp_enqueue_scripts', 'fs_non_ajax_checkout', 100 );
+
 /**
  * ایمیل خودکار اگر کاربر ایمیلی وارد نکرده باشد.
  *

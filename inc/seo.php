@@ -1070,3 +1070,46 @@ function fs_schema_guard_type( $data ) {
 	return $data;
 }
 add_filter( 'woocommerce_structured_data_product', 'fs_schema_guard_type', 99 );
+
+/* -------------------------------------------------------------------------
+   Open Graph — فقط وقتی افزونه‌ی سئویی نیست
+   ------------------------------------------------------------------------- */
+
+/**
+ * تگ‌های اشتراک‌گذاری برای صفحه‌ی محصول.
+ *
+ * بدون این‌ها، لینک محصول در تلگرام و شبکه‌های اجتماعی بدون عنوان، توضیح و
+ * تصویر دیده می‌شود. مثل کنونیکال و توضیحات متا، اگر رنک‌مث یا هر افزونه‌ی
+ * سئوی دیگری فعال باشد اینجا کنار می‌کشیم تا تگ تکراری ساخته نشود.
+ *
+ * @return void
+ */
+function fs_print_fallback_og() {
+	if ( fs_seo_plugin_active() || ! is_singular( 'product' ) ) {
+		return;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return;
+	}
+
+	printf( '<meta property="og:type" content="product">' . "\n" );
+	printf( '<meta property="og:title" content="%s">' . "\n", esc_attr( wp_strip_all_tags( get_the_title( $id ) ) ) );
+	printf( '<meta property="og:url" content="%s">' . "\n", esc_url( get_permalink( $id ) ) );
+	printf( '<meta property="og:site_name" content="%s">' . "\n", esc_attr( get_bloginfo( 'name' ) ) );
+
+	$description = fs_meta_description_text();
+
+	if ( $description ) {
+		printf( '<meta property="og:description" content="%s">' . "\n", esc_attr( $description ) );
+	}
+
+	$image = get_the_post_thumbnail_url( $id, 'large' );
+
+	if ( $image ) {
+		printf( '<meta property="og:image" content="%s">' . "\n", esc_url( $image ) );
+	}
+}
+add_action( 'wp_head', 'fs_print_fallback_og', 5 );
