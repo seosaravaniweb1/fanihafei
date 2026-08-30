@@ -27,10 +27,17 @@ $fs_term    = ( is_tax() || is_product_category() || is_product_tag() ) && $fs_q
 	: null;
 $fs_total = (int) $wp_query->found_posts;
 
-// زیردسته‌ها فقط روی صفحه‌ی دسته‌ی مادر نمایش داده می‌شوند، نه در خود زیردسته.
+/*
+ * زیردسته‌های همین ترم، در هر سطحی که باشد.
+ *
+ * پیش از این شرط `0 === $fs_term->parent` بود، یعنی ریل زیردسته‌ها فقط روی
+ * دسته‌های مادر می‌آمد. نتیجه‌اش این بود که لایه‌ی سوم دسته‌بندی در هیچ‌جای
+ * سایت لینک نمی‌گرفت — نه در مگامنو (که دو لایه می‌بیند) و نه در صفحه‌ی
+ * دسته‌ی والدش. عملاً یتیم بود و فقط از سایت‌مپ کشف می‌شد.
+ */
 $fs_subs = array();
 
-if ( $fs_term && 'product_cat' === $fs_term->taxonomy && 0 === (int) $fs_term->parent ) {
+if ( $fs_term && 'product_cat' === $fs_term->taxonomy ) {
 	$fs_children = get_terms(
 		array(
 			'taxonomy'   => 'product_cat',

@@ -184,48 +184,80 @@ function fs_get_categories() {
 		return $cached;
 	}
 
-	$out = array();
-
-	$parents = get_terms(
+	/*
+	 * همه‌ی ترم‌ها با یک پرس‌وجو.
+	 *
+	 * نسخه‌ی قبلی برای هر دسته‌ی مادر یک get_terms جدا می‌زد؛ با سقف ۱۶ تایی
+	 * قابل تحمل بود، ولی حالا که سقف برداشته شده هر دسته یک کوئری اضافه
+	 * می‌شد. اینجا یک بار همه خوانده می‌شوند و درخت در حافظه ساخته می‌شود.
+	 */
+	$terms = get_terms(
 		array(
 			'taxonomy'   => 'product_cat',
-			'parent'     => 0,
 			'hide_empty' => false,
-			'number'     => (int) apply_filters( 'fs_parent_cats_limit', 16 ),
 		)
 	);
 
-	if ( ! is_wp_error( $parents ) && $parents ) {
-		foreach ( $parents as $parent ) {
-			$children = get_terms(
-				array(
-					'taxonomy'   => 'product_cat',
-					'parent'     => $parent->term_id,
-					'hide_empty' => false,
-					'number'     => 8,
-				)
-			);
+	if ( is_wp_error( $terms ) || ! $terms ) {
+		set_transient( $key, array(), HOUR_IN_SECONDS );
 
-			$subs = array();
+		return array();
+	}
 
-			if ( ! is_wp_error( $children ) && $children ) {
-				foreach ( $children as $child ) {
-					$subs[] = array(
-						'name'  => $child->name,
-						'count' => fs_fa_num( fs_cat_product_count( $child ) ),
-						'link'  => get_term_link( $child ),
-					);
-				}
-			}
+	// گروه‌بندی بر اساس والد.
+	$by_parent = array();
 
-			$out[] = array(
-				'name'  => $parent->name,
-				'slug'  => $parent->slug,
-				'count' => fs_fa_num( fs_cat_product_count( $parent ) ),
-				'link'  => get_term_link( $parent ),
-				'subs'  => $subs,
+	foreach ( $terms as $term ) {
+		$by_parent[ (int) $term->parent ][] = $term;
+	}
+
+	/*
+	 * سقف‌ها حالا پیش‌فرض «بی‌نهایت» هستند.
+	 *
+	 * پیش از این ۱۶ دسته‌ی مادر و ۸ زیردسته سقف داشتند و هرچه بیرون از آن
+	 * می‌ماند در هیچ منویی دیده نمی‌شد — یعنی از نظر لینک داخلی یتیم بود.
+	 * صفر یعنی بدون محدودیت؛ اگر منو شلوغ شد می‌توانید با همین فیلترها
+	 * دوباره محدودش کنید.
+	 */
+	$parent_cap = max( 0, (int) apply_filters( 'fs_parent_cats_limit', 0 ) );
+	$child_cap  = max( 0, (int) apply_filters( 'fs_child_cats_limit', 0 ) );
+
+	$parents = isset( $by_parent[0] ) ? $by_parent[0] : array();
+
+	if ( $parent_cap ) {
+		$parents = array_slice( $parents, 0, $parent_cap );
+	}
+
+	$out = array();
+
+	foreach ( $parents as $parent ) {
+		$children = isset( $by_parent[ (int) $parent->term_id ] ) ? $by_parent[ (int) $parent->term_id ] : array();
+
+		if ( $child_cap ) {
+			$children = array_slice( $children, 0, $child_cap );
+		}
+
+		$subs = array();
+
+		foreach ( $children as $child ) {
+			$link = get_term_link( $child );
+
+			$subs[] = array(
+				'name'  => $child->name,
+				'count' => fs_fa_num( fs_cat_product_count( $child ) ),
+				'link'  => is_wp_error( $link ) ? '' : $link,
 			);
 		}
+
+		$link = get_term_link( $parent );
+
+		$out[] = array(
+			'name'  => $parent->name,
+			'slug'  => $parent->slug,
+			'count' => fs_fa_num( fs_cat_product_count( $parent ) ),
+			'link'  => is_wp_error( $link ) ? '' : $link,
+			'subs'  => $subs,
+		);
 	}
 
 	set_transient( $key, $out, HOUR_IN_SECONDS );

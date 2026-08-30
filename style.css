@@ -506,7 +506,13 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   font: 600 12px var(--fs-font);
 }
 
-.fs-mega__panel { padding: 22px 24px; }
+/* هم‌ارتفاع با ستون فهرست دسته‌ها. سقف دسته‌ها برداشته شده، پس یک دسته‌ی
+   پرزیرمجموعه نباید منو را تا کف صفحه بکشد — مثل ستون کناری اسکرول می‌شود. */
+.fs-mega__panel {
+  padding: 22px 24px;
+  max-height: 404px;
+  overflow-y: auto;
+}
 
 .fs-mega__pane[hidden] { display: none; }
 
