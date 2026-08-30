@@ -12,6 +12,60 @@ defined( 'ABSPATH' ) || exit;
 if ( ! $order ) {
 	return;
 }
+
+/*
+ * پرداخت ناموفق: تا وقتی سفارش پرداخت نشده، نباید پیام «پرداخت با موفقیت
+ * انجام شد» نمایش داده شود. درگاه‌های ایرانی (زیبال / زرین‌پال) در صورت
+ * انصراف یا خطای بانک، سفارش را با وضعیت `failed` یا `pending` به همین
+ * صفحه برمی‌گردانند.
+ */
+if ( $order->has_status( array( 'failed', 'cancelled', 'pending' ) ) ) {
+	$fs_gateway  = $order->get_meta( '_fs_failure_gateway' );
+	$fs_gateway  = $fs_gateway ? $fs_gateway : $order->get_payment_method();
+	$fs_reason   = $order->get_meta( '_fs_failure_reason' );
+	$fs_guidance = fs_get_payment_failure_guidance( $fs_gateway );
+	?>
+
+	<div class="fs-failed">
+		<div class="fs-failed__hero">
+			<span class="fs-failed__mark" aria-hidden="true">!</span>
+			<div>
+				<div class="fs-failed__title">پرداخت انجام نشد</div>
+				<div class="fs-failed__sub">
+					تراکنش سفارش <?php echo esc_html( fs_fa_num( $order->get_order_number() ) ); ?> ناتمام ماند. اگر مبلغی از حساب شما کسر شده باشد، طبق قوانین بانک مرکزی حداکثر تا ۷۲ ساعت به‌صورت خودکار برمی‌گردد.
+				</div>
+			</div>
+		</div>
+
+		<?php if ( $fs_reason ) : ?>
+			<p class="fs-failed__reason">پیام درگاه پرداخت: <?php echo esc_html( $fs_reason ); ?></p>
+		<?php endif; ?>
+
+		<a class="fs-failed__retry" href="<?php echo esc_url( $order->get_checkout_payment_url() ); ?>">
+			<?php fs_the_icon( 'download', 16, array( 'stroke' => '#fff' ) ); ?>
+			تلاش دوباره برای پرداخت
+		</a>
+
+		<?php if ( $fs_guidance ) : ?>
+			<div class="fs-failed__help">
+				<h2 class="fs-failed__help-title">چه کاری انجام دهم؟</h2>
+				<ol class="fs-failed__steps">
+					<?php foreach ( $fs_guidance as $fs_i => $fs_step ) : ?>
+						<li>
+							<span class="fs-failed__num"><?php echo esc_html( fs_fa_num( $fs_i + 1 ) ); ?></span>
+							<?php echo esc_html( $fs_step ); ?>
+						</li>
+					<?php endforeach; ?>
+				</ol>
+			</div>
+		<?php endif; ?>
+
+		<a class="fs-failed__back" href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>">بازگشت به پیشخوان</a>
+	</div>
+
+	<?php
+	return;
+}
 ?>
 
 <div class="fs-thanks">

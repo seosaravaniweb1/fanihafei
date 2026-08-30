@@ -1018,6 +1018,58 @@
 		}
 	}
 
+	/**
+	 * صفحه‌ی تسویه‌حساب.
+	 *
+	 * اسکریپت اجاکسی ووکامرس (wc-checkout) در این صفحه عمداً غیرفعال است تا
+	 * ثبت سفارش یک POST واقعی باشد و ریدایرکت درگاه بدون وابستگی به
+	 * جاوااسکریپت انجام شود؛ پس دو کار کوچکی که آن اسکریپت انجام می‌داد را
+	 * اینجا خودمان انجام می‌دهیم.
+	 */
+	function initCheckout() {
+		var form = document.querySelector( 'form.checkout' );
+
+		if ( ! form ) {
+			return;
+		}
+
+		// ۱. باز و بسته کردن باکس «قوانین و مقررات».
+		var termsLink = document.querySelector( '.woocommerce-terms-and-conditions-link' );
+		var termsBox = document.querySelector( '.woocommerce-terms-and-conditions' );
+
+		if ( termsLink && termsBox ) {
+			termsBox.style.display = 'none';
+
+			termsLink.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				var open = 'none' !== termsBox.style.display;
+				termsBox.style.display = open ? 'none' : 'block';
+				termsLink.setAttribute( 'aria-expanded', open ? 'false' : 'true' );
+			} );
+		}
+
+		// ۲. زدن Enter در فیلدهای فرم نباید دکمه‌ی «اعمال کد» را بزند —
+		//    اولین دکمه‌ی submit فرم همان است، پس خودمان سفارش را ثبت می‌کنیم.
+		var placeOrder = form.querySelector( '#place_order' );
+
+		if ( ! placeOrder ) {
+			return;
+		}
+
+		form.addEventListener( 'keydown', function ( e ) {
+			if ( 'Enter' !== e.key || 'INPUT' !== e.target.tagName ) {
+				return;
+			}
+
+			if ( 'fs-coupon-code' === e.target.id ) {
+				return;
+			}
+
+			e.preventDefault();
+			placeOrder.click();
+		} );
+	}
+
 	function init() {
 		initAuth();
 		initWishlist();
@@ -1036,6 +1088,7 @@
 		initGallery();
 		initFaq();
 		initCollapse();
+		initCheckout();
 	}
 
 	if ( 'loading' === document.readyState ) {

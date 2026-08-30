@@ -88,9 +88,10 @@ $fs_cart = WC()->cart;
 						<div class="fs-coupon">
 							<label class="fs-coupon__label" for="fs-coupon-code">کد تخفیف دارید؟</label>
 							<div class="fs-coupon__row">
-								<input class="fs-coupon__input" id="fs-coupon-code" type="text" name="coupon_code" placeholder="کد تخفیف">
-								<button class="fs-coupon__btn" type="submit" name="apply_coupon" value="اعمال کد">اعمال کد</button>
+								<input class="fs-coupon__input" id="fs-coupon-code" type="text" name="coupon_code" placeholder="کد تخفیف" autocomplete="off">
+								<button class="fs-coupon__btn" type="submit" name="fs_apply_coupon" value="1" formnovalidate>اعمال کد</button>
 							</div>
+							<?php wp_nonce_field( 'fs_apply_coupon', 'fs_coupon_nonce' ); ?>
 						</div>
 					<?php endif; ?>
 				</div>

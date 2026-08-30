@@ -5531,3 +5531,260 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   .fs-thanks__body { padding: 16px; }
   .fs-thanks__side { position: static; }
 }
+
+/* =========================================================================
+   ۳۵. تسویه‌حساب — بخش‌هایی که مارک‌آپشان را خود ووکامرس می‌سازد
+   ─────────────────────────────────────────────────────────────────────────
+   فهرست درگاه‌ها، باکس «قوانین و مقررات» و فیلدهای صورت‌حساب استایل نداشتند
+   و خام نمایش داده می‌شدند. سلکتورها به `body.woocommerce-checkout` بسته
+   شده‌اند تا حتی وقتی پوشش `.woocommerce` دور فرم نیست هم اعمال شوند.
+   ========================================================================= */
+
+/* --- فهرست درگاه‌های پرداخت --- */
+.woocommerce-checkout ul.wc_payment_methods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.woocommerce-checkout ul.wc_payment_methods > li {
+  list-style: none;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 0 0 9px;
+  background: #fff;
+  transition: border-color .2s, background .2s;
+}
+
+.woocommerce-checkout ul.wc_payment_methods > li:last-child { margin-bottom: 0; }
+.woocommerce-checkout ul.wc_payment_methods > li:hover { border-color: var(--fs-green-edge); }
+
+.woocommerce-checkout ul.wc_payment_methods > li:has(input[type="radio"]:checked) {
+  border-color: var(--fs-green);
+  background: var(--fs-green-wash);
+}
+
+.woocommerce-checkout ul.wc_payment_methods > li > label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  cursor: pointer;
+  font: 700 12.5px var(--fs-font);
+  color: var(--fs-ink);
+}
+
+.woocommerce-checkout ul.wc_payment_methods input[type="radio"] {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--fs-green);
+}
+
+.woocommerce-checkout ul.wc_payment_methods label img {
+  max-height: 26px;
+  width: auto;
+  margin-inline-start: auto;
+}
+
+/* --- قوانین و مقررات: جمع‌شده در یک باکس اسکرول‌شونده، نه پخش در کل صفحه --- */
+.woocommerce-terms-and-conditions {
+  max-height: 190px;
+  overflow: auto;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  background: var(--fs-bg);
+  font: 500 12px/1.95 var(--fs-font);
+  color: var(--fs-ink-3);
+}
+
+.woocommerce-terms-and-conditions h1,
+.woocommerce-terms-and-conditions h2,
+.woocommerce-terms-and-conditions h3,
+.woocommerce-terms-and-conditions h4 { font-size: 13px; margin: 12px 0 6px; }
+
+.woocommerce-terms-and-conditions-wrapper { margin-top: 4px; }
+.woocommerce-terms-and-conditions-wrapper .form-row { margin: 0; padding: 0; }
+
+.woocommerce-terms-and-conditions-wrapper label.checkbox,
+.woocommerce-terms-and-conditions-wrapper label.woocommerce-form__label-for-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  cursor: pointer;
+  font: 500 12.5px/1.9 var(--fs-font);
+  color: var(--fs-ink-3);
+}
+
+.woocommerce-terms-and-conditions-wrapper input[type="checkbox"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--fs-green);
+}
+
+.woocommerce-terms-and-conditions-link,
+.woocommerce-privacy-policy-link { font-weight: 700; color: var(--fs-green); }
+
+.woocommerce-privacy-policy-text {
+  font: 500 11.5px/1.9 var(--fs-font);
+  color: var(--fs-muted);
+}
+
+/* --- فیلدهای صورت‌حساب داخل باکس «۲ · اطلاعات دریافت فایل» --- */
+.fs-fields .form-row { margin: 0 0 14px; padding: 0; }
+.fs-fields .form-row:last-child { margin-bottom: 0; }
+
+.fs-fields .form-row-first,
+.fs-fields .form-row-last {
+  display: inline-block;
+  width: calc(50% - 5px);
+  vertical-align: top;
+}
+
+.fs-fields .form-row-first { margin-inline-end: 10px; }
+
+.fs-fields label {
+  display: block;
+  font: 600 11.5px var(--fs-font);
+  color: var(--fs-ink-2);
+  margin-bottom: 8px;
+}
+
+.fs-fields .required { color: #dc2626; text-decoration: none; border: 0; }
+.fs-fields .optional { color: var(--fs-muted); font-weight: 500; }
+
+.fs-fields input[type="text"],
+.fs-fields input[type="email"],
+.fs-fields input[type="tel"],
+.fs-fields textarea {
+  width: 100%;
+  font: 500 12.5px var(--fs-font);
+  background: var(--fs-bg);
+  border: 1px solid var(--fs-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  color: var(--fs-ink);
+}
+
+.fs-fields input:focus,
+.fs-fields textarea:focus { border-color: var(--fs-green); }
+
+.fs-fields .description {
+  display: block;
+  margin-top: 6px;
+  font: 500 11px var(--fs-font);
+  color: var(--fs-muted);
+}
+
+@media (max-width: 599px) {
+  .fs-fields .form-row-first,
+  .fs-fields .form-row-last { display: block; width: 100%; margin-inline-end: 0; }
+}
+
+/* =========================================================================
+   ۳۶. صفحه‌ی «پرداخت ناموفق»
+   ========================================================================= */
+
+.fs-failed {
+  max-width: 620px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 22px;
+  padding: 26px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+}
+
+.fs-failed__hero { display: flex; align-items: center; gap: 14px; }
+
+.fs-failed__mark {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(220, 38, 38, .1);
+  color: #dc2626;
+  font: 900 22px var(--fs-font);
+}
+
+.fs-failed__title { font: 800 18px var(--fs-font); color: var(--fs-ink); }
+
+.fs-failed__sub {
+  margin-top: 4px;
+  font: 500 12.5px/1.85 var(--fs-font);
+  color: var(--fs-muted);
+}
+
+.fs-failed__reason {
+  margin: 16px 0 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(220, 38, 38, .22);
+  background: rgba(220, 38, 38, .05);
+  font: 600 12px/1.8 var(--fs-font);
+  color: #b91c1c;
+}
+
+.fs-failed__retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 13px;
+  background: var(--fs-orange);
+  color: #fff;
+  font: 800 13.5px var(--fs-font);
+}
+
+.fs-failed__retry:hover { background: var(--fs-orange-d); color: #fff; }
+
+.fs-failed__help {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--fs-line);
+}
+
+.fs-failed__help-title { font: 800 13.5px var(--fs-font); color: var(--fs-ink); margin: 0 0 12px; }
+
+.fs-failed__steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.fs-failed__steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 500 12.5px/1.85 var(--fs-font);
+  color: var(--fs-ink-3);
+}
+
+.fs-failed__num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fs-bg-2);
+  color: var(--fs-muted);
+  font: 800 11px var(--fs-font);
+}
+
+.fs-failed__back {
+  display: block;
+  margin-top: 18px;
+  text-align: center;
+  font: 700 12.5px var(--fs-font);
+  color: var(--fs-muted);
+}
+
+.fs-failed__back:hover { color: var(--fs-ink); }
