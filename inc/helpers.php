@@ -256,3 +256,95 @@ function fs_safe_media_url( $url ) {
 
 	return $url;
 }
+
+/**
+ * آی‌پی بازدیدکننده، با تفکیک «قابل اعتماد» و «قابل جعل».
+ *
+ * سرآیندهای X-Forwarded-For و CF-Connecting-IP را هر کسی می‌تواند در درخواست
+ * خودش بنویسد. پشت کلادفلر یا یک پراکسی واقعی، همان‌ها آی‌پی درست‌اند؛ ولی
+ * بدون پراکسی، اعتماد به آن‌ها یعنی هر محدودیتی که روی آی‌پی بگذاریم با یک
+ * سرآیند ساختگی دور می‌خورد.
+ *
+ * پس پیش‌فرض فقط REMOTE_ADDR است — تنها چیزی که در لایه‌ی برنامه جعل‌ناپذیر
+ * است. اگر سایت واقعاً پشت پراکسی است، با این فیلتر روشنش کنید:
+ *
+ *   add_filter( 'fs_trust_proxy_headers', '__return_true' );
+ *
+ * @param bool $allow_forwarded آیا سرآیندهای فوروارد هم خوانده شوند.
+ * @return string
+ */
+function fs_client_ip( $allow_forwarded = false ) {
+	$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	$remote = filter_var( $remote, FILTER_VALIDATE_IP ) ? $remote : '';
+
+	if ( ! $allow_forwarded || ! apply_filters( 'fs_trust_proxy_headers', false ) ) {
+		return $remote;
+	}
+
+	foreach ( array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR' ) as $header ) {
+		if ( empty( $_SERVER[ $header ] ) ) {
+			continue;
+		}
+
+		$forwarded = explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) );
+		$candidate = trim( $forwarded[0] );
+
+		if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+			return $candidate;
+		}
+	}
+
+	return $remote;
+}
+
+/**
+ * شمارنده‌ی محدودیت نرخ.
+ *
+ * پنجره‌ی زمانی با اولین درخواست باز می‌شود و با درخواست‌های بعدی تمدید
+ * نمی‌شود. زمان پایان داخل خود مقدار نگه داشته می‌شود، چون set_transient
+ * هر بار TTL را از نو می‌گذارد و بدون این، پنجره با هر ضربه جلو می‌رفت.
+ *
+ * @param string $bucket نام سطل (مثلاً otp_ip).
+ * @param string $id     شناسه (آی‌پی یا شماره).
+ * @param int    $limit  سقف در این پنجره.
+ * @param int    $window طول پنجره به ثانیه.
+ * @return int صفر یعنی مجاز؛ عدد مثبت یعنی رد شده و چند ثانیه تا باز شدن مانده.
+ */
+function fs_rate_limit_hit( $bucket, $id, $limit, $window ) {
+	if ( '' === (string) $id ) {
+		return 0;
+	}
+
+	$key  = 'fs_rl_' . $bucket . '_' . md5( (string) $id );
+	$data = get_transient( $key );
+	$now  = time();
+
+	if ( ! is_array( $data ) || empty( $data['exp'] ) || $data['exp'] <= $now ) {
+		$data = array(
+			'n'   => 0,
+			'exp' => $now + (int) $window,
+		);
+	}
+
+	if ( (int) $data['n'] >= (int) $limit ) {
+		return max( 1, (int) $data['exp'] - $now );
+	}
+
+	++$data['n'];
+	set_transient( $key, $data, max( 1, (int) $data['exp'] - $now ) );
+
+	return 0;
+}
+
+/**
+ * پاک‌کردن شمارنده — پس از یک ورود موفق.
+ *
+ * @param string $bucket نام سطل.
+ * @param string $id     شناسه.
+ * @return void
+ */
+function fs_rate_limit_clear( $bucket, $id ) {
+	if ( '' !== (string) $id ) {
+		delete_transient( 'fs_rl_' . $bucket . '_' . md5( (string) $id ) );
+	}
+}

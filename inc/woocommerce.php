@@ -973,19 +973,29 @@ function fs_toc_from_content( $html ) {
 				return $m[0];
 			}
 
-			// اگر خود تیتر از قبل شناسه دارد، همان نگه داشته می‌شود.
-			if ( preg_match( '/\sid=["\']([^"\']+)["\']/i', $attrs, $has ) ) {
-				$id = $has[1];
-			} else {
-				$id   = fs_anchor_slug( $text );
-				$base = $id;
-				$n    = 2;
+			/*
+			 * شناسه‌ی یکتا.
+			 *
+			 * پیش از این، تیتری که خودش id داشت مستقیم پذیرفته می‌شد و از
+			 * حلقه‌ی یکتاسازی رد می‌شد؛ دو تیتر با id یکسان یعنی لینک لنگری
+			 * همیشه به اولی می‌پرد. حالا هر دو مسیر از یک بررسی می‌گذرند.
+			 */
+			$existing = preg_match( '/\sid=["\']([^"\']+)["\']/i', $attrs, $has ) ? $has[1] : '';
+			$id       = $existing ? $existing : fs_anchor_slug( $text );
+			$base     = $id;
+			$n        = 2;
 
-				while ( isset( $used[ $id ] ) ) {
-					$id = $base . '-' . $n;
-					++$n;
+			while ( isset( $used[ $id ] ) ) {
+				$id = $base . '-' . $n;
+				++$n;
+			}
+
+			if ( $existing ) {
+				// اگر مجبور شدیم عوضش کنیم، باید در خود تگ هم عوض شود.
+				if ( $id !== $existing ) {
+					$attrs = preg_replace( '/\sid=["\'][^"\']*["\']/i', ' id="' . esc_attr( $id ) . '"', $attrs, 1 );
 				}
-
+			} else {
 				$attrs .= ' id="' . esc_attr( $id ) . '"';
 			}
 
@@ -997,7 +1007,21 @@ function fs_toc_from_content( $html ) {
 				'level' => 'h2' === $tag ? 2 : 3,
 			);
 
-			return '<' . $tag . $attrs . ' class="fs-anchor">' . $m[3] . '</' . $tag . '>';
+			/*
+			 * کلاس باید ادغام شود، نه اضافه.
+			 *
+			 * الحاق مستقیمِ class روی تیتری که از قبل کلاس داشت، خروجی
+			 * <h2 class="foo" class="fs-anchor"> می‌ساخت: HTML نامعتبر، و
+			 * مرورگر دومی را دور می‌ریزد — یعنی fs-anchor اصلاً اعمال نمی‌شد.
+			 */
+			if ( preg_match( '/\sclass=(["\'])(.*?)\1/i', $attrs, $cls ) ) {
+				$merged = trim( $cls[2] . ' fs-anchor' );
+				$attrs  = str_replace( $cls[0], ' class="' . esc_attr( $merged ) . '"', $attrs );
+			} else {
+				$attrs .= ' class="fs-anchor"';
+			}
+
+			return '<' . $tag . $attrs . '>' . $m[3] . '</' . $tag . '>';
 		},
 		$html
 	);

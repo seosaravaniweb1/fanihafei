@@ -16,6 +16,18 @@ const FS_OTP_RESEND   = 90;  // فاصله لازم تا ارسال دوباره
 const FS_OTP_TRIES    = 5;   // حداکثر تلاش برای هر کد.
 const FS_PHONE_META   = 'billing_phone';
 
+/*
+ * محدودیت نرخ.
+ *
+ * FS_OTP_RESEND فقط برای «همان شماره» بود؛ مهاجم با شماره‌های متفاوت آن را
+ * دور می‌زد و می‌توانست هزاران پیامک به حساب شما بفرستد. سقف زیر روی آی‌پی
+ * است، مستقل از اینکه چه شماره‌ای وارد می‌شود.
+ */
+const FS_OTP_IP_MAX      = 5;                  // پیامک از یک آی‌پی
+const FS_OTP_IP_WINDOW   = 15 * MINUTE_IN_SECONDS;
+const FS_LOGIN_MAX       = 8;                  // تلاش ناموفق رمز
+const FS_LOGIN_WINDOW    = 15 * MINUTE_IN_SECONDS;
+
 // نشانه‌ی کاربرانی که ایمیل واقعی ندادند و نشانی‌شان خودکار ساخته شده است.
 const FS_AUTO_EMAIL_META = '_has_auto_generated_email';
 
@@ -139,6 +151,16 @@ function fs_otp_key( $phone ) {
  * @return true|WP_Error
  */
 function fs_otp_send( $phone ) {
+	// سقف روی آی‌پی، پیش از هر کار دیگری: هر پیامک برای شما هزینه دارد.
+	$blocked = fs_rate_limit_hit( 'otp_ip', fs_client_ip(), FS_OTP_IP_MAX, FS_OTP_IP_WINDOW );
+
+	if ( $blocked ) {
+		return new WP_Error(
+			'fs_otp_flood',
+			sprintf( 'درخواست بیش از حد. %s دقیقه دیگر تلاش کنید.', fs_fa_num( (int) ceil( $blocked / 60 ) ) )
+		);
+	}
+
 	$key   = fs_otp_key( $phone );
 	$saved = get_transient( $key );
 
@@ -377,8 +399,22 @@ function fs_login_user( $user ) {
 function fs_auth_redirect( $requested = '' ) {
 	$requested = trim( (string) $requested );
 
-	if ( $requested && wp_http_validate_url( $requested ) && 0 === strpos( $requested, home_url() ) ) {
-		return $requested;
+	/*
+	 * بررسی با strpos امن نبود.
+	 *
+	 * شرط قبلی فقط می‌دید که نشانی با home_url() «شروع» می‌شود؛ یعنی
+	 * https://luxu.ir.evil.com از تست رد می‌شد و کاربر بعد از ورود به دامنه‌ی
+	 * مهاجم می‌رفت — یک Open Redirect تمام‌عیار روی مسیر ورود و ثبت‌نام.
+	 *
+	 * wp_validate_redirect خودِ هاست را می‌سنجد، نه پیشوند رشته را، و اگر
+	 * بیرونی باشد رشته‌ی خالی برمی‌گرداند.
+	 */
+	if ( $requested ) {
+		$safe = wp_validate_redirect( $requested, '' );
+
+		if ( $safe ) {
+			return $safe;
+		}
 	}
 
 	if ( fs_has_woo() && WC()->cart && ! WC()->cart->is_empty() ) {
@@ -581,17 +617,45 @@ function fs_ajax_auth_password() {
 
 	$login    = isset( $_POST['login'] ) ? sanitize_text_field( wp_unslash( $_POST['login'] ) ) : '';
 	$password = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- رمز نباید تغییر کند.
+
+	/*
+	 * قفل تلاش ناموفق.
+	 *
+	 * این نقطه nopriv است و nonce دارد، ولی nonce جلوی حمله را نمی‌گیرد —
+	 * مهاجم یک بار صفحه را می‌گیرد و با همان nonce هزاران رمز را امتحان
+	 * می‌کند. سقف هم روی آی‌پی است و هم روی خودِ نام کاربری، تا نه یک آی‌پی
+	 * بتواند چند حساب را بکوبد و نه چند آی‌پی یک حساب را.
+	 */
+	$ip = fs_client_ip();
+
+	foreach ( array( array( 'login_ip', $ip ), array( 'login_user', strtolower( $login ) ) ) as $gate ) {
+		$blocked = fs_rate_limit_hit( $gate[0], $gate[1], FS_LOGIN_MAX, FS_LOGIN_WINDOW );
+
+		if ( $blocked ) {
+			wp_send_json_error(
+				array(
+					'message' => sprintf( 'تلاش بیش از حد. %s دقیقه دیگر تلاش کنید.', fs_fa_num( (int) ceil( $blocked / 60 ) ) ),
+				),
+				429
+			);
+		}
+	}
+
 	$resolved = fs_resolve_login( $login );
 
 	if ( ! $resolved['user'] ) {
-		wp_send_json_error( array( 'message' => 'کاربری با این مشخصات پیدا نشد.' ) );
+		wp_send_json_error( array( 'message' => 'نام کاربری یا رمز عبور درست نیست.' ) );
 	}
 
 	$user = wp_authenticate( $resolved['user']->user_login, $password );
 
 	if ( is_wp_error( $user ) ) {
-		wp_send_json_error( array( 'message' => 'رمز عبور درست نیست.' ) );
+		wp_send_json_error( array( 'message' => 'نام کاربری یا رمز عبور درست نیست.' ) );
 	}
+
+	// ورود موفق، شمارنده‌ها آزاد.
+	fs_rate_limit_clear( 'login_ip', $ip );
+	fs_rate_limit_clear( 'login_user', strtolower( $login ) );
 
 	fs_login_user( $user );
 
