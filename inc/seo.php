@@ -443,6 +443,42 @@ add_action( 'wp_head', 'fs_print_meta_description', 5 );
    ------------------------------------------------------------------------- */
 
 /**
+ * تبدیل هر چیزی که فیلترها پاس می‌دهند به یک WC_Product.
+ *
+ * ووکامرس همیشه WC_Product می‌دهد، ولی رنک‌مث شیء خودش را پاس می‌کند — و
+ * چون فروشگاه از رنک‌مث استفاده می‌کند، بدون این تبدیل هیچ‌کدام از این
+ * فیلترها روی سایت اجرا نمی‌شدند.
+ *
+ * @param mixed $product ورودی فیلتر.
+ * @return WC_Product|null
+ */
+function fs_resolve_wc_product( $product ) {
+	if ( $product instanceof WC_Product ) {
+		return $product;
+	}
+
+	if ( ! function_exists( 'wc_get_product' ) ) {
+		return null;
+	}
+
+	$id = 0;
+
+	if ( is_numeric( $product ) ) {
+		$id = (int) $product;
+	} elseif ( is_object( $product ) && method_exists( $product, 'get_id' ) ) {
+		$id = (int) $product->get_id();
+	}
+
+	if ( ! $id ) {
+		$id = get_the_ID();
+	}
+
+	$resolved = $id ? wc_get_product( $id ) : null;
+
+	return $resolved instanceof WC_Product ? $resolved : null;
+}
+
+/**
  * فرمت‌هایی که یعنی محصول واقعاً یک نرم‌افزار است.
  *
  * عمداً کوتاه و محافظه‌کارانه: PDF و Word نرم‌افزار نیستند و برچسب‌زدنشان با
@@ -464,7 +500,9 @@ function fs_software_formats() {
  * @return bool
  */
 function fs_product_is_software( $product ) {
-	if ( ! $product instanceof WC_Product ) {
+	$product = fs_resolve_wc_product( $product );
+
+	if ( ! $product ) {
 		return false;
 	}
 
@@ -496,7 +534,9 @@ function fs_product_is_software( $product ) {
  * @param WC_Product $product محصول.
  * @return array
  */
-function fs_schema_software( $data, $product ) {
+function fs_schema_software( $data, $product = null ) {
+	$product = fs_resolve_wc_product( $product );
+
 	if ( ! is_array( $data ) || ! fs_product_is_software( $product ) ) {
 		return $data;
 	}
@@ -536,6 +576,7 @@ function fs_schema_software( $data, $product ) {
 	return $data;
 }
 add_filter( 'woocommerce_structured_data_product', 'fs_schema_software', 30, 2 );
+add_filter( 'rank_math/snippet/rich_snippet_product_entity', 'fs_schema_software', 30, 2 );
 
 /**
  * اسکیمای مقاله برای نوشته‌های وبلاگ.
@@ -687,3 +728,253 @@ function fs_fallback_image_alt( $attr, $attachment ) {
 	return $attr;
 }
 add_filter( 'wp_get_attachment_image_attributes', 'fs_fallback_image_alt', 10, 2 );
+
+/* -------------------------------------------------------------------------
+   فیلدهای اختصاصی محصول در اسکیما
+   ------------------------------------------------------------------------- */
+
+/**
+ * یک ویژگی PropertyValue.
+ *
+ * @param string $name  نام ویژگی.
+ * @param string $value مقدار.
+ * @return array
+ */
+function fs_schema_property( $name, $value ) {
+	return array(
+		'@type' => 'PropertyValue',
+		'name'  => $name,
+		// ادمین «۱۲ مگابایت» می‌نویسد؛ ارقام فارسی برای خواننده‌ی ماشینی عدد
+		// نیستند، پس در اسکیما لاتین می‌روند. ظاهر سایت دست نمی‌خورد.
+		'value' => fs_en_num( (string) $value ),
+	);
+}
+
+/**
+ * مقدار خام «مقدار» و واحدش — بدون تبدیل به عدد فارسی.
+ *
+ * fs_product_amount() خروجی نمایشی می‌دهد (ارقام فارسی) که برای اسکیما
+ * بی‌فایده است؛ گوگل عدد لاتین می‌خواهد.
+ *
+ * @param int $product_id شناسه محصول.
+ * @return array{n:string,unit:string}|null
+ */
+function fs_schema_amount( $product_id ) {
+	$units = fs_amount_units();
+	$value = fs_product_field( $product_id, 'amount' );
+	$unit  = fs_product_field( $product_id, 'amount_unit' );
+
+	if ( '' === $value ) {
+		foreach ( array( 'page_count' => 'page', 'question_count' => 'question' ) as $legacy => $legacy_unit ) {
+			$found = fs_product_field( $product_id, $legacy );
+
+			if ( '' !== $found ) {
+				$value = $found;
+				$unit  = $legacy_unit;
+
+				break;
+			}
+		}
+	}
+
+	if ( '' === $value ) {
+		return null;
+	}
+
+	if ( ! isset( $units[ $unit ] ) ) {
+		$unit = 'page';
+	}
+
+	return array(
+		'n'    => fs_en_num( $value ),
+		'unit' => $units[ $unit ],
+	);
+}
+
+/**
+ * افزودن فیلدهای اختصاصی محصول به داده‌ی ساختاریافته.
+ *
+ * یک نکته‌ی مهم که باید بدانید: از این‌ها فقط ویدیو در نتایج گوگل ظاهر
+ * می‌شود (ریچ‌ریزالت ویدیو). حجم فایل، تعداد صفحه و ضمیمه‌ها را گوگل نمایش
+ * نمی‌دهد؛ ولی داده‌ی معتبرند و به درک موجودیت صفحه کمک می‌کنند.
+ *
+ * فرمت فایل، نویسنده و مترجم روی خود موجودیت می‌نشینند — این‌ها ویژگی‌های
+ * CreativeWork هستند نه Product، پس نوع موجودیت هم گسترش پیدا می‌کند. بقیه
+ * به‌صورت additionalProperty می‌روند که راه استاندارد بیان مشخصات دلخواه
+ * روی Product است.
+ *
+ * @param array      $data    داده‌ی اسکیما.
+ * @param WC_Product $product محصول.
+ * @return array
+ */
+function fs_schema_product_details( $data, $product = null ) {
+	$product = fs_resolve_wc_product( $product );
+
+	if ( ! is_array( $data ) || ! $product ) {
+		return $data;
+	}
+
+	$id = $product->get_id();
+
+	// --- نوع موجودیت ------------------------------------------------------
+	$type = isset( $data['@type'] ) ? (array) $data['@type'] : array( 'Product' );
+
+	// SoftwareApplication خودش زیرمجموعه‌ی CreativeWork است؛ دوباره نگذاریم.
+	if ( ! array_intersect( array( 'CreativeWork', 'SoftwareApplication' ), $type ) ) {
+		$type[] = 'CreativeWork';
+	}
+
+	$data['@type'] = $type;
+
+	if ( empty( $data['inLanguage'] ) ) {
+		$data['inLanguage'] = 'fa-IR';
+	}
+
+	// --- فرمت فایل --------------------------------------------------------
+	$format = fs_product_field( $id, 'file_format' );
+
+	if ( $format && empty( $data['encodingFormat'] ) ) {
+		$data['encodingFormat'] = $format;
+	}
+
+	// --- نویسنده و مترجم --------------------------------------------------
+	if ( empty( $data['author'] ) ) {
+		$authors = fs_get_product_authors( $id );
+
+		if ( $authors ) {
+			$person = array(
+				'@type' => 'Person',
+				'name'  => $authors[0]['name'],
+			);
+
+			if ( ! empty( $authors[0]['link'] ) ) {
+				$person['url'] = $authors[0]['link'];
+			}
+
+			$data['author'] = $person;
+		}
+	}
+
+	$translator = fs_product_field( $id, 'translator_name' );
+
+	if ( $translator && empty( $data['translator'] ) ) {
+		$data['translator'] = array(
+			'@type' => 'Person',
+			'name'  => $translator,
+		);
+	}
+
+	// --- مشخصات به‌صورت ویژگی --------------------------------------------
+	$props = isset( $data['additionalProperty'] ) ? (array) $data['additionalProperty'] : array();
+
+	if ( $format ) {
+		$props[] = fs_schema_property( 'فرمت فایل', $format );
+	}
+
+	$size = fs_product_field( $id, 'file_size' );
+
+	if ( $size ) {
+		$props[] = fs_schema_property( 'حجم فایل', $size );
+	}
+
+	$amount = fs_schema_amount( $id );
+
+	if ( $amount ) {
+		$props[] = fs_schema_property( 'تعداد ' . $amount['unit'], $amount['n'] );
+	}
+
+	if ( fs_product_flag( $id, 'has_answers' ) ) {
+		$props[] = fs_schema_property( 'پاسخنامه', 'دارد' );
+	}
+
+	$extras = fs_get_product_attachments( $id );
+
+	if ( $extras ) {
+		$props[] = fs_schema_property( 'ضمیمه‌ها', implode( '، ', $extras ) );
+	}
+
+	if ( $props ) {
+		$data['additionalProperty'] = $props;
+	}
+
+	// --- رسانه‌ی معرفی ----------------------------------------------------
+	$media = array();
+	$audio = fs_product_field( $id, 'audio_url' );
+
+	if ( $audio ) {
+		$media[] = array(
+			'@type'      => 'AudioObject',
+			'name'       => 'نمونه صوتی ' . wp_strip_all_tags( get_the_title( $id ) ),
+			'contentUrl' => fs_safe_media_url( $audio ),
+		);
+	}
+
+	$video = fs_schema_video_object( $product );
+
+	if ( $video ) {
+		$media[] = $video;
+	}
+
+	if ( $media && empty( $data['associatedMedia'] ) ) {
+		$data['associatedMedia'] = $media;
+	}
+
+	return $data;
+}
+add_filter( 'woocommerce_structured_data_product', 'fs_schema_product_details', 40, 2 );
+add_filter( 'rank_math/snippet/rich_snippet_product_entity', 'fs_schema_product_details', 40, 2 );
+
+/**
+ * موجودیت ویدیوی معرفی.
+ *
+ * گوگل برای ریچ‌ریزالت ویدیو سه چیز را لازم دارد: name، thumbnailUrl و
+ * uploadDate. اگر تصویر شاخص نباشد، thumbnailUrl نداریم و ساختن موجودیت
+ * ناقص فقط اخطار سرچ کنسول می‌سازد — پس در آن حالت چیزی نمی‌سازیم.
+ *
+ * @param WC_Product $product محصول.
+ * @return array|null
+ */
+function fs_schema_video_object( $product ) {
+	if ( ! $product instanceof WC_Product ) {
+		return null;
+	}
+
+	$id  = $product->get_id();
+	$raw = fs_product_field( $id, 'video_url' );
+
+	if ( ! $raw ) {
+		return null;
+	}
+
+	$source = fs_video_source( $raw );
+
+	if ( empty( $source['src'] ) ) {
+		return null;
+	}
+
+	$thumb = get_the_post_thumbnail_url( $id, 'large' );
+
+	if ( ! $thumb ) {
+		return null;
+	}
+
+	$created = $product->get_date_created();
+
+	$video = array(
+		'@type'        => 'VideoObject',
+		'name'         => 'ویدیوی معرفی ' . wp_strip_all_tags( get_the_title( $id ) ),
+		'description'  => wp_strip_all_tags( $product->get_short_description() ? $product->get_short_description() : get_the_title( $id ) ),
+		'thumbnailUrl' => $thumb,
+		'uploadDate'   => $created ? $created->date( DATE_W3C ) : get_the_date( DATE_W3C, $id ),
+	);
+
+	// فایل مستقیم contentUrl است و آپارات embedUrl؛ جابه‌جا گذاشتنشان اخطار
+	// می‌سازد چون گوگل انتظار دارد contentUrl خودِ فایل ویدیو باشد.
+	if ( 'file' === $source['type'] ) {
+		$video['contentUrl'] = fs_safe_media_url( $source['src'] );
+	} else {
+		$video['embedUrl'] = $source['src'];
+	}
+
+	return $video;
+}

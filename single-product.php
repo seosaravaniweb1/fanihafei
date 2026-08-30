@@ -175,7 +175,17 @@ while ( have_posts() ) :
 
 							<span class="fs-audio__time"><span data-current>۰۰:۰۰</span> / <span data-duration>۰۰:۰۰</span></span>
 
-							<audio preload="metadata" src="<?php echo esc_url( $fs_audio ); ?>"></audio>
+							<span class="fs-audio__error" data-audio-error hidden>فایل صوتی در دسترس نیست.</span>
+
+							<?php
+							/*
+							 * نشانی http روی صفحه‌ی https «محتوای مختلط» است و
+							 * مرورگر آن را بی‌صدا و بی‌خطا مسدود می‌کند: ظاهر
+							 * پخش‌کننده می‌آید ولی صدا هرگز پخش نمی‌شود.
+							 * برای فایل‌های همین دامنه بی‌خطر می‌شود ارتقا داد.
+							 */
+							?>
+							<audio preload="metadata" src="<?php echo esc_url( fs_safe_media_url( $fs_audio ) ); ?>"></audio>
 						</div>
 					<?php endif; ?>
 

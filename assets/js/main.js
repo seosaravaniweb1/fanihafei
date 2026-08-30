@@ -460,6 +460,37 @@
 				}
 			}
 
+			/*
+			 * آیکون‌ها باید از خودِ عنصر صدا خبر بگیرند، نه از کلیک.
+			 *
+			 * پیش از این، کلیک بی‌قیدوشرط آیکون را به حالت «در حال پخش»
+			 * می‌برد و نتیجه‌ی audio.play() هرگز بررسی نمی‌شد. این متد یک
+			 * Promise برمی‌گرداند که می‌تواند reject شود — فایل پیدا نشود،
+			 * نشانی http روی سایت https باشد (مرورگر بی‌صدا مسدود می‌کند)،
+			 * یا فرمت پشتیبانی نشود. در همه‌ی این حالت‌ها ظاهر می‌گفت در حال
+			 * پخش است ولی هیچ صدایی نبود و هیچ خطایی هم دیده نمی‌شد.
+			 */
+			var message = player.querySelector( '[data-audio-error]' );
+
+			function paintState( playing ) {
+				toggle( playIcon, ! playing );
+				toggle( pauseIcon, playing );
+			}
+
+			function fail() {
+				paintState( false );
+				player.classList.add( 'is-broken' );
+				toggle( message, true );
+			}
+
+			audio.addEventListener( 'play', function () {
+				paintState( true );
+			} );
+
+			audio.addEventListener( 'pause', function () {
+				paintState( false );
+			} );
+
 			audio.addEventListener( 'loadedmetadata', function () {
 				if ( duration ) {
 					duration.textContent = clock( audio.duration );
@@ -469,20 +500,30 @@
 			audio.addEventListener( 'timeupdate', paint );
 
 			audio.addEventListener( 'ended', function () {
-				toggle( playIcon, true );
-				toggle( pauseIcon, false );
+				paintState( false );
 				paint();
 			} );
 
+			// خطای بارگذاری منبع؛ روی خود <audio> بابل نمی‌کند ولی اینجا
+			// مستقیم به همان عنصر بسته شده است.
+			audio.addEventListener( 'error', fail );
+
 			button.addEventListener( 'click', function () {
-				if ( audio.paused ) {
-					audio.play();
-					toggle( playIcon, false );
-					toggle( pauseIcon, true );
-				} else {
+				if ( ! audio.paused ) {
 					audio.pause();
-					toggle( playIcon, true );
-					toggle( pauseIcon, false );
+
+					return;
+				}
+
+				toggle( message, false );
+				player.classList.remove( 'is-broken' );
+
+				var started = audio.play();
+
+				// مرورگرهای قدیمی چیزی برنمی‌گردانند؛ آن‌جا رویداد play
+				// وضعیت را درست می‌کند.
+				if ( started && 'function' === typeof started.catch ) {
+					started.catch( fail );
 				}
 			} );
 

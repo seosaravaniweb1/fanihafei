@@ -3793,6 +3793,16 @@ a.fs-fcontact:hover {
 
 .fs-audio__wave span.is-played { background: var(--fs-brand); }
 
+/* پیام خطای پخش‌کننده — تا وقتی جاوااسکریپت شکست پخش را تشخیص ندهد پنهان
+   است (اتریبیوت hidden). */
+.fs-audio__error {
+  font: 600 11px var(--fs-font);
+  color: #b91c1c;
+  flex: 1 0 100%;
+}
+
+.fs-audio.is-broken .fs-audio__wave { opacity: .35; }
+
 .fs-audio__time {
   font: 600 10px ui-monospace, Menlo, monospace;
   color: var(--fs-muted-2);

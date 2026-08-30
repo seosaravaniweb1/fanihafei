@@ -226,3 +226,33 @@ function fs_valid_icon( $name ) {
 
 	return isset( $icons[ $name ] ) ? $name : 'check';
 }
+
+/**
+ * نشانی امن برای رسانه‌ای که قرار است در صفحه پخش شود.
+ *
+ * اگر سایت روی https باشد و نشانی رسانه http، مرورگر آن را «محتوای مختلط»
+ * می‌شمارد و بی‌صدا مسدود می‌کند — نه خطایی در صفحه دیده می‌شود نه صدایی پخش
+ * می‌شود. برای فایل‌هایی که روی همین دامنه‌اند ارتقا به https بی‌خطر است.
+ *
+ * دامنه‌های دیگر دست‌نخورده می‌مانند: ممکن است اصلاً https نداشته باشند و
+ * ارتقای کورکورانه لینک سالم را خراب می‌کند.
+ *
+ * @param string $url نشانی خام.
+ * @return string
+ */
+function fs_safe_media_url( $url ) {
+	$url = trim( (string) $url );
+
+	if ( ! $url || ! is_ssl() || 0 !== strpos( $url, 'http://' ) ) {
+		return $url;
+	}
+
+	$host = wp_parse_url( $url, PHP_URL_HOST );
+	$home = wp_parse_url( home_url(), PHP_URL_HOST );
+
+	if ( $host && $home && strtolower( $host ) === strtolower( $home ) ) {
+		return set_url_scheme( $url, 'https' );
+	}
+
+	return $url;
+}
