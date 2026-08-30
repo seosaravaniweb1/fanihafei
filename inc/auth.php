@@ -16,6 +16,9 @@ const FS_OTP_RESEND   = 90;  // فاصله لازم تا ارسال دوباره
 const FS_OTP_TRIES    = 5;   // حداکثر تلاش برای هر کد.
 const FS_PHONE_META   = 'billing_phone';
 
+// نشانه‌ی کاربرانی که ایمیل واقعی ندادند و نشانی‌شان خودکار ساخته شده است.
+const FS_AUTO_EMAIL_META = '_has_auto_generated_email';
+
 /**
  * یکسان‌سازی شماره موبایل به شکل 09xxxxxxxxx.
  *
@@ -249,10 +252,12 @@ function fs_create_user( $phone, $args = array() ) {
 	);
 
 	$email = $args['email'] ? sanitize_email( $args['email'] ) : '';
+	$auto  = false;
 
 	// ایمیل اختیاری است؛ اگر نبود، خودکار از روی شماره ساخته می‌شود.
 	if ( ! $email || ! is_email( $email ) || email_exists( $email ) ) {
 		$email = fs_auth_phone_email( $phone );
+		$auto  = true;
 	}
 
 	if ( email_exists( $email ) ) {
@@ -277,9 +282,34 @@ function fs_create_user( $phone, $args = array() ) {
 		return $user_id;
 	}
 
+	// نشانه‌گذاری کاربرانی که ایمیل واقعی ندارند تا هیچ ایمیلی به نشانی
+	// ساختگی‌شان فرستاده نشود و از گزارش‌های ایمیلی بیرون بمانند.
+	if ( $auto ) {
+		update_user_meta( $user_id, FS_AUTO_EMAIL_META, 'yes' );
+	}
+
 	fs_sync_user_billing( $user_id, $phone, $args['first_name'], $args['last_name'], $email );
 
 	return get_user_by( 'id', $user_id );
+}
+
+/**
+ * آیا این نشانی، ایمیل ساختگیِ ساخته‌شده از روی شماره موبایل است؟
+ *
+ * @param string $email نشانی.
+ * @return bool
+ */
+function fs_is_auto_email( $email ) {
+	$email = trim( (string) $email );
+
+	if ( ! $email || false === strpos( $email, '@' ) ) {
+		return false;
+	}
+
+	list( $local, $domain ) = explode( '@', $email, 2 );
+
+	return (bool) preg_match( '/^09\d{9}$/', $local )
+		&& strtolower( $domain ) === strtolower( fs_auth_email_domain() );
 }
 
 /**
@@ -323,8 +353,16 @@ function fs_sync_user_billing( $user_id, $phone = '', $first = '', $last = '', $
  * @return void
  */
 function fs_login_user( $user ) {
-	wp_set_current_user( $user->ID );
-	wp_set_auth_cookie( $user->ID, true );
+	// تابع خود ووکامرس علاوه بر کوکی ورود، کوکی نشست ووکامرس را هم از حالت
+	// مهمان به حساب کاربر منتقل می‌کند. چون ورود اینجا اجاکسی است و init با
+	// شناسه‌ی مهمان اجرا شده، بدون این انتقال سبد زیر کلید مهمان جا می‌ماند.
+	if ( function_exists( 'wc_set_customer_auth_cookie' ) ) {
+		wc_set_customer_auth_cookie( $user->ID );
+	} else {
+		wp_set_current_user( $user->ID );
+		wp_set_auth_cookie( $user->ID, true );
+	}
+
 	do_action( 'wp_login', $user->user_login, $user );
 
 	fs_sync_user_billing( $user->ID );

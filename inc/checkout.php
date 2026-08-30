@@ -116,6 +116,19 @@ function fs_fill_email( $data ) {
 		return $data;
 	}
 
+	// اگر کاربر لاگین است و ایمیل واقعی روی حسابش دارد، همان باید در سفارش
+	// بنشیند. پیش از این، خالی‌گذاشتن کادر ایمیل باعث می‌شد نشانی ساختگی
+	// جای ایمیل واقعی را بگیرد و لینک دانلود هرگز به دست کاربر نرسد.
+	if ( is_user_logged_in() ) {
+		$account_email = wp_get_current_user()->user_email;
+
+		if ( $account_email && is_email( $account_email ) && ! fs_is_auto_email( $account_email ) ) {
+			$data['billing_email'] = $account_email;
+
+			return $data;
+		}
+	}
+
 	$phone = '';
 
 	if ( ! empty( $data['billing_phone'] ) ) {
@@ -162,7 +175,15 @@ add_filter( 'woocommerce_checkout_posted_data', 'fs_normalize_order_phone', 10 )
  * @return void
  */
 function fs_require_login_for_checkout() {
-	if ( ! fs_has_woo() || is_user_logged_in() || ! is_checkout() || is_wc_endpoint_url( 'order-received' ) ) {
+	// order-received و order-pay هر دو زیرمجموعه‌ی is_checkout() هستند ولی
+	// صفحه‌ی «فرم خرید» نیستند: اولی بازگشت از درگاه است و دومی پرداخت دوباره‌ی
+	// یک سفارش موجود. ریدایرکت‌کردنشان به صفحه‌ی ورود، بازگشت از زرین‌پال و
+	// زیبال را می‌شکند.
+	if ( ! fs_has_woo() || is_user_logged_in() || ! is_checkout() ) {
+		return;
+	}
+
+	if ( is_wc_endpoint_url( 'order-received' ) || is_wc_endpoint_url( 'order-pay' ) ) {
 		return;
 	}
 
@@ -278,25 +299,6 @@ function fs_download_permitted( $permitted, $order ) {
 	return $order->is_paid() || $order->has_status( array( 'processing', 'completed' ) );
 }
 add_filter( 'woocommerce_order_is_download_permitted', 'fs_download_permitted', 20, 2 );
-
-/**
- * اگر کاربر لاگین است ولی سفارش به ایمیل دیگری ثبت شده، باز هم اجازه دانلود
- * داشته باشد — تطبیق بر اساس شناسه کاربر سفارش.
- *
- * @param bool  $granted وضعیت فعلی.
- * @param array $data    داده‌های دانلود.
- * @return bool
- */
-function fs_download_access( $granted, $data ) {
-	if ( $granted || ! is_user_logged_in() || empty( $data['order_id'] ) ) {
-		return $granted;
-	}
-
-	$order = wc_get_order( $data['order_id'] );
-
-	return $order && (int) $order->get_customer_id() === get_current_user_id();
-}
-add_filter( 'woocommerce_download_product_permissions_check', 'fs_download_access', 20, 2 );
 
 /**
  * حذف مراحل اضافی: بدون حمل‌ونقل، بدون یادداشت سفارش.
