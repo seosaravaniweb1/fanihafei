@@ -176,6 +176,9 @@ function fs_wishlist_endpoint_content() {
 		return;
 	}
 	?>
+	<?php // همان جداکننده‌ی آرشیو: بدون آن، کارت‌های h3 مستقیم زیر H1 برگه می‌افتادند. ?>
+	<h2 class="fs-sr-only">فهرست فایل‌های ذخیره‌شده</h2>
+
 	<div class="fs-cgrid fs-cgrid--account">
 		<?php
 		foreach ( $ids as $fs_i => $fs_pid ) {

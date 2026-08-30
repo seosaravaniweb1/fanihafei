@@ -326,7 +326,13 @@ while ( have_posts() ) :
 								<aside class="fs-pside">
 
 									<div class="fs-glance">
-										<h2 class="fs-glance__title">در یک نگاه</h2>
+										<?php
+										// سایدبار نباید با H2 های محتوای اصلی
+										// رقابت کند. h3 (نه h4) چون بالادستش
+										// H2 «توضیحات کامل محصول» است و پرش
+										// سطح خودش اخطار ساختاری می‌سازد.
+										?>
+										<h3 class="fs-glance__title">در یک نگاه</h3>
 										<?php foreach ( $fs_specs as $fs_spec ) : ?>
 											<div class="fs-glance__row">
 												<span><?php echo esc_html( $fs_spec['k'] ); ?></span>
@@ -337,7 +343,13 @@ while ( have_posts() ) :
 
 									<?php if ( $fs_why ) : ?>
 										<div class="fs-why">
-											<h2 class="fs-why__title"><?php echo esc_html( $fs_why['title'] ); ?></h2>
+											<?php
+											// متن این جعبه روی همه‌ی محصولات
+											// یکسان است؛ هدینگِ تکراری روی
+											// هزاران صفحه سیگنال سئویی ندارد،
+											// پس عنوانِ صرفاً بصری می‌ماند.
+											?>
+											<div class="fs-why__title"><?php echo esc_html( $fs_why['title'] ); ?></div>
 											<?php foreach ( $fs_why['items'] as $fs_item ) : ?>
 												<div class="fs-why__row">
 													<span class="fs-why__icon">

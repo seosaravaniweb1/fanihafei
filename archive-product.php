@@ -141,7 +141,12 @@ do_action( 'woocommerce_before_main_content' );
 			</h2>
 
 			<div class="fs-collapse" data-collapse>
-				<div class="fs-collapse__inner fs-rich"><?php echo wp_kses_post( wpautop( $fs_term->description ) ); ?></div>
+				<?php
+				// سطح هدینگ‌های متن ترم هم‌تراز می‌شود: H1 نشود، پرش سطح نکند.
+				// جعبه‌ی «درباره…» یک H2 است، پس تیترهای داخل متن هم H2 و
+				// زیرتیترها H3 می‌مانند و کانتینر سطحی تحمیل نمی‌کند.
+				?>
+				<div class="fs-collapse__inner fs-rich"><?php echo wp_kses_post( fs_normalize_term_headings( wpautop( $fs_term->description ) ) ); ?></div>
 				<button class="fs-collapse__btn fs-collapse__btn--pill" type="button" aria-expanded="false" hidden
 					data-more="<?php echo esc_attr( fs_copy( 'read_more' ) ); ?>"
 					data-less="<?php echo esc_attr( fs_copy( 'read_less' ) ); ?>">
@@ -181,6 +186,26 @@ do_action( 'woocommerce_before_main_content' );
 		do_action( 'woocommerce_archive_description' );
 		do_action( 'woocommerce_before_shop_loop' );
 		?>
+
+		<?php
+		/*
+		 * جداکننده‌ی معنایی فهرست محصولات.
+		 *
+		 * بدون این، عنوان محصول‌ها مستقیم زیر H1 دسته می‌نشستند و هیچ چیزی
+		 * نمی‌گفت «از اینجا فهرست شروع می‌شود». حالا یک H2 آن‌ها را جمع
+		 * می‌کند و خودشان H3 می‌شوند: H1 دسته ← H2 فهرست ← H3 هر محصول.
+		 *
+		 * روی صفحه دیده نمی‌شود چون طرح عنوانی برای این بخش ندارد؛ برای
+		 * خزنده و صفحه‌خوان کاملاً خواناست.
+		 */
+		?>
+		<h2 class="fs-sr-only">
+			<?php
+			echo $fs_term
+				? 'فهرست فایل‌های ' . esc_html( $fs_term->name )
+				: 'فهرست فایل‌ها';
+			?>
+		</h2>
 
 		<div class="fs-cgrid" id="fs-archive-grid">
 			<?php

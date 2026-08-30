@@ -68,10 +68,11 @@ $fs_is_new  = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY
 			 * است؛ وقتی همه‌شان span بودند، صفحه برای خزنده فقط یک H1 داشت و
 			 * هیچ ساختاری زیرش نبود. ووکامرس هم در حلقه‌ی خودش H2 می‌گذارد.
 			 *
-			 * سطح از بیرون قابل تعیین است: در آرشیو زیرِ H1 دسته می‌نشیند (h2)
-			 * و در ریل‌های صفحه‌ی اصلی زیرِ H2 همان بخش (h3).
+			 * سطح از بیرون قابل تعیین است. پیش‌فرض h3 است چون هر جا این کارت
+			 * می‌آید، بالادستش یک H2 هست که فهرست را معرفی می‌کند — در آرشیو
+			 * «فهرست فایل‌های فلان» و در ذخیره‌شده‌ها عنوان همان بخش.
 			 */
-			$fs_htag = isset( $args['heading'] ) ? $args['heading'] : 'h2';
+			$fs_htag = isset( $args['heading'] ) ? $args['heading'] : 'h3';
 			?>
 			<<?php echo esc_attr( $fs_htag ); ?> class="fs-gcard__title"><?php echo esc_html( $fs_product->get_name() ); ?></<?php echo esc_attr( $fs_htag ); ?>>
 

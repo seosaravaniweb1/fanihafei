@@ -1045,3 +1045,42 @@ function fs_toc_lines_to_items( $lines ) {
 
 	return $out;
 }
+
+/**
+ * هم‌ترازکردن سطح هدینگ‌های متن توضیحات دسته/برچسب/ویژگی.
+ *
+ * این متن، محتوای سئوی صفحه‌ی آرشیو است و ادمین آن را در ویرایشگر ترم
+ * می‌نویسد — جایی که هیچ چیز جلوی گذاشتن H1 را نمی‌گیرد. یک H1 آنجا یعنی
+ * صفحه دو H1 دارد و ساختار می‌شکند.
+ *
+ * قاعده‌ی خروجی: تیتر اصلی متن H2، زیرتیترها H3 و پایین‌تر. سقف H6 است.
+ * پرش سطح هم برداشته می‌شود؛ اگر ادمین بعد از H2 مستقیم H4 بگذارد، H3 شود.
+ *
+ * @param string $html متن خام ترم.
+ * @return string
+ */
+function fs_normalize_term_headings( $html ) {
+	$html = (string) $html;
+
+	if ( ! trim( $html ) || ! preg_match( '/<h[1-6][\s>]/i', $html ) ) {
+		return $html;
+	}
+
+	$previous = 1; // بالادستِ متن، H1 صفحه است.
+
+	return preg_replace_callback(
+		'#<(h)([1-6])([^>]*)>(.*?)</h\2>#is',
+		function ( $m ) use ( &$previous ) {
+			$level = (int) $m[2];
+
+			// هرگز بالاتر از H2، و هرگز بیش از یک پله عمیق‌تر از قبلی.
+			$level = max( 2, $level );
+			$level = min( $level, $previous + 1, 6 );
+
+			$previous = $level;
+
+			return sprintf( '<h%1$d%2$s>%3$s</h%1$d>', $level, $m[3], $m[4] );
+		},
+		$html
+	);
+}

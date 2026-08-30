@@ -172,16 +172,25 @@ function fs_schema_common_fields( $data, $product ) {
 		$data['sku'] = $sku ? $sku : (string) $id;
 	}
 
-	// --- brand: از همان تاکسونومی برندی که صفحه‌ی محصول «نویسنده» را از آن می‌خواند.
-	if ( empty( $data['brand'] ) ) {
-		$authors = function_exists( 'fs_get_product_authors' ) ? fs_get_product_authors( $id ) : array();
+	/*
+	 * brand: نام نویسنده.
+	 *
+	 * فروشگاه فایل برند تجاری ندارد — یک رمان برند ندارد ولی نویسنده دارد، و
+	 * همان اسمی است که خریدار در نتایج گوگل دنبالش می‌گردد. پس هر وقت
+	 * نویسنده‌ای داشته باشیم، برند همان می‌شود و مقدار پیش‌فرضِ ووکامرس یا
+	 * رنک‌مث (که معمولاً نام فروشگاه است) را کنار می‌زند. شرط empty قبلی
+	 * دقیقاً جلوی همین را می‌گرفت.
+	 *
+	 * نوع Brand می‌ماند نه Person: گوگل برای اسنیپت محصول فقط Brand و
+	 * Organization را می‌پذیرد و Person آنجا اخطار می‌سازد.
+	 */
+	$authors = function_exists( 'fs_get_product_authors' ) ? fs_get_product_authors( $id ) : array();
 
-		if ( $authors ) {
-			$data['brand'] = array(
-				'@type' => 'Brand',
-				'name'  => $authors[0]['name'],
-			);
-		}
+	if ( $authors ) {
+		$data['brand'] = array(
+			'@type' => 'Brand',
+			'name'  => $authors[0]['name'],
+		);
 	}
 
 	// --- امتیازها: aggregateRating فقط وقتی دیدگاه واقعی هست.
