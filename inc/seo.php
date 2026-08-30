@@ -488,6 +488,63 @@ function fs_resolve_wc_product( $product ) {
 }
 
 /**
+ * افزودن یک نوع فرعی به موجودیت، بدون دست‌زدن به @type.
+ *
+ * @type باید رشته بماند. ووکامرس در WC_Structured_Data::set_data آن را با
+ * الگوی |^[a-zA-Z]{1,20}$| می‌سنجد؛ آرایه دادن به آن روی PHP 8 خطای مرگبار
+ * می‌دهد و صفحه‌ی محصول وسط رندر قطع می‌شود، و روی PHP 7 بی‌صدا کل اسکیمای
+ * محصول را دور می‌ریزد. هر دو حالت بدتر از نداشتن نوع فرعی است.
+ *
+ * additionalType راه استاندارد schema.org برای همین کار است و رشته/آرایه‌ای
+ * از نشانی‌ها می‌گیرد.
+ *
+ * @param array  $data داده‌ی اسکیما.
+ * @param string $type نام نوع (مثلاً CreativeWork).
+ * @return array
+ */
+function fs_schema_add_type( $data, $type ) {
+	if ( ! is_array( $data ) || fs_schema_has_type( $data, $type ) ) {
+		return $data;
+	}
+
+	$url      = 'https://schema.org/' . $type;
+	$existing = isset( $data['additionalType'] ) ? (array) $data['additionalType'] : array();
+
+	$existing[]               = $url;
+	$data['additionalType']   = array_values( array_unique( $existing ) );
+
+	// اگر فقط یکی است، رشته تمیزتر از آرایه‌ی تک‌عضوی است.
+	if ( 1 === count( $data['additionalType'] ) ) {
+		$data['additionalType'] = $data['additionalType'][0];
+	}
+
+	return $data;
+}
+
+/**
+ * آیا این نوع از قبل روی موجودیت هست؟
+ *
+ * @param array  $data داده‌ی اسکیما.
+ * @param string $type نام نوع.
+ * @return bool
+ */
+function fs_schema_has_type( $data, $type ) {
+	if ( ! is_array( $data ) ) {
+		return false;
+	}
+
+	$main = isset( $data['@type'] ) ? (array) $data['@type'] : array();
+
+	if ( in_array( $type, $main, true ) ) {
+		return true;
+	}
+
+	$extra = isset( $data['additionalType'] ) ? (array) $data['additionalType'] : array();
+
+	return in_array( 'https://schema.org/' . $type, $extra, true );
+}
+
+/**
  * فرمت‌هایی که یعنی محصول واقعاً یک نرم‌افزار است.
  *
  * عمداً کوتاه و محافظه‌کارانه: PDF و Word نرم‌افزار نیستند و برچسب‌زدنشان با
@@ -550,13 +607,7 @@ function fs_schema_software( $data, $product = null ) {
 		return $data;
 	}
 
-	$type = isset( $data['@type'] ) ? (array) $data['@type'] : array( 'Product' );
-
-	if ( ! in_array( 'SoftwareApplication', $type, true ) ) {
-		$type[] = 'SoftwareApplication';
-	}
-
-	$data['@type'] = $type;
+	$data = fs_schema_add_type( $data, 'SoftwareApplication' );
 
 	if ( empty( $data['applicationCategory'] ) ) {
 		$data['applicationCategory'] = (string) apply_filters(
@@ -826,14 +877,10 @@ function fs_schema_product_details( $data, $product = null ) {
 	$id = $product->get_id();
 
 	// --- نوع موجودیت ------------------------------------------------------
-	$type = isset( $data['@type'] ) ? (array) $data['@type'] : array( 'Product' );
-
 	// SoftwareApplication خودش زیرمجموعه‌ی CreativeWork است؛ دوباره نگذاریم.
-	if ( ! array_intersect( array( 'CreativeWork', 'SoftwareApplication' ), $type ) ) {
-		$type[] = 'CreativeWork';
+	if ( ! fs_schema_has_type( $data, 'SoftwareApplication' ) ) {
+		$data = fs_schema_add_type( $data, 'CreativeWork' );
 	}
-
-	$data['@type'] = $type;
 
 	if ( empty( $data['inLanguage'] ) ) {
 		$data['inLanguage'] = 'fa-IR';
@@ -987,3 +1034,39 @@ function fs_schema_video_object( $product ) {
 
 	return $video;
 }
+
+/**
+ * محافظ نهایی: @type محصول همیشه رشته بماند.
+ *
+ * این تور ایمنی است، نه منطق اصلی — توابع بالا دیگر به @type دست نمی‌زنند.
+ * ولی چون شکستن این قاعده روی PHP 8 کل صفحه‌ی محصول را با خطای مرگبار پایین
+ * می‌آورد (WC_Structured_Data::set_data یک preg_match روی آن اجرا می‌کند)،
+ * ارزشش را دارد که آخر صف هم یک بار بررسی شود؛ افزونه‌های دیگر هم روی همین
+ * فیلتر می‌نشینند.
+ *
+ * @param array $data داده‌ی اسکیما.
+ * @return array
+ */
+function fs_schema_guard_type( $data ) {
+	if ( ! is_array( $data ) || ! isset( $data['@type'] ) || is_string( $data['@type'] ) ) {
+		return $data;
+	}
+
+	$types = array_values( array_filter( (array) $data['@type'], 'is_string' ) );
+
+	if ( ! $types ) {
+		$data['@type'] = 'Product';
+
+		return $data;
+	}
+
+	// اولی می‌ماند، بقیه به additionalType می‌روند تا داده‌ای گم نشود.
+	$data['@type'] = array_shift( $types );
+
+	foreach ( $types as $extra ) {
+		$data = fs_schema_add_type( $data, $extra );
+	}
+
+	return $data;
+}
+add_filter( 'woocommerce_structured_data_product', 'fs_schema_guard_type', 99 );
