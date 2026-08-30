@@ -4017,10 +4017,6 @@ a.fs-fcontact:hover {
   display: flex;
   justify-content: center;
   padding: 40px var(--fs-pad) 60px;
-
-  /* ظرف پرسش — پایین توضیحش هست. */
-  container-type: inline-size;
-  container-name: fsauth;
 }
 
 .fs-auth__wrap {
@@ -4028,6 +4024,7 @@ a.fs-fcontact:hover {
 }
 
 .fs-auth__card {
+  position: relative;
   width: 100%;
   background: #fff;
   border: 1px solid var(--fs-line-2);
@@ -4042,159 +4039,82 @@ a.fs-fcontact:hover {
   margin-bottom: 20px;
 }
 
-.fs-auth__side { display: none; }
-
-@media (min-width: 900px) {
-  .fs-auth__wrap {
-    width: min(760px, 100%);
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    background: #fff;
-    border-radius: 24px;
-    overflow: hidden;
-    box-shadow: 0 24px 60px rgba(15, 23, 42, .12);
-  }
-
-  .fs-auth__card {
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 30px 32px;
-  }
-
-  .fs-auth__card .fs-auth__brand { display: none; }
-
-  .fs-auth__side {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    position: relative;
-    overflow: hidden;
-    padding: 32px 26px;
-    background: linear-gradient(165deg, #1e1b4b, #4c1d95);
-  }
-
-  .fs-auth__side::before {
-    content: '';
-    position: absolute;
-    bottom: -70px;
-    right: -50px;
-    width: 230px;
-    height: 230px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(var(--fs-brand-l-rgb), .3), rgba(var(--fs-brand-l-rgb), 0) 70%);
-  }
-
-  .fs-auth__side-logo { position: relative; }
-  .fs-auth__side-logo img { max-height: 30px; }
-
-  .fs-auth__side-title {
-    position: relative;
-    font: 800 19px/1.65 var(--fs-font);
-    color: #fff;
-    margin: 0;
-  }
-
-  .fs-auth__side-list {
-    position: relative;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .fs-auth__side-list li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font: 600 11.5px/1.6 var(--fs-font);
-    color: #cbd5e1;
-  }
-
-  .fs-auth__side-check {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 9px;
-    background: rgba(255, 255, 255, .12);
-  }
-
-  .fs-auth__side-foot {
-    position: relative;
-    margin-top: auto;
-    font: 500 10px/1.9 var(--fs-font);
-    color: #64748b;
-  }
-
-  .fs-auth__side-foot span { color: #c4b5fd; }
+/* سربرگ کارت — لوگو وسط، دکمه‌ی بازگشت گوشه‌ی چپ ------------------------- */
+.fs-auth__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
 }
+
+.fs-auth__brand img { max-height: 40px; }
 
 /*
- * چیدمان کارت ورود باید به عرض «ظرف» واکنش نشان دهد، نه عرض پنجره.
+ * دکمه‌ی بازگشت داخل هر گام است، نه در سربرگ مشترک.
  *
- * مدیاکوئری زیر عرض پنجره را می‌سنجد، ولی این کارت داخل محتوای برگه‌ی
- * «حساب کاربری» می‌نشیند و عرض واقعی‌اش را از والدش می‌گیرد. اگر والد به هر
- * دلیلی باریک باشد — بلوک گوتنبرگ با عرض محدود، ستون یک افزونه، یا استایل
- * سفارشی — پنجره همچنان دسکتاپ است، گرید دوستونی فعال می‌ماند و ستون فرم به
- * چند ده پیکسل له می‌شود؛ همان چیزی که روی نصب ویندوز دیده شد.
- *
- * این قانون هر وقت ظرف کمتر از ۷۲۰ پیکسل باشد به همان چیدمان تک‌ستونیِ
- * موبایل برمی‌گردد که همیشه خواناست. مرورگرهای بدون پشتیبانی از @container
- * دقیقاً مثل قبل رفتار می‌کنند.
+ * این‌طور هر گام مقصد بازگشت خودش را دارد — گام اول به فروشگاه برمی‌گردد و
+ * بقیه به گام شماره‌ی موبایل — و چون فقط گام فعال دیده می‌شود، همیشه دقیقاً
+ * یک دکمه روی کارت هست. بدون هیچ منطق جاوااسکریپتی.
  */
-@container fsauth (max-width: 719px) {
-  .fs-auth__wrap {
-    width: min(430px, 100%);
-    display: block;
-    background: transparent;
-    border-radius: 0;
-    overflow: visible;
-    box-shadow: none;
-  }
-
-  .fs-auth__side { display: none; }
-
-  .fs-auth__card {
-    border: 1px solid var(--fs-line-2);
-    border-radius: 22px;
-    box-shadow: 0 24px 60px rgba(15, 23, 42, .12);
-    padding: 26px;
-  }
-
-  .fs-auth__card .fs-auth__brand { display: block; }
-}
-
-.fs-auth__tabs {
+.fs-auth__back {
+  position: absolute;
+  top: 22px;
+  left: 22px;
+  width: 34px;
+  height: 34px;
   display: flex;
-  gap: 6px;
-  background: var(--fs-bg-2);
-  border-radius: 14px;
-  padding: 5px;
-  margin-bottom: 20px;
-}
-
-.fs-auth__tab {
-  flex: 1;
-  font: 600 12.5px var(--fs-font);
-  color: var(--fs-ink-3);
-  background: transparent;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 11px;
-  padding: 11px;
-  transition: all .2s;
+  background: transparent;
+  color: var(--fs-muted);
+  transition: background .18s, color .18s;
 }
 
-.fs-auth__tab.is-active {
-  font-weight: 700;
-  background: #fff;
+.fs-auth__back:hover {
+  background: var(--fs-bg-2);
   color: var(--fs-ink);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
 }
+
+.fs-auth__title {
+  font: 800 19px var(--fs-font);
+  color: var(--fs-ink);
+  margin: 0 0 6px;
+}
+
+.fs-auth__sub {
+  font: 500 12.5px/1.9 var(--fs-font);
+  color: var(--fs-muted);
+  margin: 0 0 20px;
+}
+
+/* مسیرهای جایگزین ته کارت ------------------------------------------------- */
+.fs-auth__alts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--fs-line-3);
+}
+
+.fs-auth__alt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--fs-brand);
+  font: 700 12.5px var(--fs-font);
+  text-align: right;
+  transition: background .18s;
+}
+
+.fs-auth__alt:hover { background: var(--fs-bg-2); }
+.fs-auth__alt svg { flex: none; }
 
 .fs-auth__label {
   display: block;
@@ -4379,10 +4299,12 @@ a.fs-fcontact:hover {
 }
 
 .fs-auth__terms {
+  margin: 22px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--fs-line-3);
   font: 500 10.5px/1.9 var(--fs-font);
   color: var(--fs-muted-2);
   text-align: center;
-  margin: 20px 0 0;
 }
 
 .fs-auth__terms a { color: var(--fs-brand); }

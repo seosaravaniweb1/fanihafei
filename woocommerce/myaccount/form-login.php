@@ -14,63 +14,56 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 <div class="fs-auth" data-auth data-redirect="<?php echo esc_attr( $fs_redirect ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'fs_auth' ) ); ?>">
 
 	<div class="fs-auth__wrap">
-
-		<aside class="fs-auth__side">
-			<div class="fs-auth__side-logo"><?php fs_the_logo( 'header' ); ?></div>
-
-			<h2 class="fs-auth__side-title">با یک حساب، همه فایل‌هایتان همیشه در دسترس است</h2>
-
-			<ul class="fs-auth__side-list">
-				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.6' ) ); ?></span>
-					دانلود فوری فایل‌ها بعد از پرداخت
-				</li>
-				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.6' ) ); ?></span>
-					دسترسی همیشگی به همه خریدها
-				</li>
-				<li>
-					<span class="fs-auth__side-check"><?php fs_the_icon( 'check', 13, array( 'stroke' => '#c4b5fd', 'width' => '2.6' ) ); ?></span>
-					ذخیره فایل‌های مورد علاقه
-				</li>
-			</ul>
-
-			<p class="fs-auth__side-foot">با ادامه، <span>قوانین و حریم خصوصی</span> <?php bloginfo( 'name' ); ?> را می‌پذیرید.</p>
-		</aside>
-
 	<div class="fs-auth__card">
 
 		<div class="fs-auth__brand"><?php fs_the_logo( 'header' ); ?></div>
-
-		<div class="fs-auth__tabs" role="tablist">
-			<button class="fs-auth__tab is-active" type="button" data-goto="entry">کد پیامکی</button>
-			<button class="fs-auth__tab" type="button" data-goto="password">رمز عبور</button>
-		</div>
 
 		<p class="fs-auth__error" data-error hidden></p>
 
 		<!-- گام ۱: شماره موبایل -->
 		<div class="fs-auth__step" data-step="entry">
-			<label class="fs-auth__label" for="fs-auth-login">شماره موبایل، ایمیل یا نام کاربری</label>
+			<a class="fs-auth__back" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="بازگشت به فروشگاه">
+				<?php fs_the_icon( 'arrow-next', 19, array( 'width' => '2' ) ); ?>
+			</a>
+
+			<h2 class="fs-auth__title">ورود | ثبت‌نام</h2>
+			<p class="fs-auth__sub">سلام! لطفاً شماره موبایل خود را وارد کنید.</p>
+
+			<label class="fs-sr-only" for="fs-auth-login">شماره موبایل، ایمیل یا نام کاربری</label>
 			<input class="fs-auth__input" id="fs-auth-login" type="text" inputmode="tel" autocomplete="username"
 				placeholder="۰۹۱۲۱۲۳۴۵۶۷" data-field="login">
 
 			<button class="fs-auth__submit" type="button" data-action="entry">
 				<span class="fs-auth__submit-text">ادامه</span>
+				<?php fs_the_icon( 'chevron-prev', 15, array( 'stroke' => '#fff', 'width' => '2.4' ) ); ?>
 				<span class="fs-auth__spinner" hidden></span>
 			</button>
 
-			<p class="fs-auth__hint">ورود و ثبت‌نام یکی است؛ اگر شماره تازه باشد همین‌جا حساب ساخته می‌شود.</p>
+			<div class="fs-auth__alts">
+				<button class="fs-auth__alt" type="button" data-goto="password">
+					<?php fs_the_icon( 'user', 16, array( 'width' => '1.9' ) ); ?>
+					ورود بدون احراز پیامکی
+				</button>
+				<button class="fs-auth__alt" type="button" data-goto="register">
+					<?php fs_the_icon( 'plus', 16, array( 'width' => '2.2' ) ); ?>
+					ثبت‌نام بدون احراز پیامکی
+				</button>
+			</div>
 		</div>
 
 		<!-- گام ۲: کد پیامکی -->
 		<div class="fs-auth__step" data-step="otp" hidden>
+			<button class="fs-auth__back" type="button" data-goto="entry" aria-label="بازگشت">
+				<?php fs_the_icon( 'arrow-next', 19, array( 'width' => '2' ) ); ?>
+			</button>
+
+			<h2 class="fs-auth__title">تایید شماره</h2>
+			<p class="fs-auth__sub">کد پنج‌رقمی پیامک‌شده را وارد کنید.</p>
+
 			<div class="fs-auth__phone">
 				<span data-phone-label></span>
 				<button class="fs-auth__link" type="button" data-goto="entry">تغییر شماره</button>
 			</div>
-
-			<label class="fs-auth__label">کد ۵ رقمی پیامک‌شده را وارد کنید</label>
 
 			<div class="fs-auth__otp" data-otp dir="ltr">
 				<input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
@@ -90,12 +83,17 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 				<span class="fs-auth__spinner" hidden></span>
 			</button>
 
-			<button class="fs-auth__link fs-auth__link--block" type="button" data-goto="password">ورود با رمز عبور</button>
+			<button class="fs-auth__alt" type="button" data-goto="password"><?php fs_the_icon( 'user', 16, array( 'width' => '1.9' ) ); ?>ورود بدون احراز پیامکی</button>
 		</div>
 
 		<!-- گام ۳: نام و نام خانوادگی (کاربر تازه) -->
 		<div class="fs-auth__step" data-step="profile" hidden>
-			<p class="fs-auth__welcome">خوش آمدید! برای تکمیل حساب، نام خود را وارد کنید.</p>
+			<button class="fs-auth__back" type="button" data-goto="entry" aria-label="بازگشت">
+				<?php fs_the_icon( 'arrow-next', 19, array( 'width' => '2' ) ); ?>
+			</button>
+
+			<h2 class="fs-auth__title">تکمیل حساب</h2>
+			<p class="fs-auth__sub">خوش آمدید! برای ساخت حساب، نام خود را وارد کنید.</p>
 
 			<div class="fs-auth__row">
 				<div>
@@ -122,6 +120,13 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 
 		<!-- ورود با رمز عبور -->
 		<div class="fs-auth__step" data-step="password" hidden>
+			<button class="fs-auth__back" type="button" data-goto="entry" aria-label="بازگشت">
+				<?php fs_the_icon( 'arrow-next', 19, array( 'width' => '2' ) ); ?>
+			</button>
+
+			<h2 class="fs-auth__title">ورود با رمز عبور</h2>
+			<p class="fs-auth__sub">شماره موبایل یا ایمیل و رمز عبورتان را وارد کنید.</p>
+
 			<label class="fs-auth__label" for="fs-auth-user">شماره موبایل، ایمیل یا نام کاربری</label>
 			<input class="fs-auth__input" id="fs-auth-user" type="text" autocomplete="username" data-field="login">
 
@@ -137,12 +142,21 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 				<span class="fs-auth__spinner" hidden></span>
 			</button>
 
-			<button class="fs-auth__link fs-auth__link--block" type="button" data-goto="entry">ورود با کد پیامکی</button>
-			<button class="fs-auth__link fs-auth__link--block" type="button" data-goto="register">ساخت حساب با رمز عبور</button>
+			<div class="fs-auth__alts">
+				<button class="fs-auth__alt" type="button" data-goto="entry"><?php fs_the_icon( 'chat', 16, array( 'width' => '1.9' ) ); ?>ورود با کد پیامکی</button>
+				<button class="fs-auth__alt" type="button" data-goto="register"><?php fs_the_icon( 'plus', 16, array( 'width' => '2.2' ) ); ?>ثبت‌نام بدون احراز پیامکی</button>
+			</div>
 		</div>
 
 		<!-- ثبت‌نام با رمز عبور -->
 		<div class="fs-auth__step" data-step="register" hidden>
+			<button class="fs-auth__back" type="button" data-goto="entry" aria-label="بازگشت">
+				<?php fs_the_icon( 'arrow-next', 19, array( 'width' => '2' ) ); ?>
+			</button>
+
+			<h2 class="fs-auth__title">ثبت‌نام با رمز عبور</h2>
+			<p class="fs-auth__sub">حساب تازه بسازید؛ بدون نیاز به کد پیامکی.</p>
+
 			<label class="fs-auth__label" for="fs-reg-phone">شماره موبایل</label>
 			<input class="fs-auth__input" id="fs-reg-phone" type="text" inputmode="tel" placeholder="۰۹۱۲۱۲۳۴۵۶۷" data-field="phone">
 
@@ -171,7 +185,9 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 				<span class="fs-auth__spinner" hidden></span>
 			</button>
 
-			<button class="fs-auth__link fs-auth__link--block" type="button" data-goto="entry">ثبت‌نام با پیامک</button>
+			<div class="fs-auth__alts">
+				<button class="fs-auth__alt" type="button" data-goto="entry"><?php fs_the_icon( 'chat', 16, array( 'width' => '1.9' ) ); ?>ثبت‌نام با کد پیامکی</button>
+			</div>
 		</div>
 
 		<p class="fs-auth__terms">

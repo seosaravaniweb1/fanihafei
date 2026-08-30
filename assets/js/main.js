@@ -712,7 +712,6 @@
 		}
 
 		var steps = root.querySelectorAll( '[data-step]' );
-		var tabs = root.querySelectorAll( '.fs-auth__tab' );
 		var error = root.querySelector( '[data-error]' );
 		var redirect = root.getAttribute( 'data-redirect' ) || '';
 		var state = { phone: '', ticket: '', timer: null };
@@ -720,11 +719,6 @@
 		function show( name ) {
 			Array.prototype.forEach.call( steps, function ( step ) {
 				toggle( step, step.getAttribute( 'data-step' ) === name );
-			} );
-
-			Array.prototype.forEach.call( tabs, function ( tab ) {
-				var target = tab.getAttribute( 'data-goto' );
-				tab.classList.toggle( 'is-active', target === name || ( 'entry' === target && 'otp' === name ) || ( 'password' === target && 'register' === name ) );
 			} );
 
 			toggle( error, false );

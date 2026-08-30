@@ -145,6 +145,7 @@ function fs_icon( $name, $size = 16, $args = array() ) {
 		'chevron-down' => '<path d="m6 9 6 6 6-6"></path>',
 		'chevron-prev' => '<path d="m14 6-6 6 6 6"></path>',
 		'chevron-next' => '<path d="m10 6 6 6-6 6"></path>',
+		'arrow-next'  => '<path d="M4 12h16"></path><path d="m14 6 6 6-6 6"></path>',
 		'grid'        => '<path d="M4 4h7v7H4z"></path><path d="M13 4h7v7h-7z"></path><path d="M4 13h7v7H4z"></path><path d="M13 13h7v7h-7z"></path>',
 		'download'    => '<path d="M12 3v12"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path>',
 		'zap'         => '<path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"></path>',
