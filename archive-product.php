@@ -2,7 +2,8 @@
 /**
  * آرشیو محصولات و صفحه دسته — برگردان دقیق طرح «Category Listing UI».
  *
- * تمام‌عرض، بدون سایدبار، بدون صفحه‌بندی — با اسکرول محصولات بعدی بارگذاری می‌شوند.
+ * تمام‌عرض، بدون سایدبار. محصولات بعدی با اسکرول بارگذاری می‌شوند، ولی لینک
+ * صفحه‌ی بعد همیشه یک <a href> واقعی است تا خزنده کل کاتالوگ را ببیند.
  *
  * @package SiFile
  */
@@ -152,7 +153,7 @@ do_action( 'woocommerce_before_main_content' );
 				</span>
 				<?php foreach ( $fs_sorts as $fs_key => $fs_label ) : ?>
 					<a class="fs-sortbtn<?php echo $fs_key === $fs_current_sort ? ' is-active' : ''; ?>"
-						href="<?php echo esc_url( add_query_arg( 'orderby', $fs_key ) ); ?>">
+						href="<?php echo esc_url( add_query_arg( 'orderby', $fs_key ) ); ?>" rel="nofollow">
 						<?php echo esc_html( $fs_label ); ?>
 					</a>
 				<?php endforeach; ?>
@@ -201,9 +202,23 @@ do_action( 'woocommerce_before_main_content' );
 		<?php do_action( 'woocommerce_after_shop_loop' ); ?>
 
 		<?php if ( $fs_next ) : ?>
+			<?php
+			/*
+			 * «نمایش بیشتر» باید یک <a href> واقعی باشد، نه <button>.
+			 *
+			 * پیش از این نشانی صفحه‌ی بعد فقط در data-next می‌نشست و دکمه‌ای که
+			 * کاربر می‌دید هیچ مقصدی نداشت. خزنده نه اتریبیوت دیتا را دنبال
+			 * می‌کند نه دکمه را کلیک؛ یعنی از هر دسته فقط محصولات صفحه‌ی اول
+			 * کشف می‌شدند و بقیه‌ی کاتالوگ بی‌لینک می‌ماند.
+			 *
+			 * حالا هر صفحه به صفحه‌ی بعدی لینک واقعی دارد و زنجیره کامل است.
+			 * جاوااسکریپت همین لینک را برمی‌دارد و کلیک را می‌گیرد، پس رفتار و
+			 * ظاهر برای کاربر دقیقاً همان است.
+			 */
+			?>
 			<div class="fs-infinite" data-infinite data-next="<?php echo esc_url( $fs_next ); ?>" data-target="fs-archive-grid">
 				<span class="fs-infinite__spinner" aria-hidden="true"></span>
-				<button class="fs-infinite__btn" type="button">نمایش محصولات بیشتر</button>
+				<a class="fs-infinite__btn" href="<?php echo esc_url( $fs_next ); ?>" rel="next">نمایش محصولات بیشتر</a>
 			</div>
 		<?php endif; ?>
 

@@ -1015,6 +1015,11 @@
 
 					if ( url ) {
 						box.setAttribute( 'data-next', url );
+
+						if ( button ) {
+							button.setAttribute( 'href', url );
+						}
+
 						toggle( button, true );
 					} else {
 						box.remove();
@@ -1034,7 +1039,12 @@
 		}
 
 		if ( button ) {
-			button.addEventListener( 'click', load );
+			// دکمه حالا یک <a> با نشانی واقعی صفحه‌ی بعد است تا خزنده بتواند
+			// دنبالش کند؛ برای کاربر باید همان بارگذاری درجا بماند.
+			button.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				load();
+			} );
 		}
 
 		if ( 'IntersectionObserver' in window ) {

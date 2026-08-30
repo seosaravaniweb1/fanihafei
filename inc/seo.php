@@ -274,3 +274,324 @@ function fs_rank_math_currency() {
 	return fs_schema_currency();
 }
 add_filter( 'rank_math/woocommerce/og_currency', 'fs_rank_math_currency', 20 );
+
+/* -------------------------------------------------------------------------
+   متادیتا: کنونیکال آرشیو و توضیحات متا
+   ------------------------------------------------------------------------- */
+
+/**
+ * آیا افزونه‌ی سئویی نصب است که خودش متادیتا می‌نویسد؟
+ *
+ * هر چیزی که در ادامه می‌آید فقط «پرکننده‌ی جای خالی» است. اگر رنک‌مث یا یواست
+ * فعال باشد، آن‌ها canonical و description را می‌نویسند و خروجی دوباره‌ی ما
+ * فقط تگ تکراری می‌سازد — که خودش خطای سرچ کنسول است.
+ *
+ * @return bool
+ */
+function fs_seo_plugin_active() {
+	$active = defined( 'RANK_MATH_VERSION' )
+		|| defined( 'WPSEO_VERSION' )
+		|| defined( 'SEOPRESS_VERSION' )
+		|| defined( 'AIOSEO_VERSION' )
+		|| defined( 'THE_SEO_FRAMEWORK_VERSION' );
+
+	return (bool) apply_filters( 'fs_seo_plugin_active', $active );
+}
+
+/**
+ * نشانی کنونیکال آرشیوها.
+ *
+ * `rel_canonical` هسته‌ی وردپرس فقط روی `is_singular()` اجرا می‌شود؛ یعنی
+ * صفحه‌ی دسته با `?orderby=price` و بدون آن، دو نشانی جدا و بدون هیچ سیگنالی
+ * برای گوگل بودند. اینجا نشانی پاکِ همان صفحه ساخته می‌شود: پارامترهای
+ * مرتب‌سازی و فیلتر حذف، ولی شماره‌ی صفحه نگه داشته می‌شود — صفحه‌ی دوم
+ * محتوای دیگری دارد و نباید به صفحه‌ی اول کنونیکال بخورد.
+ *
+ * @return string نشانی یا رشته‌ی خالی.
+ */
+function fs_archive_canonical_url() {
+	if ( is_singular() || is_front_page() || is_404() || is_search() ) {
+		return '';
+	}
+
+	$base = '';
+
+	if ( is_tax( array( 'product_cat', 'product_tag' ) ) || is_category() || is_tag() || is_tax() ) {
+		$term = get_queried_object();
+
+		if ( $term instanceof WP_Term ) {
+			$link = get_term_link( $term );
+			$base = is_wp_error( $link ) ? '' : $link;
+		}
+	} elseif ( function_exists( 'is_shop' ) && is_shop() ) {
+		$shop_id = wc_get_page_id( 'shop' );
+		$base    = $shop_id > 0 ? get_permalink( $shop_id ) : '';
+	} elseif ( is_home() ) {
+		$blog_id = (int) get_option( 'page_for_posts' );
+		$base    = $blog_id ? get_permalink( $blog_id ) : home_url( '/' );
+	}
+
+	if ( ! $base ) {
+		return '';
+	}
+
+	$paged = max( 1, (int) get_query_var( 'paged' ) );
+
+	if ( $paged > 1 ) {
+		$base = trailingslashit( $base ) . 'page/' . $paged . '/';
+	}
+
+	return $base;
+}
+
+/**
+ * چاپ کنونیکال آرشیو.
+ *
+ * @return void
+ */
+function fs_print_archive_canonical() {
+	if ( fs_seo_plugin_active() ) {
+		return;
+	}
+
+	$url = fs_archive_canonical_url();
+
+	if ( $url ) {
+		printf( '<link rel="canonical" href="%s">' . "\n", esc_url( $url ) );
+	}
+}
+add_action( 'wp_head', 'fs_print_archive_canonical', 5 );
+
+/**
+ * متن توضیحات متا برای نمای جاری.
+ *
+ * @return string
+ */
+function fs_meta_description_text() {
+	$text = '';
+
+	if ( is_singular() ) {
+		$post = get_queried_object();
+
+		if ( $post instanceof WP_Post ) {
+			$text = $post->post_excerpt;
+
+			if ( ! $text && function_exists( 'wc_get_product' ) && 'product' === $post->post_type ) {
+				$product = wc_get_product( $post->ID );
+
+				if ( $product ) {
+					$text = $product->get_short_description();
+				}
+			}
+
+			if ( ! $text ) {
+				$text = $post->post_content;
+			}
+		}
+	} elseif ( is_tax() || is_category() || is_tag() ) {
+		$term = get_queried_object();
+
+		if ( $term instanceof WP_Term ) {
+			$text = $term->description;
+		}
+	} elseif ( is_front_page() || is_home() ) {
+		$text = get_bloginfo( 'description' );
+	}
+
+	$text = wp_strip_all_tags( strip_shortcodes( (string) $text ), true );
+	$text = trim( preg_replace( '/\s+/u', ' ', $text ) );
+
+	if ( ! $text ) {
+		return '';
+	}
+
+	// ۱۶۰ نویسه سقف عملی گوگل است؛ برش روی مرز واژه تا وسط کلمه قطع نشود.
+	if ( mb_strlen( $text, 'UTF-8' ) > 160 ) {
+		$text = mb_substr( $text, 0, 160, 'UTF-8' );
+		$cut  = mb_strrpos( $text, ' ', 0, 'UTF-8' );
+
+		if ( $cut && $cut > 80 ) {
+			$text = mb_substr( $text, 0, $cut, 'UTF-8' );
+		}
+
+		$text .= '…';
+	}
+
+	return $text;
+}
+
+/**
+ * چاپ توضیحات متا وقتی هیچ افزونه‌ی سئویی نیست.
+ *
+ * @return void
+ */
+function fs_print_meta_description() {
+	if ( fs_seo_plugin_active() ) {
+		return;
+	}
+
+	$text = fs_meta_description_text();
+
+	if ( $text ) {
+		printf( '<meta name="description" content="%s">' . "\n", esc_attr( $text ) );
+	}
+}
+add_action( 'wp_head', 'fs_print_meta_description', 5 );
+
+/* -------------------------------------------------------------------------
+   SoftwareApplication و Article
+   ------------------------------------------------------------------------- */
+
+/**
+ * فرمت‌هایی که یعنی محصول واقعاً یک نرم‌افزار است.
+ *
+ * عمداً کوتاه و محافظه‌کارانه: PDF و Word نرم‌افزار نیستند و برچسب‌زدنشان با
+ * SoftwareApplication داده‌ی نادرست به گوگل می‌دهد.
+ *
+ * @return string[]
+ */
+function fs_software_formats() {
+	return (array) apply_filters(
+		'fs_software_formats',
+		array( 'exe', 'apk', 'msi', 'dmg', 'ipa', 'appimage', 'setup' )
+	);
+}
+
+/**
+ * آیا این محصول نرم‌افزار است؟
+ *
+ * @param WC_Product $product محصول.
+ * @return bool
+ */
+function fs_product_is_software( $product ) {
+	if ( ! $product instanceof WC_Product ) {
+		return false;
+	}
+
+	$is = false;
+
+	if ( function_exists( 'fs_product_format' ) ) {
+		$format = strtolower( fs_product_format( $product->get_id() ) );
+
+		foreach ( fs_software_formats() as $needle ) {
+			if ( false !== strpos( $format, strtolower( $needle ) ) ) {
+				$is = true;
+
+				break;
+			}
+		}
+	}
+
+	return (bool) apply_filters( 'fs_product_is_software', $is, $product );
+}
+
+/**
+ * افزودن SoftwareApplication به همان موجودیت محصول.
+ *
+ * روش درست، ساختن یک نود جدا نیست — دو موجودیت برای یک چیز، گوگل را دوقلو
+ * می‌بیند. راه پذیرفته‌شده این است که `@type` آرایه شود تا همان یک موجودیت هم
+ * Product باشد هم SoftwareApplication؛ این‌طور ریچ‌ریزالت قیمت هم حفظ می‌شود.
+ *
+ * @param array      $data    داده‌ی اسکیما.
+ * @param WC_Product $product محصول.
+ * @return array
+ */
+function fs_schema_software( $data, $product ) {
+	if ( ! is_array( $data ) || ! fs_product_is_software( $product ) ) {
+		return $data;
+	}
+
+	$type = isset( $data['@type'] ) ? (array) $data['@type'] : array( 'Product' );
+
+	if ( ! in_array( 'SoftwareApplication', $type, true ) ) {
+		$type[] = 'SoftwareApplication';
+	}
+
+	$data['@type'] = $type;
+
+	if ( empty( $data['applicationCategory'] ) ) {
+		$data['applicationCategory'] = (string) apply_filters(
+			'fs_schema_application_category',
+			'UtilitiesApplication',
+			$product
+		);
+	}
+
+	if ( empty( $data['operatingSystem'] ) ) {
+		$data['operatingSystem'] = (string) apply_filters(
+			'fs_schema_operating_system',
+			'Windows, Android',
+			$product
+		);
+	}
+
+	if ( empty( $data['fileSize'] ) && function_exists( 'fs_product_field' ) ) {
+		$size = fs_product_field( $product->get_id(), 'file_size' );
+
+		if ( $size ) {
+			$data['fileSize'] = $size;
+		}
+	}
+
+	return $data;
+}
+add_filter( 'woocommerce_structured_data_product', 'fs_schema_software', 30, 2 );
+
+/**
+ * اسکیمای مقاله برای نوشته‌های وبلاگ.
+ *
+ * ووکامرس فقط محصول را پوشش می‌دهد و نوشته‌ها هیچ داده‌ی ساختاریافته‌ای
+ * نداشتند. اگر افزونه‌ی سئویی فعال باشد این را نمی‌نویسیم تا موجودیت تکراری
+ * نسازیم.
+ *
+ * @return void
+ */
+function fs_print_article_schema() {
+	if ( fs_seo_plugin_active() || ! is_singular( 'post' ) ) {
+		return;
+	}
+
+	$post = get_queried_object();
+
+	if ( ! $post instanceof WP_Post ) {
+		return;
+	}
+
+	$data = array(
+		'@context'         => 'https://schema.org',
+		'@type'            => 'BlogPosting',
+		'mainEntityOfPage' => array(
+			'@type' => 'WebPage',
+			'@id'   => get_permalink( $post ),
+		),
+		'headline'         => wp_strip_all_tags( get_the_title( $post ) ),
+		'datePublished'    => get_the_date( DATE_W3C, $post ),
+		'dateModified'     => get_the_modified_date( DATE_W3C, $post ),
+		'author'           => array(
+			'@type' => 'Person',
+			'name'  => get_the_author_meta( 'display_name', (int) $post->post_author ),
+		),
+		'publisher'        => array(
+			'@type' => 'Organization',
+			'name'  => get_bloginfo( 'name' ),
+		),
+	);
+
+	$description = fs_meta_description_text();
+
+	if ( $description ) {
+		$data['description'] = $description;
+	}
+
+	$thumb = get_the_post_thumbnail_url( $post, 'large' );
+
+	if ( $thumb ) {
+		$data['image'] = $thumb;
+	}
+
+	printf(
+		'<script type="application/ld+json">%s</script>' . "\n",
+		wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE )
+	);
+}
+add_action( 'wp_footer', 'fs_print_article_schema', 20 );

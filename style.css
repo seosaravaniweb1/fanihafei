@@ -5426,7 +5426,13 @@ a.fs-otable__row:last-child { border-bottom: 0; }
 .fs-infinite__spinner { display: none; }
 .fs-infinite.is-loading .fs-infinite__spinner { display: block; }
 
+/* یک <a> است نه <button> (تا خزنده صفحه‌ی بعد را ببیند)، پس چیدمانِ دکمه را
+   باید صریح بدهیم: لینک به‌صورت پیش‌فرض inline است و padding عمودی روی خط اثر
+   نمی‌گذارد. */
 .fs-infinite__btn {
+  display: inline-block;
+  cursor: pointer;
+  text-align: center;
   font: 700 12.5px var(--fs-font);
   color: var(--fs-ink);
   background: #fff;
