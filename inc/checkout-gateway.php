@@ -214,3 +214,72 @@ function fs_woo_strings( $translated, $original, $domain ) {
 	return isset( $map[ $original ] ) ? $map[ $original ] : $translated;
 }
 add_filter( 'gettext', 'fs_woo_strings', 20, 3 );
+
+/* -------------------------------------------------------------------------
+   ۶ · جلوگیری از کش‌شدن صفحه‌های خرید
+   -------------------------------------------------------------------------
+   نشانه‌ی مشکل: کاربر ناشناس در حالت ناشناس (Incognito) نوار مدیریت و نام
+   «pooga» و حتی نام و موبایل و ایمیل او را روی صفحه‌ی تسویه‌حساب می‌دید.
+   یعنی HTMLی که یک‌بار برای کاربر لاگین‌شده ساخته شده بود، از کش سرور/افزونه/
+   CDN به همه سرو می‌شد.
+
+   این فقط یک مشکل ظاهری نیست: آن صفحه‌ی کش‌شده nonce و سشن کاربر دیگری را
+   هم با خودش دارد، و ووکامرس هنگام ثبت سفارش آن را رد می‌کند
+   (WC_Checkout::process_checkout — «نشست شما منقضی شده است») و کاربر دقیقاً
+   همان‌جا روی صفحه‌ی خرید می‌ماند.
+
+   ⚠️ توجه: خود ووکامرس از قبل روی سبد خرید / تسویه‌حساب / حساب کاربری
+   ثابت DONOTCACHEPAGE را تعریف و هدر no-cache می‌فرستد
+   (WC_Cache_Helper::prevent_caching). پس اینکه صفحه باز هم کش شده یعنی
+   کشی که جلوی PHP نشسته — کش سطح سرور (Nginx FastCGI / LiteSpeed) یا CDN —
+   این علامت‌ها را نادیده می‌گیرد. **درمان اصلی، تنظیم همان کش یا CDN است.**
+
+   چیزی که کد پایین اضافه می‌کند و ووکامرس ندارد:
+   - پوشش‌دادن «هر بازدید کاربر لاگین‌شده» در تمام صفحه‌ها، نه فقط سه صفحه‌ی
+     فروشگاهی — همین بود که نوار مدیریت pooga را به صفحه‌ی کاربر ناشناس برد.
+   - هدرهای صریح no-store / private و Vary: Cookie و هدرهای اختصاصی
+     Nginx و LiteSpeed که ووکامرس نمی‌فرستد.
+   ------------------------------------------------------------------------- */
+
+/**
+ * علامت‌زدن صفحه‌های خصوصی به‌عنوان «کش نشود».
+ *
+ * @return void
+ */
+function fs_never_cache_private_pages() {
+	if ( is_admin() ) {
+		return;
+	}
+
+	$is_private = is_user_logged_in();
+
+	if ( ! $is_private && fs_has_woo() ) {
+		$is_private = is_cart() || is_checkout() || is_account_page();
+	}
+
+	if ( ! $is_private ) {
+		return;
+	}
+
+	// ثابت‌هایی که W3 Total Cache، WP Super Cache، WP Rocket، Comet Cache و… می‌شناسند.
+	foreach ( array( 'DONOTCACHEPAGE', 'DONOTCACHEOBJECT', 'DONOTCACHEDB' ) as $fs_const ) {
+		if ( ! defined( $fs_const ) ) {
+			define( $fs_const, true );
+		}
+	}
+
+	// لایت‌اسپید کش.
+	do_action( 'litespeed_control_set_nocache', 'fanni-soal: private page' );
+
+	if ( headers_sent() ) {
+		return;
+	}
+
+	nocache_headers();
+	header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0, private', true );
+	header( 'Pragma: no-cache' );
+	header( 'Vary: Cookie', false );
+	header( 'X-Accel-Expires: 0' );          // Nginx FastCGI / proxy cache.
+	header( 'X-LiteSpeed-Cache-Control: no-cache' );
+}
+add_action( 'template_redirect', 'fs_never_cache_private_pages', 0 );
