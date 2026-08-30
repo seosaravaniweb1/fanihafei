@@ -1,10 +1,10 @@
 <?php
 /**
- * سبد خرید تک‌فروشی.
+ * سبد خرید.
  *
- * فروشگاه تک‌فروشی است: هر خرید دقیقاً یک فایل است، پس افزودن فایل تازه جای
- * فایل قبلی را می‌گیرد و کاربر مستقیم به مراحل خرید می‌رود. کشوی کناری برای
- * دیدن و حذف همان یک فایلِ در انتظار پرداخت باقی مانده است.
+ * کاربر می‌تواند چند فایل را کنار هم بگذارد و یک‌جا بپردازد. پس از هر افزودن،
+ * سمت کاربر پرسیده می‌شود که به پرداخت برود یا فایل بیشتری اضافه کند؛ سرور
+ * فقط فایل را اضافه می‌کند و وضعیت تازه‌ی سبد را برمی‌گرداند.
  *
  * @package SiFile
  */
@@ -140,12 +140,18 @@ function fs_ajax_cart_add() {
 		wp_send_json_error( array( 'message' => 'این فایل در حال حاضر قابل خرید نیست.' ), 400 );
 	}
 
-	// تک‌فروشی: فایل قبلی کنار می‌رود و همیشه یک نسخه خریداری می‌شود.
-	if ( ! WC()->cart->is_empty() ) {
-		WC()->cart->empty_cart( false );
+	// از هر فایل یک نسخه؛ اگر همین حالا در سبد باشد، دوباره اضافه نمی‌شود.
+	$already = false;
+
+	foreach ( WC()->cart->get_cart() as $fs_item ) {
+		if ( isset( $fs_item['product_id'] ) && (int) $fs_item['product_id'] === $product_id ) {
+			$already = true;
+
+			break;
+		}
 	}
 
-	$added = WC()->cart->add_to_cart( $product_id, 1 );
+	$added = $already ? true : WC()->cart->add_to_cart( $product_id, 1 );
 
 	if ( ! $added ) {
 		$notice = wc_get_notices( 'error' );
@@ -161,8 +167,12 @@ function fs_ajax_cart_add() {
 		array_merge(
 			fs_cart_payload(),
 			array(
-				'message'  => 'در حال انتقال به مراحل خرید…',
-				'redirect' => wc_get_checkout_url(),
+				'message'     => $already ? 'این فایل از قبل در سبد شماست.' : 'به سبد خرید اضافه شد.',
+				'already'     => $already,
+				'title'       => $product->get_name(),
+				// برای انیمیشن پرواز به سبد: تصویر کوچک همین فایل.
+				'thumb'       => (string) get_the_post_thumbnail_url( $product_id, 'thumbnail' ),
+				'checkoutUrl' => wc_get_checkout_url(),
 			)
 		)
 	);

@@ -349,3 +349,19 @@ function fs_rate_limit_clear( $bucket, $id ) {
 		delete_transient( 'fs_rl_' . $bucket . '_' . md5( (string) $id ) );
 	}
 }
+
+/**
+ * آیا این درخواست، صفحه‌ی ورود/ثبت‌نام است؟
+ *
+ * فقط وقتی کاربر هنوز وارد نشده. بعد از ورود همان نشانی پیشخوان کاربری است و
+ * باید با سربرگ و پاورقی کامل بیاید.
+ *
+ * @return bool
+ */
+function fs_is_auth_screen() {
+	if ( ! fs_has_woo() || is_user_logged_in() ) {
+		return false;
+	}
+
+	return is_account_page() && ! is_wc_endpoint_url( 'order-received' ) && ! is_wc_endpoint_url( 'order-pay' );
+}

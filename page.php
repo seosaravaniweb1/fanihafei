@@ -7,6 +7,25 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/*
+ * صفحه‌ی ورود سند خودش را دارد.
+ *
+ * خواسته این است که آنجا نه سربرگ باشد نه پاورقی — فقط کارت ورود. چون
+ * get_header() کل ساختار سایت را می‌آورد، اینجا زودتر منشعب می‌شویم.
+ */
+if ( fs_is_auth_screen() ) {
+	get_template_part( 'template-parts/auth/open' );
+
+	while ( have_posts() ) {
+		the_post();
+		the_content();
+	}
+
+	get_template_part( 'template-parts/auth/close' );
+
+	return;
+}
+
 get_header();
 
 $fs_classes = array( 'fs-section', 'fs-page' );

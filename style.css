@@ -6813,3 +6813,180 @@ body.fs-noscroll { overflow: hidden; }
   .fs-404__code { font-size: 46px; }
   .fs-404__search { flex-direction: column; }
 }
+
+/* =========================================================================
+   صفحه‌ی ورود مستقل (بدون سربرگ و پاورقی)
+   ========================================================================= */
+.fs-authpage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--fs-bg);
+}
+
+.fs-authpage__main {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+/* در این حالت خود کارت تنها چیز روی صفحه است؛ فاصله‌ی بیرونیِ نسخه‌ی
+   داخل‌صفحه اینجا لازم نیست. */
+.fs-authpage .fs-auth { padding: 0; width: 100%; }
+.fs-authpage .woocommerce-notices-wrapper { max-width: 430px; margin-inline: auto; }
+
+/* =========================================================================
+   برگه‌ی انتخاب پس از افزودن به سبد + پرواز به سبد
+   ========================================================================= */
+/* [hidden] مرورگر display:none می‌دهد، ولی سلکتور کلاسیِ زیر بر آن مقدم است.
+   بدون این خط، برگه نامرئی ولی روی کل صفحه می‌ماند و همه‌ی کلیک‌ها را می‌گیرد
+   — یعنی سایت کاملاً غیرقابل استفاده. */
+.fs-buysheet[hidden] { display: none; }
+
+.fs-buysheet {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.fs-buysheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .5);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity .22s;
+}
+
+.fs-buysheet.is-open .fs-buysheet__backdrop { opacity: 1; }
+
+.fs-buysheet__panel {
+  position: relative;
+  width: min(392px, 100%);
+  background: #fff;
+  border-radius: 22px;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, .22);
+  padding: 28px 24px 22px;
+  text-align: center;
+  transform: translateY(14px) scale(.97);
+  opacity: 0;
+  transition: transform .24s, opacity .24s;
+}
+
+.fs-buysheet.is-open .fs-buysheet__panel {
+  transform: none;
+  opacity: 1;
+}
+
+.fs-buysheet__tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--fs-grad);
+  box-shadow: 0 10px 24px rgba(var(--fs-brand-rgb), .32);
+}
+
+.fs-buysheet__title {
+  font: 800 16px var(--fs-font);
+  color: var(--fs-ink);
+  margin: 0 0 5px;
+}
+
+.fs-buysheet__name {
+  font: 600 12px/1.8 var(--fs-font);
+  color: var(--fs-muted);
+  margin: 0 0 20px;
+}
+
+.fs-buysheet__go {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 14px;
+  padding: 15px;
+  background: var(--fs-grad);
+  color: #fff;
+  font: 800 13px var(--fs-font);
+  box-shadow: 0 10px 24px rgba(var(--fs-brand-rgb), .3);
+  transition: filter .18s;
+}
+
+.fs-buysheet__go:hover { filter: brightness(1.07); }
+
+.fs-buysheet__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 9px;
+  border: 1px solid var(--fs-line);
+  border-radius: 14px;
+  padding: 13px;
+  background: #fff;
+  color: var(--fs-brand);
+  font: 700 12.5px var(--fs-font);
+  transition: border-color .18s, background .18s;
+}
+
+.fs-buysheet__more:hover {
+  border-color: var(--fs-brand);
+  background: var(--fs-bg-2);
+}
+
+/* تصویر پرنده — از دکمه تا آیکون سبد در سربرگ ------------------------------ */
+.fs-flychip {
+  position: fixed;
+  z-index: 120;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--fs-grad);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .28);
+}
+
+.fs-flychip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fs-flychip.is-flying {
+  transition: transform .62s cubic-bezier(.55, -0.2, .3, 1), opacity .62s ease-in;
+}
+
+/* تکان کوتاه آیکون سبد وقتی فایل رسید. */
+.fs-btn-cart.is-bumped { animation: fs-cart-bump .42s ease; }
+
+@keyframes fs-cart-bump {
+  0%, 100% { transform: scale(1); }
+  35%      { transform: scale(1.18); }
+  70%      { transform: scale(.95); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-buysheet__panel,
+  .fs-buysheet__backdrop { transition: none; }
+  .fs-btn-cart.is-bumped { animation: none; }
+}
+
+@media (max-width: 600px) {
+  .fs-buysheet { align-items: flex-end; padding: 0; }
+  .fs-buysheet__panel {
+    width: 100%;
+    border-radius: 22px 22px 0 0;
+    padding: 24px 18px 20px;
+  }
+}

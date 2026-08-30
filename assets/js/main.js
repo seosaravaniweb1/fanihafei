@@ -1174,11 +1174,6 @@
 				paint( data );
 				say( data && data.message, ! ( res && res.success ) );
 
-				// تک‌فروشی: بعد از انتخاب فایل مستقیم به مراحل خرید می‌رویم.
-				if ( res && res.success && data && data.redirect ) {
-					window.location.href = data.redirect;
-				}
-
 				return data;
 			} ).catch( function () {
 				say( 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.', true );
@@ -1190,11 +1185,137 @@
 			} );
 		}
 
+		/* ----------------------------------- برگه‌ی انتخاب پس از افزودن */
+		var sheet = document.getElementById( 'fs-buysheet' );
+		var sheetName = sheet && sheet.querySelector( '[data-sheet-name]' );
+		var pending = null; // { button, thumb } تا لحظه‌ی تصمیم کاربر.
+
+		function sheetOpen( state ) {
+			if ( ! sheet ) {
+				return;
+			}
+
+			toggle( sheet, state );
+			sheet.classList.toggle( 'is-open', state );
+			document.body.classList.toggle( 'fs-noscroll', state );
+
+			if ( state ) {
+				var first = sheet.querySelector( '[data-sheet-checkout]' );
+
+				if ( first ) {
+					first.focus();
+				}
+			}
+		}
+
+		/*
+		 * پرواز فایل به سبد.
+		 *
+		 * یک تصویر کوچک از همان جایی که کاربر کلیک کرده ساخته می‌شود و تا
+		 * آیکون سبد در سربرگ حرکت می‌کند. هدفش این است که کاربر ببیند فایلش
+		 * کجا رفت — بدون آن، شمارنده‌ی سربرگ بی‌مقدمه عوض می‌شود.
+		 *
+		 * روی position: fixed کار می‌کند تا اسکرول صفحه مسیر را خراب نکند، و
+		 * اگر کاربر «کاهش حرکت» را روشن کرده باشد اصلاً اجرا نمی‌شود.
+		 */
+		function flyToCart( from, thumbUrl ) {
+			var target = document.querySelector( '.fs-btn-cart' );
+			var reduce = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+
+			if ( ! from || ! target || reduce ) {
+				return Promise.resolve();
+			}
+
+            var a = from.getBoundingClientRect();
+            var b = target.getBoundingClientRect();
+            var chip = document.createElement( 'span' );
+
+			chip.className = 'fs-flychip';
+			chip.style.top = ( a.top + a.height / 2 - 26 ) + 'px';
+			chip.style.left = ( a.left + a.width / 2 - 26 ) + 'px';
+
+			if ( thumbUrl ) {
+				var img = document.createElement( 'img' );
+				img.src = thumbUrl;
+				img.alt = '';
+				chip.appendChild( img );
+			}
+
+			document.body.appendChild( chip );
+
+			var dx = ( b.left + b.width / 2 ) - ( a.left + a.width / 2 );
+			var dy = ( b.top + b.height / 2 ) - ( a.top + a.height / 2 );
+
+			return new Promise( function ( done ) {
+				// یک فریم صبر تا مرورگر حالت اولیه را ثبت کند، وگرنه گذار رخ نمی‌دهد.
+				window.requestAnimationFrame( function () {
+					chip.classList.add( 'is-flying' );
+					chip.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.25)';
+					chip.style.opacity = '.2';
+				} );
+
+				window.setTimeout( function () {
+					chip.remove();
+					target.classList.add( 'is-bumped' );
+					window.setTimeout( function () {
+						target.classList.remove( 'is-bumped' );
+					}, 420 );
+					done();
+				}, 640 );
+			} );
+		}
+
+		if ( sheet ) {
+			sheet.addEventListener( 'click', function ( e ) {
+				if ( e.target.closest( '[data-sheet-checkout]' ) ) {
+					window.location.href = ( pending && pending.checkoutUrl ) || window.fsData.checkoutUrl;
+
+					return;
+				}
+
+				if ( e.target.closest( '[data-sheet-more]' ) ) {
+					sheetOpen( false );
+
+					// انیمیشن اول، بعد کشو: اگر کشو زودتر باز شود، پرواز دیده نمی‌شود.
+					flyToCart( pending && pending.button, pending && pending.thumb ).then( function () {
+						open( true );
+					} );
+
+					return;
+				}
+
+				if ( e.target.closest( '[data-sheet-close]' ) ) {
+					sheetOpen( false );
+				}
+			} );
+		}
+
 		// فقط مسیر شبکه محدود می‌شود؛ باز و بسته‌کردن کشو باید آنی بماند.
 		var buyThrottled = throttle( function ( button, productId ) {
 			button.classList.add( 'is-loading' );
 
-			request( 'fs_cart_add', { product_id: productId } ).finally( function () {
+			request( 'fs_cart_add', { product_id: productId } ).then( function ( data ) {
+				if ( ! data ) {
+					return;
+				}
+
+				pending = {
+					button: button,
+					thumb: data.thumb || '',
+					checkoutUrl: data.checkoutUrl || ''
+				};
+
+				if ( sheetName ) {
+					sheetName.textContent = data.title || '';
+				}
+
+				if ( sheet ) {
+					sheetOpen( true );
+				} else {
+					// بدون برگه (نسخه‌ی قدیمی مارک‌آپ) دست‌کم کشو را نشان بده.
+					open( true );
+				}
+			} ).finally( function () {
 				button.classList.remove( 'is-loading' );
 			} );
 		}, 400 );
@@ -1261,7 +1382,17 @@
 		} );
 
 		document.addEventListener( 'keydown', function ( e ) {
-			if ( 'Escape' === e.key && ! drawer.hasAttribute( 'hidden' ) ) {
+			if ( 'Escape' !== e.key ) {
+				return;
+			}
+
+			if ( sheet && ! sheet.hasAttribute( 'hidden' ) ) {
+				sheetOpen( false );
+
+				return;
+			}
+
+			if ( ! drawer.hasAttribute( 'hidden' ) ) {
 				open( false );
 			}
 		} );
