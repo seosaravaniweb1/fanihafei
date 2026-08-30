@@ -14,7 +14,17 @@ get_header();
 
 global $wp_query;
 
-$fs_term  = is_tax( array( 'product_cat', 'product_tag' ) ) ? get_queried_object() : null;
+/*
+ * هر تاکسونومی محصول، نه فقط دسته و برچسب.
+ *
+ * پیش از این آرشیو ویژگی‌ها (pa_*) از این شرط بیرون می‌ماند: عنوان صفحه از
+ * woocommerce_page_title() می‌آمد و توضیحی که در آن ترم نوشته بودید هرگز
+ * رندر نمی‌شد — یعنی آن آرشیوها برای گوگل صفحه‌ی بی‌محتوا بودند.
+ */
+$fs_queried = get_queried_object();
+$fs_term    = ( is_tax() || is_product_category() || is_product_tag() ) && $fs_queried instanceof WP_Term
+	? $fs_queried
+	: null;
 $fs_total = (int) $wp_query->found_posts;
 
 // زیردسته‌ها فقط روی صفحه‌ی دسته‌ی مادر نمایش داده می‌شوند، نه در خود زیردسته.

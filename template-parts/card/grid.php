@@ -60,7 +60,20 @@ $fs_is_new  = $fs_created && ( time() - $fs_created->getTimestamp() ) < 14 * DAY
 		</span>
 
 		<span class="fs-gcard__body">
-			<span class="fs-gcard__title"><?php echo esc_html( $fs_product->get_name() ); ?></span>
+			<?php
+			/*
+			 * عنوان هر محصول در لیستینگ باید هدینگ باشد، نه span.
+			 *
+			 * لیست محصولات یک دسته/برچسب/ویژگی، مجموعه‌ای از آیتم‌های مستقل
+			 * است؛ وقتی همه‌شان span بودند، صفحه برای خزنده فقط یک H1 داشت و
+			 * هیچ ساختاری زیرش نبود. ووکامرس هم در حلقه‌ی خودش H2 می‌گذارد.
+			 *
+			 * سطح از بیرون قابل تعیین است: در آرشیو زیرِ H1 دسته می‌نشیند (h2)
+			 * و در ریل‌های صفحه‌ی اصلی زیرِ H2 همان بخش (h3).
+			 */
+			$fs_htag = isset( $args['heading'] ) ? $args['heading'] : 'h2';
+			?>
+			<<?php echo esc_attr( $fs_htag ); ?> class="fs-gcard__title"><?php echo esc_html( $fs_product->get_name() ); ?></<?php echo esc_attr( $fs_htag ); ?>>
 
 			<?php
 			do_action( 'woocommerce_shop_loop_item_title' );

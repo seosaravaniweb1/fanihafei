@@ -3308,7 +3308,7 @@ a.fs-fcontact:hover {
 
 .fs-why__title {
   font: 800 13.5px var(--fs-font);
-  margin-bottom: 16px;
+  padding-bottom: 16px;
 }
 
 .fs-why__row {
@@ -3361,7 +3361,7 @@ a.fs-fcontact:hover {
 .fs-glance__title {
   font: 700 12.5px var(--fs-font);
   color: var(--fs-ink);
-  margin-bottom: 12px;
+  padding-bottom: 12px;
 }
 
 .fs-glance__row {
@@ -5358,6 +5358,14 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   font: 600 9.5px var(--fs-font);
   color: var(--fs-muted);
 }
+
+/* این عنوان‌ها حالا هدینگ‌اند (h2/h3) نه span/div، تا لیستینگ برای خزنده
+   ساختار داشته باشد. ظاهرشان نباید تغییر کند: margin پیش‌فرض هدینگ صفر
+   می‌شود چون ظرف‌ها flex با gap هستند و margin روی gap اضافه می‌شد. */
+.fs-gcard__title,
+.fs-pcard__title,
+.fs-glance__title,
+.fs-why__title { margin: 0; }
 
 .fs-gcard__title {
   font: 700 12.5px/1.6 var(--fs-font);

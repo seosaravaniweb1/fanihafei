@@ -316,7 +316,7 @@ while ( have_posts() ) :
 								<aside class="fs-pside">
 
 									<div class="fs-glance">
-										<div class="fs-glance__title">در یک نگاه</div>
+										<h2 class="fs-glance__title">در یک نگاه</h2>
 										<?php foreach ( $fs_specs as $fs_spec ) : ?>
 											<div class="fs-glance__row">
 												<span><?php echo esc_html( $fs_spec['k'] ); ?></span>
@@ -327,7 +327,7 @@ while ( have_posts() ) :
 
 									<?php if ( $fs_why ) : ?>
 										<div class="fs-why">
-											<div class="fs-why__title"><?php echo esc_html( $fs_why['title'] ); ?></div>
+											<h2 class="fs-why__title"><?php echo esc_html( $fs_why['title'] ); ?></h2>
 											<?php foreach ( $fs_why['items'] as $fs_item ) : ?>
 												<div class="fs-why__row">
 													<span class="fs-why__icon">
@@ -351,6 +351,20 @@ while ( have_posts() ) :
 
 					<?php if ( $fs_has_rev ) : ?>
 						<div class="fs-ptabs__pane" id="fs-ptab-rev" role="tabpanel" <?php echo $fs_has_desc ? 'hidden' : ''; ?>>
+
+							<?php
+							/*
+							 * این بخش تا امروز هیچ هدینگی نداشت: تنها چیزی که
+							 * اسمش را می‌گفت، دکمه‌ی تب بود و دکمه برای خزنده
+							 * عنوان بخش نیست.
+							 *
+							 * چون دکمه‌ی تب همین متن را به کاربر نشان می‌دهد،
+							 * هدینگ فقط برای خزنده و صفحه‌خوان است تا روی صفحه
+							 * عنوان تکراری دیده نشود.
+							 */
+							?>
+							<h2 class="fs-sr-only">نظرات و پرسش‌های خریداران درباره <?php the_title(); ?></h2>
+
 							<?php if ( $fs_rev_summary ) : ?>
 								<div class="fs-revs">
 

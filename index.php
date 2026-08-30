@@ -11,6 +11,19 @@
 defined( 'ABSPATH' ) || exit;
 
 get_header();
+
+/*
+ * مسیر راهنما برای برگه‌ها و بایگانی‌های غیرمحصولی.
+ *
+ * تا امروز فقط صفحه‌ی محصول و آرشیو محصول بردکرامب داشتند؛ برگه‌ها، نتایج
+ * جست‌وجو و بایگانی نوشته‌ها/برچسب‌ها بدون مسیر بودند — هم برای کاربر و هم
+ * برای اسکیمای BreadcrumbList که ووکامرس روی همین اکشن می‌سازد.
+ */
+if ( fs_has_woo() && ! is_front_page() ) {
+	echo '<nav class="fs-crumbs" aria-label="مسیر">';
+	woocommerce_breadcrumb( array( 'delimiter' => '' ) );
+	echo '</nav>';
+}
 ?>
 <section class="fs-section fs-section--cats">
 

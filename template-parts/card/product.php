@@ -31,7 +31,12 @@ $fs_is_new = ! empty( $args['badge'] );
 	</span>
 
 	<span class="fs-pcard__body">
-		<span class="fs-pcard__title"><?php echo esc_html( $fs_card['title'] ); ?></span>
+		<?php
+		// ریل‌ها همیشه زیر یک H2 بخش می‌نشینند («جدیدترین فایل‌ها»، «فایل‌های
+		// مرتبط»)، پس سطح پیش‌فرض اینجا h3 است تا سلسله‌مراتب نشکند.
+		$fs_htag = isset( $args['heading'] ) ? $args['heading'] : 'h3';
+		?>
+		<<?php echo esc_attr( $fs_htag ); ?> class="fs-pcard__title"><?php echo esc_html( $fs_card['title'] ); ?></<?php echo esc_attr( $fs_htag ); ?>>
 
 		<span class="fs-pcard__chips">
 			<?php foreach ( $fs_card['chips'] as $fs_chip ) : ?>

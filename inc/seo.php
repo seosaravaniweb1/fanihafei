@@ -595,3 +595,95 @@ function fs_print_article_schema() {
 	);
 }
 add_action( 'wp_footer', 'fs_print_article_schema', 20 );
+
+/* -------------------------------------------------------------------------
+   متن جایگزین تصاویر
+   ------------------------------------------------------------------------- */
+
+/**
+ * شناسه‌ی نوشته‌ای که همین حالا تصویر شاخصش رندر می‌شود.
+ *
+ * @param int|null $set مقدار تازه، یا null برای فقط خواندن.
+ * @return int
+ */
+function fs_thumbnail_owner( $set = null ) {
+	static $owner = 0;
+
+	if ( null !== $set ) {
+		$owner = (int) $set;
+	}
+
+	return $owner;
+}
+
+/**
+ * گرفتن صاحب تصویر شاخص، درست پیش از رندرشدنش.
+ *
+ * چرا این راه: فیلتر اتریبیوت‌های تصویر فقط خودِ پیوست را می‌بیند و نمی‌داند
+ * برای کدام نوشته رندر می‌شود. تکیه‌کردن به post_parent هم کافی نیست — تصویری
+ * که از کتابخانه‌ی رسانه انتخاب شود اصلاً والد ندارد، و دقیقاً همین حالت در
+ * عمل رایج‌ترین است.
+ *
+ * @param int $post_id شناسه نوشته.
+ * @return void
+ */
+function fs_capture_thumbnail_owner( $post_id ) {
+	fs_thumbnail_owner( $post_id );
+}
+add_action( 'begin_fetch_post_thumbnail_html', 'fs_capture_thumbnail_owner' );
+
+/**
+ * رهاکردن صاحب تصویر پس از رندر.
+ *
+ * @return void
+ */
+function fs_release_thumbnail_owner() {
+	fs_thumbnail_owner( 0 );
+}
+add_action( 'end_fetch_post_thumbnail_html', 'fs_release_thumbnail_owner' );
+
+/**
+ * اگر تصویری alt نداشت، از نام محصولی که به آن تعلق دارد استفاده کن.
+ *
+ * قالب هیچ‌جا alt را دستی پاس نمی‌دهد و درست هم همین است — متن جایگزین باید
+ * از خود رسانه بیاید. ولی در عمل فیلد «متن جایگزین» کتابخانه‌ی رسانه معمولاً
+ * خالی می‌ماند و نتیجه‌اش کاور و اسکرین‌شات‌هایی است که با alt="" رندر
+ * می‌شوند: نه در جست‌وجوی تصویر گوگل می‌آیند و نه برای صفحه‌خوان معنا دارند.
+ *
+ * سه محدودیت عمدی:
+ * — متن دستی ادمین همیشه برنده است؛ این فقط جای خالی را پر می‌کند.
+ * — فقط محصول‌ها. تصاویر تزئینی (نماد اعتماد، لوگوی بانک‌ها) که عمداً alt
+ *   خالی دارند دست‌نخورده می‌مانند.
+ * — هیچ کوئری اضافه‌ای نمی‌زند؛ صاحب تصویر از همان چرخه‌ی رندر می‌آید.
+ *
+ * @param array   $attr       اتریبیوت‌های تصویر.
+ * @param WP_Post $attachment پیوست.
+ * @return array
+ */
+function fs_fallback_image_alt( $attr, $attachment ) {
+	if ( ! empty( $attr['alt'] ) || ! $attachment instanceof WP_Post ) {
+		return $attr;
+	}
+
+	// اول نوشته‌ای که همین حالا تصویر شاخصش رندر می‌شود، بعد والد پیوست
+	// (تصویرهایی که از خود صفحه‌ی محصول بارگذاری شده‌اند)، و در نهایت محصولی
+	// که صفحه‌اش باز است — برای تصاویر گالری.
+	$owner = fs_thumbnail_owner();
+
+	if ( ! $owner ) {
+		$owner = (int) $attachment->post_parent;
+	}
+
+	if ( ! $owner && is_singular( 'product' ) ) {
+		$owner = get_queried_object_id();
+	}
+
+	if ( ! $owner || 'product' !== get_post_type( $owner ) ) {
+		return $attr;
+	}
+
+	$attr['alt'] = wp_strip_all_tags( get_the_title( $owner ) );
+
+	return $attr;
+}
+add_filter( 'wp_get_attachment_image_attributes', 'fs_fallback_image_alt', 10, 2 );
