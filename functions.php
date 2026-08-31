@@ -21,6 +21,7 @@ require_once get_theme_file_path( 'inc/pages.php' );
 require_once get_theme_file_path( 'inc/woocommerce.php' );
 require_once get_theme_file_path( 'inc/seo.php' );
 require_once get_theme_file_path( 'inc/auth.php' );
+require_once get_theme_file_path( 'inc/sms.php' );
 require_once get_theme_file_path( 'inc/cart.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
 require_once get_theme_file_path( 'inc/checkout-repair.php' );
