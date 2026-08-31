@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '2.2.0' );
+define( 'FS_VERSION', '2.2.1' );
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );

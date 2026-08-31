@@ -118,43 +118,326 @@ function fs_structured_data_product( $data, $product = null ) {
 		return $data;
 	}
 
-	// --- offers: واحد پول، قیمت و تاریخ اعتبار ---------------------------
+	// --- offers: واحد پول، قیمت، تاریخ اعتبار، بازگشت و تحویل -------------
 	if ( ! empty( $data['offers'] ) && is_array( $data['offers'] ) ) {
 		foreach ( $data['offers'] as $i => $offer ) {
-			if ( ! is_array( $offer ) ) {
-				continue;
+			if ( is_array( $offer ) ) {
+				$data['offers'][ $i ] = fs_schema_complete_offer( $offer, $product );
 			}
-
-			$offer['priceCurrency'] = fs_schema_currency();
-
-			if ( isset( $offer['price'] ) ) {
-				$offer['price'] = fs_schema_price( $offer['price'] );
-			}
-
-			foreach ( array( 'lowPrice', 'highPrice' ) as $key ) {
-				if ( isset( $offer[ $key ] ) ) {
-					$offer[ $key ] = fs_schema_price( $offer[ $key ] );
-				}
-			}
-
-			if ( isset( $offer['priceSpecification'] ) && is_array( $offer['priceSpecification'] ) ) {
-				if ( isset( $offer['priceSpecification']['price'] ) ) {
-					$offer['priceSpecification']['price'] = fs_schema_price( $offer['priceSpecification']['price'] );
-				}
-				$offer['priceSpecification']['priceCurrency'] = fs_schema_currency();
-			}
-
-			$offer['priceValidUntil'] = fs_schema_price_valid_until( $product );
-
-			$data['offers'][ $i ] = $offer;
 		}
 	}
 
-	$data = fs_schema_common_fields( $data, $product );
-
-	return $data;
+	return fs_schema_common_fields( $data, $product );
 }
 add_filter( 'woocommerce_structured_data_product', 'fs_structured_data_product', 20, 2 );
+
+/**
+ * اصلاح دیدگاه‌ها در همان لحظه‌ی ساخته‌شدن.
+ *
+ * ووکامرس دیدگاه‌ها را جدا می‌سازد و *بعد از* اجرای فیلتر محصول به آن سنجاق
+ * می‌کند؛ پس پاک‌سازی داخل fs_schema_common_fields هیچ‌وقت آن‌ها را نمی‌بیند.
+ * تنها جای مطمئن، همین‌جاست.
+ *
+ * @param array $markup داده‌ی دیدگاه.
+ * @return array
+ */
+function fs_structured_data_review( $markup ) {
+	if ( ! is_array( $markup ) || empty( $markup['reviewRating'] ) ) {
+		return $markup;
+	}
+
+	$rating = fs_schema_valid_rating(
+		isset( $markup['reviewRating']['ratingValue'] ) ? $markup['reviewRating']['ratingValue'] : 0
+	);
+
+	if ( null === $rating ) {
+		// دیدگاهی که ستاره نگرفته: خود دیدگاه می‌ماند، فقط امتیازِ نامعتبر
+		// برداشته می‌شود.
+		unset( $markup['reviewRating'] );
+
+		return $markup;
+	}
+
+	$markup['reviewRating'] = array(
+		'@type'       => 'Rating',
+		'ratingValue' => (string) $rating,
+		'bestRating'  => '5',
+		'worstRating' => '1',
+	);
+
+	return $markup;
+}
+add_filter( 'woocommerce_structured_data_review', 'fs_structured_data_review', 20 );
+
+/**
+ * امتیاز معتبر، یا null.
+ *
+ * گوگل امتیاز را فقط بین worstRating و bestRating می‌پذیرد. دیدگاهی که ستاره
+ * نگرفته، در ووکامرس امتیاز صفر دارد و همان صفر «Rating value is out of
+ * range» می‌سازد. صفر را به یک تبدیل نمی‌کنیم — این یعنی ساختن نظری که کاربر
+ * نداده؛ به‌جایش کل بلوک امتیاز از آن دیدگاه برداشته می‌شود.
+ *
+ * @param mixed $value امتیاز خام.
+ * @return float|null
+ */
+function fs_schema_valid_rating( $value ) {
+	$rating = (float) $value;
+
+	if ( $rating < 1 || $rating > 5 ) {
+		return null;
+	}
+
+	return round( $rating, 1 );
+}
+
+/**
+ * پاک‌سازی بلوک دیدگاه‌ها.
+ *
+ * هر دیدگاهی که امتیاز نامعتبر دارد، امتیازش برداشته می‌شود نه خود دیدگاه —
+ * متن نظر همچنان برای گوگل ارزش دارد. اگر دیدگاهی اصلاً نویسنده یا متن ندارد
+ * حذف می‌شود چون بدون آن‌ها فیلد ناقص است.
+ *
+ * @param array $reviews آرایه‌ی دیدگاه‌ها.
+ * @return array
+ */
+function fs_schema_clean_reviews( $reviews ) {
+	if ( ! is_array( $reviews ) ) {
+		return array();
+	}
+
+	// رنک‌مث گاهی یک دیدگاه تکی می‌دهد، نه آرایه‌ای از دیدگاه‌ها.
+	$single = isset( $reviews['@type'] );
+	$list   = $single ? array( $reviews ) : $reviews;
+	$clean  = array();
+
+	foreach ( $list as $review ) {
+		if ( ! is_array( $review ) ) {
+			continue;
+		}
+
+		if ( isset( $review['reviewRating'] ) && is_array( $review['reviewRating'] ) ) {
+			$rating = fs_schema_valid_rating(
+				isset( $review['reviewRating']['ratingValue'] ) ? $review['reviewRating']['ratingValue'] : 0
+			);
+
+			if ( null === $rating ) {
+				unset( $review['reviewRating'] );
+			} else {
+				$review['reviewRating'] = array(
+					'@type'       => 'Rating',
+					'ratingValue' => (string) $rating,
+					'bestRating'  => '5',
+					'worstRating' => '1',
+				);
+			}
+		}
+
+		/*
+		 * ووکامرس متن دیدگاه را در description می‌گذارد و رنک‌مث در
+		 * reviewBody؛ هر دو معتبرند، پس هر دو را می‌پذیریم. اگر هیچ‌کدام
+		 * نبود، دیدگاه بی‌متن است و به کار گوگل نمی‌آید.
+		 */
+		$body = '';
+
+		foreach ( array( 'reviewBody', 'description' ) as $key ) {
+			if ( ! empty( $review[ $key ] ) ) {
+				$body = $review[ $key ];
+				break;
+			}
+		}
+
+		if ( empty( $review['author'] ) || '' === $body ) {
+			continue;
+		}
+
+		$clean[] = $review;
+	}
+
+	if ( ! $clean ) {
+		return array();
+	}
+
+	return $single ? $clean[0] : array_values( $clean );
+}
+
+/**
+ * دسته‌ی محصول برای اسکیما.
+ *
+ * گوگل برای category یک رشته‌ی ساده می‌خواهد. اگر رنک‌مث یا افزونه‌ای آرایه یا
+ * شیء بگذارد، «Invalid value in field category» می‌گیریم؛ پس همیشه به رشته
+ * تبدیلش می‌کنیم و مسیر دسته را با « > » می‌سازیم که شکل مورد انتظار گوگل است.
+ *
+ * @param WC_Product $product محصول.
+ * @return string
+ */
+function fs_schema_category( $product ) {
+	$terms = get_the_terms( $product->get_id(), 'product_cat' );
+
+	if ( ! $terms || is_wp_error( $terms ) ) {
+		return '';
+	}
+
+	// عمیق‌ترین دسته را می‌گیریم: مشخص‌ترین توصیف از محصول همان است.
+	$deepest = $terms[0];
+
+	foreach ( $terms as $term ) {
+		if ( count( get_ancestors( $term->term_id, 'product_cat' ) ) > count( get_ancestors( $deepest->term_id, 'product_cat' ) ) ) {
+			$deepest = $term;
+		}
+	}
+
+	$path = array( $deepest->name );
+
+	foreach ( get_ancestors( $deepest->term_id, 'product_cat' ) as $parent_id ) {
+		$parent = get_term( $parent_id, 'product_cat' );
+
+		if ( $parent && ! is_wp_error( $parent ) ) {
+			array_unshift( $path, $parent->name );
+		}
+	}
+
+	return implode( ' > ', $path );
+}
+
+/**
+ * توضیح محصول برای اسکیما.
+ *
+ * ترتیب: توضیح کوتاه، بعد توضیح بلند، بعد عنوان. کوتاه اول است چون همان چیزی
+ * است که برای خلاصه نوشته شده؛ عنوان آخرین پناهگاه است تا فیلد خالی نماند.
+ *
+ * @param WC_Product $product محصول.
+ * @return string
+ */
+function fs_schema_description( $product ) {
+	foreach ( array( $product->get_short_description(), $product->get_description() ) as $text ) {
+		$text = trim( wp_strip_all_tags( strip_shortcodes( (string) $text ) ) );
+
+		if ( '' !== $text ) {
+			return wp_html_excerpt( $text, 5000, '' );
+		}
+	}
+
+	return $product->get_name();
+}
+
+/**
+ * سیاست بازگشت کالا.
+ *
+ * پیش‌فرض «بازگشت پذیرفته نمی‌شود» است، چون فایل دانلودی سالم پس گرفته
+ * نمی‌شود و قوانین همین سایت هم همین را می‌گوید؛ عودت فقط برای فایل خراب یا
+ * مغایر است، که ضمانت است نه بازگشت. اعلام یک پنجره‌ی بازگشتِ نداشته، در
+ * اسکیما یعنی وعده‌ای که پشتش نیستید.
+ *
+ * @return array
+ */
+function fs_schema_return_policy() {
+	return (array) apply_filters(
+		'fs_schema_return_policy',
+		array(
+			'@type'                => 'MerchantReturnPolicy',
+			'applicableCountry'    => 'IR',
+			'returnPolicyCategory' => 'https://schema.org/MerchantReturnNotPermitted',
+		)
+	);
+}
+
+/**
+ * جزئیات تحویل.
+ *
+ * فایل دانلودی حمل ندارد: هزینه صفر و زمان صفر. این دقیقاً همان چیزی است که
+ * اتفاق می‌افتد — لینک بلافاصله بعد از پرداخت فعال می‌شود — پس گفتنش در
+ * اسکیما نه اغراق است نه دور زدن اخطار گوگل.
+ *
+ * @return array
+ */
+function fs_schema_shipping_details() {
+	return (array) apply_filters(
+		'fs_schema_shipping_details',
+		array(
+			'@type'          => 'OfferShippingDetails',
+			'shippingRate'   => array(
+				'@type'    => 'MonetaryAmount',
+				'value'    => '0',
+				'currency' => fs_schema_currency(),
+			),
+			'shippingDestination' => array(
+				'@type'          => 'DefinedRegion',
+				'addressCountry' => 'IR',
+			),
+			'deliveryTime'   => array(
+				'@type'                => 'ShippingDeliveryTime',
+				'handlingTime'         => array(
+					'@type'    => 'QuantitativeValue',
+					'minValue' => 0,
+					'maxValue' => 0,
+					'unitCode' => 'DAY',
+				),
+				'transitTime'          => array(
+					'@type'    => 'QuantitativeValue',
+					'minValue' => 0,
+					'maxValue' => 0,
+					'unitCode' => 'DAY',
+				),
+			),
+		)
+	);
+}
+
+/**
+ * کامل‌کردن یک offer.
+ *
+ * @param array      $offer   پیشنهاد.
+ * @param WC_Product $product محصول.
+ * @return array
+ */
+function fs_schema_complete_offer( $offer, $product ) {
+	$offer['priceCurrency'] = fs_schema_currency();
+
+	if ( isset( $offer['price'] ) ) {
+		$offer['price'] = fs_schema_price( $offer['price'] );
+	}
+
+	foreach ( array( 'lowPrice', 'highPrice' ) as $key ) {
+		if ( isset( $offer[ $key ] ) ) {
+			$offer[ $key ] = fs_schema_price( $offer[ $key ] );
+		}
+	}
+
+	if ( isset( $offer['priceSpecification'] ) && is_array( $offer['priceSpecification'] ) ) {
+		if ( isset( $offer['priceSpecification']['price'] ) ) {
+			$offer['priceSpecification']['price'] = fs_schema_price( $offer['priceSpecification']['price'] );
+		}
+
+		$offer['priceSpecification']['priceCurrency'] = fs_schema_currency();
+	}
+
+	$offer['priceValidUntil'] = fs_schema_price_valid_until( $product );
+
+	// validFrom: از کِی این قیمت برقرار است. اگر تخفیف تاریخ شروع دارد همان،
+	// وگرنه تاریخ انتشار محصول — که واقعاً هم از همان روز این قیمت بوده.
+	if ( empty( $offer['validFrom'] ) ) {
+		$sale_start = $product->get_date_on_sale_from();
+		$created    = $product->get_date_created();
+
+		if ( $sale_start ) {
+			$offer['validFrom'] = $sale_start->date( 'Y-m-d' );
+		} elseif ( $created ) {
+			$offer['validFrom'] = $created->date( 'Y-m-d' );
+		}
+	}
+
+	if ( empty( $offer['itemCondition'] ) ) {
+		$offer['itemCondition'] = 'https://schema.org/NewCondition';
+	}
+
+	// فقط روی offer تکی معنی دارد، نه AggregateOffer.
+	if ( ! isset( $offer['@type'] ) || 'AggregateOffer' !== $offer['@type'] ) {
+		$offer['hasMerchantReturnPolicy'] = fs_schema_return_policy();
+		$offer['shippingDetails']         = fs_schema_shipping_details();
+	}
+
+	return $offer;
+}
 
 /**
  * فیلدهای مشترک بین ووکامرس و رنک‌مث: sku، brand، امتیازها.
@@ -191,23 +474,69 @@ function fs_schema_common_fields( $data, $product ) {
 			'@type' => 'Brand',
 			'name'  => $authors[0]['name'],
 		);
+	} elseif ( empty( $data['brand'] ) ) {
+		/*
+		 * فایلی که نویسنده‌ی ثبت‌شده ندارد هم باید شناسه‌ی سراسری داشته باشد،
+		 * وگرنه گوگل «No global identifier provided» می‌دهد. برای فایل دیجیتال
+		 * gtin و mpn وجود ندارد؛ ناشرِ اثر خودِ فروشگاه است و همان می‌شود برند.
+		 */
+		$data['brand'] = array(
+			'@type' => 'Brand',
+			'name'  => get_bloginfo( 'name' ),
+		);
+	}
+
+	// --- توضیح: فیلد اجباری گوگل. خالی‌ماندنش «Missing field description» است.
+	if ( empty( $data['description'] ) ) {
+		$data['description'] = fs_schema_description( $product );
+	}
+
+	// --- دسته: همیشه رشته، وگرنه «Invalid value in field category».
+	if ( empty( $data['category'] ) || ! is_string( $data['category'] ) ) {
+		$category = fs_schema_category( $product );
+
+		if ( $category ) {
+			$data['category'] = $category;
+		} else {
+			unset( $data['category'] );
+		}
+	}
+
+	if ( empty( $data['url'] ) ) {
+		$data['url'] = get_permalink( $id );
+	}
+
+	// --- دیدگاه‌ها: امتیاز بیرون از بازه، خطای «Rating value is out of range».
+	if ( ! empty( $data['review'] ) ) {
+		$reviews = fs_schema_clean_reviews( $data['review'] );
+
+		if ( $reviews ) {
+			$data['review'] = $reviews;
+		} else {
+			unset( $data['review'] );
+		}
 	}
 
 	// --- امتیازها: aggregateRating فقط وقتی دیدگاه واقعی هست.
-	$count = (int) $product->get_review_count();
+	$count   = (int) $product->get_review_count();
+	$average = fs_schema_valid_rating( $product->get_average_rating() );
 
-	if ( $count < 1 ) {
-		unset( $data['aggregateRating'], $data['review'] );
-	} elseif ( empty( $data['aggregateRating'] ) ) {
-		$average = (float) $product->get_average_rating();
-
-		if ( $average > 0 ) {
-			$data['aggregateRating'] = array(
-				'@type'       => 'AggregateRating',
-				'ratingValue' => (string) $average,
-				'reviewCount' => (string) $count,
-			);
-		}
+	if ( $count < 1 || null === $average ) {
+		/*
+		 * بدون دیدگاه، aggregateRating یعنی امتیاز ساختگی. گوگل اینجا فقط
+		 * «اخطار» می‌دهد (اسنیپت بدون ستاره نمایش داده می‌شود)، ولی امتیاز
+		 * جعلی نقض دستورالعمل است و می‌تواند به جریمه‌ی دستی برسد. اخطار
+		 * بی‌ضررتر است.
+		 */
+		unset( $data['aggregateRating'] );
+	} else {
+		$data['aggregateRating'] = array(
+			'@type'       => 'AggregateRating',
+			'ratingValue' => (string) $average,
+			'reviewCount' => (string) $count,
+			'bestRating'  => '5',
+			'worstRating' => '1',
+		);
 	}
 
 	return $data;
@@ -250,21 +579,9 @@ function fs_rank_math_product_schema( $entity, $product = null ) {
 		$is_single = isset( $entity['offers']['@type'] );
 
 		foreach ( $offers as $i => $offer ) {
-			if ( ! is_array( $offer ) ) {
-				continue;
+			if ( is_array( $offer ) ) {
+				$offers[ $i ] = fs_schema_complete_offer( $offer, $wc_product );
 			}
-
-			$offer['priceCurrency'] = fs_schema_currency();
-
-			foreach ( array( 'price', 'lowPrice', 'highPrice' ) as $key ) {
-				if ( isset( $offer[ $key ] ) ) {
-					$offer[ $key ] = fs_schema_price( $offer[ $key ] );
-				}
-			}
-
-			$offer['priceValidUntil'] = fs_schema_price_valid_until( $wc_product );
-
-			$offers[ $i ] = $offer;
 		}
 
 		$entity['offers'] = $is_single ? $offers[0] : $offers;
