@@ -3,7 +3,7 @@ Theme Name: لوکسو فایل
 Theme URI: https://github.com/seosaravaniweb1/fanihafei
 Author: Saravani Web
 Description: قالب فروشگاه فایل «لوکسو فایل» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
-Version: 2.4.0
+Version: 2.4.1
 Requires at least: 6.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
@@ -7111,6 +7111,255 @@ body.fs-noscroll { overflow: hidden; }
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* پوشش انتظار دانلود -------------------------------------------------------- */
+.fs-dlwait {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, .62);
+  backdrop-filter: blur(3px);
+  animation: fs-dlwait-in .2s ease-out;
+}
+
+.fs-dlwait[hidden] { display: none; }
+
+@keyframes fs-dlwait-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fs-dlwait__box {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 22px;
+  padding: 30px 26px 24px;
+  text-align: center;
+  box-shadow: 0 30px 70px rgba(15, 23, 42, .3);
+}
+
+.fs-dlwait__close {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--fs-ink-3);
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.fs-dlwait__close:hover { background: var(--fs-bg-2); }
+
+/*
+ * قالب به‌طور سراسری svg را display:block می‌کند، پس text-align:center جعبه
+ * به آن نمی‌رسد و ساعت شنی چسبیده به لبه می‌ماند. با flex خودمان وسطش
+ * می‌آوریم به‌جای اینکه قاعده‌ی سراسری را دست بزنیم.
+ */
+.fs-dlwait__glass {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+/* ساعت شنی ----------------------------------------------------------------- */
+.fs-hg__frame {
+  fill: none;
+  stroke: var(--fs-brand);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.fs-hg__sand-top,
+.fs-hg__sand-bot { fill: #f59e0b; }
+
+/*
+ * شن بالا کم می‌شود و پایین زیاد؛ هر دو با یک چرخه‌ی ۳ ثانیه‌ای که تکرار
+ * می‌شود. این یک چرخه‌ی تزئینی است و ادعایی درباره‌ی پیشرفت واقعی ندارد —
+ * پیشرفت را نوار زیرش نشان می‌دهد.
+ */
+.fs-hg__sand-top {
+  transform-origin: 24px 29px;
+  animation: fs-hg-top 3s linear infinite;
+}
+
+.fs-hg__sand-bot { animation: fs-hg-bot 3s linear infinite; }
+
+.fs-hg__stream {
+  stroke: #f59e0b;
+  stroke-width: 2;
+  stroke-linecap: round;
+  animation: fs-hg-stream .55s linear infinite;
+}
+
+@keyframes fs-hg-top {
+  0% { transform: scaleY(1); }
+  100% { transform: scaleY(0); }
+}
+
+@keyframes fs-hg-bot {
+  0% { y: 59px; height: 0; }
+  100% { y: 38px; height: 21px; }
+}
+
+@keyframes fs-hg-stream {
+  0% { opacity: .25; }
+  50% { opacity: 1; }
+  100% { opacity: .25; }
+}
+
+.fs-dlwait__title {
+  margin: 0 0 6px;
+  font: 800 16px var(--fs-font);
+  color: var(--fs-ink);
+}
+
+.fs-dlwait__file {
+  margin: 0 0 14px;
+  font: 600 11.5px var(--fs-font);
+  color: var(--fs-brand-d);
+}
+
+.fs-dlwait__file[hidden] { display: none; }
+
+/* نوار پیشرفت -------------------------------------------------------------- */
+.fs-dlwait__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--fs-bg-2);
+  overflow: hidden;
+  margin: 0 0 16px;
+}
+
+.fs-dlwait__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--fs-grad);
+  transition: width .25s linear;
+}
+
+/* برق متحرک روی نوار: نشان می‌دهد کار متوقف نشده، حتی وقتی نوار کند شده. */
+.fs-dlwait__fill::after {
+  content: "";
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: fs-dlwait-shine 1.4s linear infinite;
+}
+
+@keyframes fs-dlwait-shine {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.fs-dlwait__note {
+  margin: 0 0 12px;
+  font: 500 11.5px/2 var(--fs-font);
+  color: var(--fs-ink-3);
+}
+
+.fs-dlwait__meta {
+  margin: 0;
+  font: 700 10.5px var(--fs-font);
+  color: var(--fs-ink-3);
+  direction: rtl;
+}
+
+.fs-dlwait__slow {
+  margin-top: 14px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--fs-accent-wash);
+  border: 1px solid var(--fs-accent-edge);
+  font: 600 10.5px/1.9 var(--fs-font);
+  color: var(--fs-accent-t);
+}
+
+.fs-dlwait__slow[hidden] { display: none; }
+.fs-dlwait__slow a { color: inherit; text-decoration: underline; }
+
+.fs-dlwait__done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  font: 700 11px/1.8 var(--fs-font);
+  color: #065f46;
+}
+
+.fs-dlwait__done[hidden] { display: none; }
+
+.fs-dlwait__tick {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+/*
+ * حالت پایان.
+ *
+ * animation:none تنها کافی نیست: انیمیشن در همان فریمی که بوده یخ می‌زند و
+ * ساعت شنی وسط ریختن می‌ماند، انگار هنوز کاری در جریان است. پس ساعت را
+ * دستی در حالت تمام‌شده می‌نشانیم — شن پایین، جریان قطع.
+ *
+ * متن‌های «صبوری کنید» و «این پنجره را نبندید» هم دیگر بی‌معنی‌اند و کنار
+ * می‌روند؛ ماندنشان کاربر را وامی‌دارد دنبال کاری بگردد که تمام شده است.
+ */
+.fs-dlwait.is-done .fs-hg__sand-top,
+.fs-dlwait.is-done .fs-hg__sand-bot,
+.fs-dlwait.is-done .fs-hg__stream,
+.fs-dlwait.is-done .fs-dlwait__fill::after { animation: none; }
+
+.fs-dlwait.is-done .fs-hg__sand-top { transform: scaleY(0); }
+
+.fs-dlwait.is-done .fs-hg__sand-bot {
+  y: 38px;
+  height: 21px;
+}
+
+.fs-dlwait.is-done .fs-hg__stream { opacity: 0; }
+.fs-dlwait.is-done .fs-hg__frame { stroke: #10b981; }
+.fs-dlwait.is-done .fs-dlwait__fill { background: #10b981; }
+
+.fs-dlwait.is-done .fs-dlwait__note,
+.fs-dlwait.is-done .fs-dlwait__meta { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-dlwait { animation: none; }
+  .fs-hg__sand-top,
+  .fs-hg__sand-bot { animation-duration: 9s; }
+  .fs-hg__stream,
+  .fs-dlwait__fill::after { animation: none; }
+}
+
+@media (max-width: 480px) {
+  .fs-dlwait__box { padding: 26px 18px 20px; }
+  .fs-dlwait__title { font-size: 15px; }
 }
 
 /* پیشنهاد زنده‌ی جست‌وجو ----------------------------------------------------- */

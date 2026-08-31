@@ -49,7 +49,7 @@ if ( ! $order ) {
 							<span class="fs-ditem__title"><?php echo esc_html( $fs_dl['product_name'] ); ?></span>
 							<span class="fs-ditem__meta">دسترسی مادام‌العمر</span>
 						</span>
-						<?php fs_the_download_button( $fs_dl['download_url'] ); ?>
+						<?php fs_the_download_button( $fs_dl['download_url'], 'دانلود', 'fs-ditem__btn', $fs_dl['product_name'] ); ?>
 					</div>
 					<?php
 					++$fs_i;

@@ -105,10 +105,7 @@ $fs_downloads = fs_has_woo() ? wc_get_customer_available_downloads( $fs_user->ID
 							?>
 						</span>
 					</span>
-					<a class="fs-ditem__btn" href="<?php echo esc_url( $fs_dl['download_url'] ); ?>">
-						<?php fs_the_icon( 'download', 14, array( 'stroke' => '#fff' ) ); ?>
-						دانلود
-					</a>
+					<?php fs_the_download_button( $fs_dl['download_url'], 'دانلود', 'fs-ditem__btn', $fs_dl['product_name'] ); ?>
 				</div>
 			<?php endforeach; ?>
 		</div>

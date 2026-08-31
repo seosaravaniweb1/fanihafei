@@ -220,11 +220,12 @@ function fs_dl_token() {
  * @param string $class کلاس دکمه.
  * @return void
  */
-function fs_the_download_button( $url, $label = 'دانلود', $class = 'fs-ditem__btn' ) {
+function fs_the_download_button( $url, $label = 'دانلود', $class = 'fs-ditem__btn', $file = '' ) {
 	$token = fs_dl_token();
 	?>
 	<a class="<?php echo esc_attr( $class ); ?>" href="<?php echo esc_url( fs_dl_tag_url( $url, $token ) ); ?>"
-		data-download="<?php echo esc_attr( $token ); ?>" rel="nofollow">
+		data-download="<?php echo esc_attr( $token ); ?>"
+		data-download-name="<?php echo esc_attr( $file ); ?>" rel="nofollow">
 		<span class="fs-dlbtn__idle">
 			<?php fs_the_icon( 'download', 14, array( 'stroke' => '#fff' ) ); ?>
 			<?php echo esc_html( $label ); ?>
@@ -236,6 +237,127 @@ function fs_the_download_button( $url, $label = 'دانلود', $class = 'fs-dit
 	</a>
 	<?php
 }
+
+/**
+ * جایگزینی دکمه‌ی دانلود در برگه‌ی «دانلودهای من» ووکامرس.
+ *
+ * آن برگه قالب خودش را دارد و قالب سایت رویش نیامده، پس لینک‌هایش ساده
+ * می‌ماندند و پوشش انتظار برایشان باز نمی‌شد — درست همان‌جایی که کاربر
+ * دیرتر و با حوصله‌ی کمتر برمی‌گردد سراغ فایلش.
+ *
+ * @param array $download داده‌ی دانلود.
+ * @return void
+ */
+function fs_dl_account_button( $download ) {
+	fs_the_download_button(
+		$download['download_url'],
+		isset( $download['download_name'] ) ? $download['download_name'] : 'دانلود',
+		'woocommerce-MyAccount-downloads-file button alt fs-ditem__btn',
+		isset( $download['product_name'] ) ? $download['product_name'] : ''
+	);
+}
+
+/**
+ * برداشتن دکمه‌ی پیش‌فرض و گذاشتن دکمه‌ی خودمان.
+ *
+ * روی init انجام می‌شود چون کال‌بک پیش‌فرض ووکامرس هنگام بارگذاری افزونه ثبت
+ * می‌شود و پیش از آن چیزی برای برداشتن وجود ندارد.
+ *
+ * @return void
+ */
+function fs_dl_swap_account_button() {
+	remove_action( 'woocommerce_account_downloads_column_download-file', 'woocommerce_account_downloads_column_download_file' );
+	add_action( 'woocommerce_account_downloads_column_download-file', 'fs_dl_account_button' );
+}
+add_action( 'init', 'fs_dl_swap_account_button', 20 );
+
+/**
+ * پوشش انتظار دانلود.
+ *
+ * یک بار در پاورقی چاپ می‌شود و همه‌ی دکمه‌های دانلود صفحه از آن استفاده
+ * می‌کنند. چرا پوشش تمام‌صفحه و نه فقط اسپینر روی دکمه: انتظار اینجا ده‌ها
+ * ثانیه است، نه یک لحظه. یک چرخنده‌ی کوچک گوشه‌ی دکمه در آن مدت به چشم
+ * نمی‌آید و کاربر — همان‌طور که در عمل دیده شده — نتیجه می‌گیرد صفحه خراب
+ * است و می‌بندد. متن باید جایی باشد که نشود ندیدش.
+ *
+ * نوار پیشرفت درصد واقعی نشان نمی‌دهد و عمداً هم عددی چاپ نمی‌کند: مرورگر
+ * هیچ راهی برای گزارش پیشرفتِ یک دانلودِ ناوبری نمی‌دهد. نوار روی منحنی‌ای
+ * جلو می‌رود که هیچ‌وقت به انتها نمی‌رسد و فقط وقتی پر می‌شود که دانلود
+ * واقعاً شروع شده باشد. یعنی «دارد کار می‌کند» را می‌گوید، نه یک عدد ساختگی.
+ *
+ * @return void
+ */
+function fs_download_overlay() {
+	if ( is_admin() ) {
+		return;
+	}
+	?>
+	<div class="fs-dlwait" id="fs-dlwait" hidden role="dialog" aria-modal="true"
+		aria-labelledby="fs-dlwait-title" aria-describedby="fs-dlwait-note">
+		<div class="fs-dlwait__box">
+
+			<button class="fs-dlwait__close" type="button" data-dlwait-close aria-label="بستن">
+				<?php fs_the_icon( 'close', 16, array( 'width' => '2.2' ) ); ?>
+			</button>
+
+			<div class="fs-dlwait__glass" aria-hidden="true">
+				<svg viewBox="0 0 48 64" width="72" height="96">
+					<defs>
+						<clipPath id="fs-hg-top"><path d="M9 5h30c0 12-9 16-9 21H18c0-5-9-9-9-21z"/></clipPath>
+						<clipPath id="fs-hg-bot"><path d="M18 38h12c0 5 9 9 9 21H9c0-12 9-16 9-21z"/></clipPath>
+					</defs>
+
+					<g class="fs-hg__frame">
+						<path d="M8 3h32M8 61h32"/>
+						<path d="M9 5c0 12 9 16 9 21s-9 9-9 21"/>
+						<path d="M39 5c0 12-9 16-9 21s9 9 9 21"/>
+					</g>
+
+					<g clip-path="url(#fs-hg-top)">
+						<rect class="fs-hg__sand-top" x="8" y="5" width="32" height="24"/>
+					</g>
+
+					<g clip-path="url(#fs-hg-bot)">
+						<rect class="fs-hg__sand-bot" x="8" y="59" width="32" height="0"/>
+					</g>
+
+					<line class="fs-hg__stream" x1="24" y1="27" x2="24" y2="45"/>
+				</svg>
+			</div>
+
+			<h2 class="fs-dlwait__title" id="fs-dlwait-title" data-dlwait-title>در حال ساخت لینک دانلود</h2>
+
+			<p class="fs-dlwait__file" data-dlwait-file hidden></p>
+
+			<div class="fs-dlwait__bar" aria-hidden="true">
+				<span class="fs-dlwait__fill" data-dlwait-fill></span>
+			</div>
+
+			<p class="fs-dlwait__note" id="fs-dlwait-note">
+				کاربر عزیز، به علت حجم بالای برخی فایل‌ها در دانلود شدن کامل فایل
+				صبوری به خرج دهید و عجله نکنید.
+			</p>
+
+			<p class="fs-dlwait__meta">
+				<span data-dlwait-timer>۰۰:۰۰</span> · این پنجره را نبندید
+			</p>
+
+			<div class="fs-dlwait__slow" data-dlwait-slow hidden>
+				اگر دانلود شروع نشد،
+				<a href="#" data-dlwait-retry>یک بار دیگر امتحان کنید</a>
+				یا با پشتیبانی تماس بگیرید.
+			</div>
+
+			<div class="fs-dlwait__done" data-dlwait-done hidden>
+				<span class="fs-dlwait__tick"><?php fs_the_icon( 'check', 18, array( 'stroke' => '#fff', 'width' => '3' ) ); ?></span>
+				دانلود شروع شد. فایل در پوشه‌ی دانلودهای مرورگر شما ذخیره می‌شود.
+			</div>
+
+		</div>
+	</div>
+	<?php
+}
+add_action( 'wp_footer', 'fs_download_overlay', 30 );
 
 /* -------------------------------------------------------------------------
    تنظیمات و عیب‌یابی

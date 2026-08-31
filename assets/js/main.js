@@ -1003,89 +1003,468 @@
 	}
 
 	/*
-	 * حالت انتظار دکمه‌های دانلود.
+	 * انتظار دانلود.
 	 *
-	 * کلیک روی لینک دانلود از نظر مرورگر یک ناوبری معمولی است و هیچ رویدادی
-	 * برای «شروع شد» نمی‌دهد؛ صفحه فقط بی‌حرکت می‌ماند. برای فایل‌های بزرگ که
-	 * سرور باید اول کاملشان را بخواند، این سکوت ده‌ها ثانیه طول می‌کشد و کاربر
-	 * صفحه را می‌بندد.
+	 * کلیک روی لینک دانلود از نظر صفحه یک ناوبری معمولی است و مرورگر هیچ
+	 * رویدادی برای «شروع شد» یا «چند درصد آمد» نمی‌دهد. برای فایل بزرگی که
+	 * سرور باید اول کاملش را بخواند، صفحه ده‌ها ثانیه بی‌حرکت می‌ماند و کاربر
+	 * نتیجه می‌گیرد خراب است.
 	 *
-	 * راه استانداردِ فهمیدنِ شروع دانلود همین است: سرور همراه پاسخِ فایل یک
-	 * کوکی با همان نشانه می‌فرستد و ما دنبالش می‌گردیم. تا وقتی پیدا نشده،
-	 * دکمه «در حال آماده‌سازی» می‌ماند.
+	 * تنها سیگنال واقعی، کوکی‌ای است که سرور همراه پاسخِ فایل می‌فرستد. تا
+	 * رسیدنش پوشش باز می‌ماند و نوار پیشرفت روی منحنی‌ای جلو می‌رود که هرگز
+	 * به انتها نمی‌رسد — عمداً هیچ عددی چاپ نمی‌شود، چون عددی در کار نیست و
+	 * درصد ساختگی بدتر از نبودنش است.
 	 */
 	function initDownloads() {
 		var buttons = document.querySelectorAll( '[data-download]' );
+		var wait = document.getElementById( 'fs-dlwait' );
 
 		if ( ! buttons.length ) {
 			return;
 		}
 
+		var fill = wait ? wait.querySelector( '[data-dlwait-fill]' ) : null;
+		var file = wait ? wait.querySelector( '[data-dlwait-file]' ) : null;
+		var timerEl = wait ? wait.querySelector( '[data-dlwait-timer]' ) : null;
+		var slow = wait ? wait.querySelector( '[data-dlwait-slow]' ) : null;
+		var done = wait ? wait.querySelector( '[data-dlwait-done]' ) : null;
+		var retry = wait ? wait.querySelector( '[data-dlwait-retry]' ) : null;
+		var titleEl = wait ? wait.querySelector( '[data-dlwait-title]' ) : null;
+		var titleIdle = titleEl ? titleEl.textContent : '';
+
+		var poll = null;
+		var tick = null;
+		var startedAt = 0;
+		var progress = 0;
+		var active = null;
+
+		function pad( n ) {
+			return ( n < 10 ? '۰' : '' ) + faNum( n );
+		}
+
+		function stop() {
+			clearInterval( poll );
+			clearInterval( tick );
+			poll = null;
+			tick = null;
+		}
+
+		function close() {
+			stop();
+
+			if ( wait ) {
+				wait.hidden = true;
+				wait.classList.remove( 'is-done' );
+			}
+
+			if ( active ) {
+				setBusy( active, false );
+				active.classList.remove( 'is-waiting' );
+				active = null;
+			}
+		}
+
+		function setBusy( button, busy ) {
+			var idle = button.querySelector( '.fs-dlbtn__idle' );
+			var spin = button.querySelector( '.fs-dlbtn__wait' );
+
+			if ( idle ) {
+				idle.hidden = busy;
+			}
+
+			if ( spin ) {
+				spin.hidden = ! busy;
+			}
+		}
+
+		function open( button ) {
+			active = button;
+			startedAt = Date.now();
+			progress = 0;
+
+			if ( ! wait ) {
+				return;
+			}
+
+			var name = button.getAttribute( 'data-download-name' );
+
+			if ( file ) {
+				file.textContent = name || '';
+				file.hidden = ! name;
+			}
+
+			if ( slow ) {
+				slow.hidden = true;
+			}
+
+			if ( done ) {
+				done.hidden = true;
+			}
+
+			if ( titleEl ) {
+				titleEl.textContent = titleIdle;
+			}
+
+			wait.classList.remove( 'is-done' );
+			wait.hidden = false;
+
+			if ( fill ) {
+				fill.style.width = '0%';
+			}
+
+			tick = setInterval( function () {
+				var secs = Math.floor( ( Date.now() - startedAt ) / 1000 );
+
+				if ( timerEl ) {
+					timerEl.textContent = pad( Math.floor( secs / 60 ) ) + ':' + pad( secs % 60 );
+				}
+
+				/*
+				 * هر تیک، بخشی از فاصله‌ی باقی‌مانده تا ۹۲٪ طی می‌شود. نتیجه
+				 * منحنی‌ای است که اول تند و بعد کند می‌رود و هیچ‌وقت نمی‌ایستد
+				 * ولی به انتها هم نمی‌رسد؛ همان چیزی که برای انتظارِ
+				 * بی‌اندازه‌ی نامعلوم درست است.
+				 */
+				progress += ( 92 - progress ) * 0.06;
+
+				if ( fill ) {
+					fill.style.width = progress.toFixed( 1 ) + '%';
+				}
+
+				if ( secs >= 45 && slow ) {
+					slow.hidden = false;
+				}
+			}, 250 );
+		}
+
+		function finish( started ) {
+			stop();
+
+			if ( ! wait ) {
+				if ( active ) {
+					setBusy( active, false );
+					active.classList.remove( 'is-waiting' );
+					active = null;
+				}
+
+				return;
+			}
+
+			if ( started ) {
+				if ( fill ) {
+					fill.style.width = '100%';
+				}
+
+				wait.classList.add( 'is-done' );
+
+				if ( titleEl ) {
+					titleEl.textContent = 'لینک دانلود آماده شد';
+				}
+
+				if ( done ) {
+					done.hidden = false;
+				}
+
+				if ( slow ) {
+					slow.hidden = true;
+				}
+
+				setTimeout( close, 3500 );
+
+				return;
+			}
+
+			close();
+		}
+
+		function watch( token ) {
+			poll = setInterval( function () {
+				var seen = document.cookie.indexOf( 'fs_dl_' + token + '=' ) > -1;
+				var expired = Date.now() - startedAt > 180000;
+
+				if ( ! seen && ! expired ) {
+					return;
+				}
+
+				// کوکی مصرف شد؛ پاکش می‌کنیم تا کلیک بعدی روی همان دکمه
+				// بلافاصله «تمام‌شده» به نظر نرسد.
+				document.cookie = 'fs_dl_' + token + '=; Max-Age=0; path=/';
+
+				finish( seen );
+			}, 400 );
+		}
+
 		Array.prototype.forEach.call( buttons, function ( button ) {
 			button.addEventListener( 'click', function () {
-				var token = button.getAttribute( 'data-download' );
-
 				if ( button.classList.contains( 'is-waiting' ) ) {
 					return;
 				}
 
 				button.classList.add( 'is-waiting' );
 				setBusy( button, true );
-
-				var started = Date.now();
-				var timer   = setInterval( function () {
-					var done    = document.cookie.indexOf( 'fs_dl_' + token + '=' ) > -1;
-					var expired = Date.now() - started > 120000;
-
-					if ( ! done && ! expired ) {
-						return;
-					}
-
-					clearInterval( timer );
-					button.classList.remove( 'is-waiting' );
-					setBusy( button, false );
-
-					// کوکی مصرف شد؛ پاکش می‌کنیم تا کلیک بعدی روی همان دکمه
-					// بلافاصله «تمام‌شده» به نظر نرسد.
-					document.cookie = 'fs_dl_' + token + '=; Max-Age=0; path=/';
-
-					if ( done ) {
-						showHint( button );
-					}
-				}, 500 );
+				open( button );
+				watch( button.getAttribute( 'data-download' ) );
 			} );
 		} );
 
-		function setBusy( button, busy ) {
-			var idle = button.querySelector( '.fs-dlbtn__idle' );
-			var wait = button.querySelector( '.fs-dlbtn__wait' );
-
-			if ( idle ) {
-				idle.hidden = busy;
-			}
-
-			if ( wait ) {
-				wait.hidden = ! busy;
-			}
+		if ( ! wait ) {
+			return;
 		}
 
-		function showHint( button ) {
-			var row = button.closest( '.fs-ditem' ) || button.parentNode;
+		if ( retry ) {
+			retry.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
 
-			if ( ! row || row.querySelector( '.fs-dlhint' ) ) {
+				if ( active ) {
+					var href = active.getAttribute( 'href' );
+
+					startedAt = Date.now();
+
+					if ( slow ) {
+						slow.hidden = true;
+					}
+
+					window.location.href = href;
+				}
+			} );
+		}
+
+		Array.prototype.forEach.call( wait.querySelectorAll( '[data-dlwait-close]' ), function ( el ) {
+			el.addEventListener( 'click', close );
+		} );
+
+		// کلیک روی پس‌زمینه و Escape هم می‌بندد؛ بستنِ پوشش دانلود را متوقف
+		// نمی‌کند، فقط پیام را کنار می‌زند.
+		wait.addEventListener( 'click', function ( e ) {
+			if ( e.target === wait ) {
+				close();
+			}
+		} );
+
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( 'Escape' === e.key && ! wait.hidden ) {
+				close();
+			}
+		} );
+	}
+
+	/*
+	 * پیشنهاد زنده‌ی جست‌وجو.
+	 *
+	 * سه محافظ دارد که هر کدام یک مشکل واقعی را می‌گیرند:
+	 *
+	 * ۱. debounce — بدون آن، هر حرفی که تایپ می‌شود یک درخواست می‌سازد و
+	 *    نوشتن «ریاضی» شش کوئری روی دیتابیس می‌زند.
+	 * ۲. AbortController — پاسخ‌ها ممکن است بی‌ترتیب برسند؛ بدون لغو درخواست
+	 *    قبلی، نتیجه‌ی «ری» می‌توانست بعد از نتیجه‌ی «ریاضی» بنشیند.
+	 * ۳. مقایسه‌ی مقدار فعلی — کاربر ممکن است بین درخواست و پاسخ کادر را پاک
+	 *    کرده باشد.
+	 */
+	function initLiveSearch() {
+		var form = document.querySelector( '.fs-search' );
+
+		if ( ! form ) {
+			return;
+		}
+
+		var input = form.querySelector( '.fs-search__input' );
+		var pop = form.querySelector( '[data-search-pop]' );
+		var cat = form.querySelector( '.fs-search__cat' );
+
+		if ( ! input || ! pop ) {
+			return;
+		}
+
+		var timer = null;
+		var control = null;
+		var lastQuery = '';
+
+		function close() {
+			pop.hidden = true;
+			pop.innerHTML = '';
+		}
+
+		function render( data, query ) {
+			if ( ! data.items.length ) {
+				pop.innerHTML = '<div class="fs-spop__empty">چیزی پیدا نشد. املای کلمه را بررسی کنید یا کوتاه‌ترش کنید.</div>';
+				pop.hidden = false;
+
 				return;
 			}
 
-			var hint = document.createElement( 'div' );
+			var html = '<ul class="fs-spop__list">';
 
-			hint.className   = 'fs-dlhint';
-			hint.textContent = 'دانلود شروع شد. اگر چیزی ذخیره نشد، پوشه‌ی دانلودهای مرورگر را ببینید.';
-			row.appendChild( hint );
+			data.items.forEach( function ( item ) {
+				html += '<li><a class="fs-spop__item" href="' + item.url + '">' +
+					( item.thumb ? '<img class="fs-spop__thumb" src="' + item.thumb + '" alt="" loading="lazy" width="40" height="40">' : '<span class="fs-spop__thumb"></span>' ) +
+					'<span class="fs-spop__body">' +
+					'<span class="fs-spop__title">' + esc( item.title ) + '</span>' +
+					( item.meta ? '<span class="fs-spop__meta">' + esc( item.meta ) + '</span>' : '' ) +
+					'</span>' +
+					( item.price ? '<span class="fs-spop__price">' + esc( item.price ) + '</span>' : '' ) +
+					'</a></li>';
+			} );
 
-			setTimeout( function () {
-				hint.remove();
-			}, 8000 );
+			html += '</ul>';
+
+			if ( data.more ) {
+				html += '<a class="fs-spop__all" href="' + data.more + '">دیدن همه‌ی نتیجه‌های «' + esc( query ) + '»</a>';
+			}
+
+			pop.innerHTML = html;
+			pop.hidden = false;
 		}
+
+		function esc( text ) {
+			var div = document.createElement( 'div' );
+
+			div.textContent = text;
+
+			return div.innerHTML;
+		}
+
+		function ask() {
+			var query = input.value.trim();
+
+			if ( query.length < 2 ) {
+				close();
+
+				return;
+			}
+
+			if ( query === lastQuery && ! pop.hidden ) {
+				return;
+			}
+
+			lastQuery = query;
+
+			if ( control ) {
+				control.abort();
+			}
+
+			control = new AbortController();
+
+			var url = ( window.fsData ? fsData.ajaxUrl : '/wp-admin/admin-ajax.php' ) +
+				'?action=fs_live_search&q=' + encodeURIComponent( query ) +
+				'&cat=' + encodeURIComponent( cat ? cat.value : '' );
+
+			pop.classList.add( 'is-loading' );
+
+			fetch( url, { credentials: 'same-origin', signal: control.signal } )
+				.then( function ( r ) {
+					return r.json();
+				} )
+				.then( function ( res ) {
+					pop.classList.remove( 'is-loading' );
+
+					if ( ! res.success || input.value.trim() !== query ) {
+						return;
+					}
+
+					render( res.data, query );
+				} )
+				.catch( function () {
+					pop.classList.remove( 'is-loading' );
+				} );
+		}
+
+		input.addEventListener( 'input', function () {
+			clearTimeout( timer );
+			timer = setTimeout( ask, 250 );
+		} );
+
+		input.addEventListener( 'focus', function () {
+			if ( input.value.trim().length >= 2 ) {
+				ask();
+			}
+		} );
+
+		if ( cat ) {
+			cat.addEventListener( 'change', function () {
+				lastQuery = '';
+				ask();
+			} );
+		}
+
+		document.addEventListener( 'click', function ( e ) {
+			if ( ! form.contains( e.target ) ) {
+				close();
+			}
+		} );
+
+		input.addEventListener( 'keydown', function ( e ) {
+			if ( 'Escape' === e.key ) {
+				close();
+
+				return;
+			}
+
+			if ( 'ArrowDown' !== e.key || pop.hidden ) {
+				return;
+			}
+
+			var first = pop.querySelector( '.fs-spop__item' );
+
+			if ( first ) {
+				e.preventDefault();
+				first.focus();
+			}
+		} );
+	}
+
+	function initCheckoutRemove() {
+		var list = document.querySelector( '.fs-checkout__main' );
+
+		if ( ! list ) {
+			return;
+		}
+
+		list.addEventListener( 'click', function ( e ) {
+			var button = e.target.closest ? e.target.closest( '[data-checkout-remove]' ) : null;
+
+			if ( ! button || button.disabled ) {
+				return;
+			}
+
+			e.preventDefault();
+
+			var row = button.closest( '.fs-citem' );
+
+			button.disabled = true;
+
+			if ( row ) {
+				row.classList.add( 'is-removing' );
+			}
+
+			var body = new URLSearchParams();
+
+			body.append( 'action', 'fs_cart_remove' );
+			body.append( 'nonce', window.fsData ? fsData.cartNonce : '' );
+			body.append( 'key', button.getAttribute( 'data-checkout-remove' ) );
+
+			fetch( window.fsData ? fsData.ajaxUrl : '/wp-admin/admin-ajax.php', {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: body
+			} ).then( function ( r ) {
+				return r.json();
+			} ).then( function ( res ) {
+				if ( ! res.success ) {
+					throw new Error( 'failed' );
+				}
+
+				// سبد خالی شد: ماندن روی صفحه‌ی پرداختِ بی‌محصول بی‌معنی است.
+				window.location.href = ( 0 === res.data.count && window.fsData && fsData.shopUrl )
+					? fsData.shopUrl
+					: window.location.href;
+			} ).catch( function () {
+				button.disabled = false;
+
+				if ( row ) {
+					row.classList.remove( 'is-removing' );
+				}
+			} );
+		} );
 	}
 
 	function initAuth() {
