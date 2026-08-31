@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '2.3.0' );
+define( 'FS_VERSION', '2.4.0' );
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );
@@ -23,6 +23,7 @@ require_once get_theme_file_path( 'inc/auth.php' );
 require_once get_theme_file_path( 'inc/auth-guard.php' );
 require_once get_theme_file_path( 'inc/sms.php' );
 require_once get_theme_file_path( 'inc/downloads.php' );
+require_once get_theme_file_path( 'inc/search.php' );
 require_once get_theme_file_path( 'inc/cart.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
 require_once get_theme_file_path( 'inc/checkout-repair.php' );
@@ -131,6 +132,15 @@ function fs_assets() {
 
 	// اسکریپت کپچا فقط روی صفحه‌ی ورود بارگذاری می‌شود؛ روی بقیه‌ی صفحه‌ها یک
 	// درخواست اضافه به گوگل است بی‌آنکه به کاری بیاید.
+	/*
+	 * اسکریپت پاسخ‌دادن وردپرس. بدون آن، لینک «پاسخ» فرم را زیر دیدگاه نمی‌برد
+	 * و comment_parent خالی می‌ماند؛ یعنی هر پاسخ به‌شکل یک دیدگاه تازه ثبت
+	 * می‌شد و هیچ‌وقت زیر نظر کاربر دیده نمی‌شد.
+	 */
+	if ( is_singular() && comments_open() && get_option( 'thread_comments' ) ) {
+		wp_enqueue_script( 'comment-reply' );
+	}
+
 	$captcha = fs_is_auth_screen() ? fs_captcha_config() : null;
 
 	if ( $captcha ) {

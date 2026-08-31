@@ -59,6 +59,15 @@ $fs_cart_n      = fs_has_woo() ? fs_cart_count() : 0;
 					<input type="hidden" name="post_type" value="product">
 				<?php endif; ?>
 
+				<?php
+				/*
+				 * جعبه‌ی پیشنهاد زنده. خالی می‌ماند تا جاوااسکریپت پرش کند؛ فرم
+				 * بدون جاوااسکریپت هم کار می‌کند و به صفحه‌ی نتایج می‌رود، پس
+				 * این فقط یک میان‌بر است نه تنها راه.
+				 */
+				?>
+				<div class="fs-search__pop" data-search-pop hidden></div>
+
 				<button class="fs-search__go" type="submit">
 					<span class="fs-sr-only">جست‌وجو</span>
 					<?php fs_the_icon( 'search', 16, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>

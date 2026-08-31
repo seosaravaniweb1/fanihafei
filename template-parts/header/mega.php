@@ -13,12 +13,26 @@ if ( ! $fs_cats ) {
 	return;
 }
 ?>
+<?php
+/*
+ * چرا ردیف‌ها <a href> هستند و نه <button>:
+ *
+ * پیش از این نام هر دسته داخل یک دکمه بود و تنها لینکِ آن دسته، دکمه‌ای در
+ * پنل کناری با متن «مشاهده صفحه دسته». برای خزنده یعنی مهم‌ترین دسته‌های
+ * فروشگاه از سربرگ — که در هر صفحه‌ی سایت تکرار می‌شود — هیچ لینکی با متن
+ * معنادار نمی‌گرفتند؛ و متن لنگرِ تکراری «مشاهده صفحه دسته» روی همه‌ی دسته‌ها
+ * هیچ سیگنالی از موضوع آن دسته نمی‌داد.
+ *
+ * حالا خود نام دسته لینک است. رفتار تب هم دست‌نخورده می‌ماند: روی دسکتاپ
+ * هاور و فوکوس پنل را عوض می‌کند و کلیک به صفحه‌ی دسته می‌رود.
+ */
+?>
 <div class="fs-mega" id="fs-mega" hidden>
 
 	<div class="fs-mega__list" role="tablist" aria-label="فهرست دسته‌ها">
 		<?php foreach ( $fs_cats as $fs_i => $fs_cat ) : ?>
-			<button class="fs-mega__row<?php echo 0 === $fs_i ? ' is-active' : ''; ?>"
-				type="button"
+			<a class="fs-mega__row<?php echo 0 === $fs_i ? ' is-active' : ''; ?>"
+				href="<?php echo esc_url( fs_url( $fs_cat['link'] ) ); ?>"
 				role="tab"
 				id="fs-mega-tab-<?php echo (int) $fs_i; ?>"
 				aria-controls="fs-mega-pane-<?php echo (int) $fs_i; ?>"
@@ -28,7 +42,7 @@ if ( ! $fs_cats ) {
 				</span>
 				<span class="fs-mega__row-name"><?php echo esc_html( $fs_cat['name'] ); ?></span>
 				<?php fs_the_icon( 'chevron-prev', 13, array( 'width' => '2.2' ) ); ?>
-			</button>
+			</a>
 		<?php endforeach; ?>
 	</div>
 
@@ -46,7 +60,7 @@ if ( ! $fs_cats ) {
 						<div class="fs-mega__count"><?php echo esc_html( $fs_cat['count'] ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?> در این دسته</div>
 					</div>
 					<a class="fs-btn-brand-sm" href="<?php echo esc_url( fs_url( $fs_cat['link'] ) ); ?>">
-						مشاهده صفحه دسته
+						همه فایل‌های <?php echo esc_html( $fs_cat['name'] ); ?>
 						<?php fs_the_icon( 'chevron-prev', 14, array( 'stroke' => '#fff', 'width' => '2.2' ) ); ?>
 					</a>
 				</div>

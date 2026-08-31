@@ -90,7 +90,32 @@ do_action( 'woocommerce_before_main_content' );
 				}
 				?>
 			</h1>
-			<p class="fs-cathero__desc"><?php echo esc_html( fs_copy( 'cathero_tagline' ) ); ?></p>
+
+			<?php if ( $fs_term && $fs_term->description ) : ?>
+				<?php
+				/*
+				 * توضیح دسته، یک بار و همین‌جا.
+				 *
+				 * پیش از این دو بار چاپ می‌شد: یک بار در جعبه‌ی «درباره این دسته»
+				 * پایین صفحه و یک بار از قلاب woocommerce_archive_description.
+				 * دو نسخه از یک متن روی یک نشانی، برای خزنده محتوای تکراری داخل
+				 * صفحه است و برای کاربر تکرار بی‌دلیل.
+				 *
+				 * جمع‌شدن با CSS انجام می‌شود، نه با حذف از HTML: متن کامل همیشه
+				 * در سورس هست و گوگل کلش را می‌خواند — همان چیزی که برای «محتوای
+				 * پنهان» توصیه شده. اگر با جاوااسکریپت تزریق می‌شد یا با
+				 * display:none می‌رفت، ارزش متنی دسته از دست می‌رفت.
+				 */
+				?>
+				<div class="fs-cathero__about fs-collapse" data-collapse>
+					<div class="fs-collapse__inner fs-rich"><?php echo wp_kses_post( fs_normalize_term_headings( wpautop( $fs_term->description ) ) ); ?></div>
+					<button class="fs-collapse__btn fs-collapse__btn--pill" type="button" aria-expanded="false" hidden
+						data-more="<?php echo esc_attr( fs_copy( 'read_more' ) ); ?>"
+						data-less="<?php echo esc_attr( fs_copy( 'read_less' ) ); ?>">
+						<?php echo esc_html( fs_copy( 'read_more' ) ); ?>
+					</button>
+				</div>
+			<?php endif; ?>
 		</div>
 
 		<div class="fs-cathero__stats">
@@ -132,34 +157,6 @@ do_action( 'woocommerce_before_main_content' );
 					<span class="fs-subtile__n"><?php echo esc_html( fs_fa_num( fs_cat_product_count( $fs_sub ) ) ); ?> <?php echo esc_html( fs_copy( 'cats_unit' ) ); ?></span>
 				</a>
 			<?php endforeach; ?>
-		</div>
-	</section>
-<?php endif; ?>
-
-<?php if ( $fs_term && $fs_term->description ) : ?>
-	<section class="fs-section fs-section--about-cat">
-		<div class="fs-catabout">
-			<h2 class="fs-catabout__title">
-				<?php
-				echo 0 === (int) $fs_term->parent
-					? 'درباره فایل‌های ' . esc_html( $fs_term->name )
-					: 'درباره این دسته';
-				?>
-			</h2>
-
-			<div class="fs-collapse" data-collapse>
-				<?php
-				// سطح هدینگ‌های متن ترم هم‌تراز می‌شود: H1 نشود، پرش سطح نکند.
-				// جعبه‌ی «درباره…» یک H2 است، پس تیترهای داخل متن هم H2 و
-				// زیرتیترها H3 می‌مانند و کانتینر سطحی تحمیل نمی‌کند.
-				?>
-				<div class="fs-collapse__inner fs-rich"><?php echo wp_kses_post( fs_normalize_term_headings( wpautop( $fs_term->description ) ) ); ?></div>
-				<button class="fs-collapse__btn fs-collapse__btn--pill" type="button" aria-expanded="false" hidden
-					data-more="<?php echo esc_attr( fs_copy( 'read_more' ) ); ?>"
-					data-less="<?php echo esc_attr( fs_copy( 'read_less' ) ); ?>">
-					<?php echo esc_html( fs_copy( 'read_more' ) ); ?>
-				</button>
-			</div>
 		</div>
 	</section>
 <?php endif; ?>

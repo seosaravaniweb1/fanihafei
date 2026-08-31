@@ -122,8 +122,24 @@
 			}
 
 			row.addEventListener( 'mouseenter', select );
-			row.addEventListener( 'click', select );
 			row.addEventListener( 'focus', select );
+
+			/*
+			 * ردیف حالا یک لینک واقعی به صفحه‌ی دسته است، ولی روی صفحه‌ی باریک
+			 * لمس اول نباید کاربر را از منو بیرون بیندازد: زیردسته‌ها را باز
+			 * می‌کند. لمس دوم روی همان ردیف — که دیگر فعال است — می‌رود.
+			 *
+			 * روی دسکتاپ پنل با هاور از قبل باز شده، پس کلیک بی‌درنگ می‌رود.
+			 */
+			row.addEventListener( 'click', function ( e ) {
+				var wasActive = row.classList.contains( 'is-active' );
+
+				select();
+
+				if ( mq.matches && ! wasActive ) {
+					e.preventDefault();
+				}
+			} );
 		} );
 
 		document.addEventListener( 'keydown', function ( e ) {
@@ -172,6 +188,26 @@
 		} );
 
 		drawer.addEventListener( 'click', function ( e ) {
+			/*
+			 * لمس روی نام دسته، زیردسته‌ها را باز می‌کند و به صفحه‌ی دسته نمی‌رود.
+			 * لینک در HTML سر جایش می‌ماند تا خزنده دنبالش کند؛ فقط رفتار لمس
+			 * عوض می‌شود. برای رفتن به خود دسته، لینک «مشاهده همه فایل‌های…»
+			 * ته همان پنل هست.
+			 */
+			var name = e.target.closest( '.fs-drawer__link' );
+
+			if ( name ) {
+				var row = name.closest( '.fs-drawer__row' );
+				var sibling = row ? row.querySelector( '.fs-drawer__caret' ) : null;
+
+				if ( sibling ) {
+					e.preventDefault();
+					sibling.click();
+
+					return;
+				}
+			}
+
 			var caret = e.target.closest( '.fs-drawer__caret' );
 
 			if ( ! caret ) {
@@ -747,6 +783,170 @@
 	 * لیست فایل‌ها و فرم درگاه همه به سبد وابسته‌اند و به‌روزکردن تکه‌تکه‌شان
 	 * راهی است برای اینکه یکی‌شان از قلم بیفتد و کاربر مبلغ اشتباه ببیند.
 	 */
+	/*
+	 * پیشنهاد زنده‌ی جست‌وجو.
+	 *
+	 * سه محافظ دارد که هر کدام یک مشکل واقعی را می‌گیرند:
+	 *
+	 * ۱. debounce — بدون آن، هر حرفی که تایپ می‌شود یک درخواست می‌سازد و
+	 *    نوشتن «ریاضی» شش کوئری روی دیتابیس می‌زند.
+	 * ۲. AbortController — پاسخ‌ها ممکن است بی‌ترتیب برسند؛ بدون لغو درخواست
+	 *    قبلی، نتیجه‌ی «ری» می‌توانست بعد از نتیجه‌ی «ریاضی» بنشیند.
+	 * ۳. مقایسه‌ی مقدار فعلی — کاربر ممکن است بین درخواست و پاسخ کادر را پاک
+	 *    کرده باشد.
+	 */
+	function initLiveSearch() {
+		var form = document.querySelector( '.fs-search' );
+
+		if ( ! form ) {
+			return;
+		}
+
+		var input = form.querySelector( '.fs-search__input' );
+		var pop = form.querySelector( '[data-search-pop]' );
+		var cat = form.querySelector( '.fs-search__cat' );
+
+		if ( ! input || ! pop ) {
+			return;
+		}
+
+		var timer = null;
+		var control = null;
+		var lastQuery = '';
+
+		function close() {
+			pop.hidden = true;
+			pop.innerHTML = '';
+		}
+
+		function render( data, query ) {
+			if ( ! data.items.length ) {
+				pop.innerHTML = '<div class="fs-spop__empty">چیزی پیدا نشد. املای کلمه را بررسی کنید یا کوتاه‌ترش کنید.</div>';
+				pop.hidden = false;
+
+				return;
+			}
+
+			var html = '<ul class="fs-spop__list">';
+
+			data.items.forEach( function ( item ) {
+				html += '<li><a class="fs-spop__item" href="' + item.url + '">' +
+					( item.thumb ? '<img class="fs-spop__thumb" src="' + item.thumb + '" alt="" loading="lazy" width="40" height="40">' : '<span class="fs-spop__thumb"></span>' ) +
+					'<span class="fs-spop__body">' +
+					'<span class="fs-spop__title">' + esc( item.title ) + '</span>' +
+					( item.meta ? '<span class="fs-spop__meta">' + esc( item.meta ) + '</span>' : '' ) +
+					'</span>' +
+					( item.price ? '<span class="fs-spop__price">' + esc( item.price ) + '</span>' : '' ) +
+					'</a></li>';
+			} );
+
+			html += '</ul>';
+
+			if ( data.more ) {
+				html += '<a class="fs-spop__all" href="' + data.more + '">دیدن همه‌ی نتیجه‌های «' + esc( query ) + '»</a>';
+			}
+
+			pop.innerHTML = html;
+			pop.hidden = false;
+		}
+
+		function esc( text ) {
+			var div = document.createElement( 'div' );
+
+			div.textContent = text;
+
+			return div.innerHTML;
+		}
+
+		function ask() {
+			var query = input.value.trim();
+
+			if ( query.length < 2 ) {
+				close();
+
+				return;
+			}
+
+			if ( query === lastQuery && ! pop.hidden ) {
+				return;
+			}
+
+			lastQuery = query;
+
+			if ( control ) {
+				control.abort();
+			}
+
+			control = new AbortController();
+
+			var url = ( window.fsData ? fsData.ajaxUrl : '/wp-admin/admin-ajax.php' ) +
+				'?action=fs_live_search&q=' + encodeURIComponent( query ) +
+				'&cat=' + encodeURIComponent( cat ? cat.value : '' );
+
+			pop.classList.add( 'is-loading' );
+
+			fetch( url, { credentials: 'same-origin', signal: control.signal } )
+				.then( function ( r ) {
+					return r.json();
+				} )
+				.then( function ( res ) {
+					pop.classList.remove( 'is-loading' );
+
+					if ( ! res.success || input.value.trim() !== query ) {
+						return;
+					}
+
+					render( res.data, query );
+				} )
+				.catch( function () {
+					pop.classList.remove( 'is-loading' );
+				} );
+		}
+
+		input.addEventListener( 'input', function () {
+			clearTimeout( timer );
+			timer = setTimeout( ask, 250 );
+		} );
+
+		input.addEventListener( 'focus', function () {
+			if ( input.value.trim().length >= 2 ) {
+				ask();
+			}
+		} );
+
+		if ( cat ) {
+			cat.addEventListener( 'change', function () {
+				lastQuery = '';
+				ask();
+			} );
+		}
+
+		document.addEventListener( 'click', function ( e ) {
+			if ( ! form.contains( e.target ) ) {
+				close();
+			}
+		} );
+
+		input.addEventListener( 'keydown', function ( e ) {
+			if ( 'Escape' === e.key ) {
+				close();
+
+				return;
+			}
+
+			if ( 'ArrowDown' !== e.key || pop.hidden ) {
+				return;
+			}
+
+			var first = pop.querySelector( '.fs-spop__item' );
+
+			if ( first ) {
+				e.preventDefault();
+				first.focus();
+			}
+		} );
+	}
+
 	function initCheckoutRemove() {
 		var list = document.querySelector( '.fs-checkout__main' );
 
@@ -1683,6 +1883,7 @@
 		initAuth();
 		initFooterTabs();
 		initCart();
+		initLiveSearch();
 		initCheckoutRemove();
 		initDownloads();
 		initWishlist();

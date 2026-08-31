@@ -3,7 +3,7 @@ Theme Name: لوکسو فایل
 Theme URI: https://github.com/seosaravaniweb1/fanihafei
 Author: Saravani Web
 Description: قالب فروشگاه فایل «لوکسو فایل» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
-Version: 2.3.0
+Version: 2.4.0
 Requires at least: 6.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
@@ -237,6 +237,7 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
  * دکمه‌ی ارسال جا را تنگ می‌کردند و برای خود کادر متن چیزی نمی‌ماند.
  */
 .fs-search {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -469,6 +470,11 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   overflow-y: auto;
 }
 
+/*
+ * ردیف حالا <a> است نه <button>؛ ظاهرش نباید عوض شود، ولی چند قاعده‌ی
+ * پیش‌فرضِ لینک باید خنثی شود: خط زیر متن، و رنگی که مرورگر به لینک بازدیدشده
+ * می‌دهد.
+ */
 .fs-mega__row {
   display: flex;
   align-items: center;
@@ -480,8 +486,14 @@ input::placeholder { color: var(--fs-muted-2); opacity: 1; }
   background: transparent;
   color: var(--fs-ink-3);
   text-align: right;
+  text-decoration: none;
+  cursor: pointer;
   transition: all .18s;
 }
+
+.fs-mega__row:hover,
+.fs-mega__row:visited { color: var(--fs-ink-3); text-decoration: none; }
+.fs-mega__row.is-active:hover { color: var(--fs-ink); }
 
 .fs-mega__row.is-active {
   background: #fff;
@@ -5845,8 +5857,13 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   margin-bottom: 14px;
 }
 
+/*
+ * ستاره‌های امتیاز هم <label> هستند و این قاعده رنگ و display بلوکی را به
+ * آن‌ها تحمیل می‌کرد — ستاره‌ی خالی تیره می‌شد و ردیف می‌شکست. کنارگذاشتنِ
+ * صریح، از بالابردن اختیاری وزن سلکتور در آن طرف روشن‌تر است.
+ */
 .fs-revform .comment-form-rating label,
-.fs-revform label {
+.fs-revform label:not(.fs-rate__star) {
   font: 600 11.5px var(--fs-font);
   color: var(--fs-ink-2);
   display: block;
@@ -7094,6 +7111,240 @@ body.fs-noscroll { overflow: hidden; }
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* پیشنهاد زنده‌ی جست‌وجو ----------------------------------------------------- */
+.fs-search__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  inset-inline: 0;
+  z-index: 60;
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 15px;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
+  overflow: hidden;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.fs-search__pop[hidden] { display: none; }
+
+/* نوار باریک بالای جعبه، فقط وقتی درخواست در راه است. */
+.fs-search__pop.is-loading::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  display: block;
+  height: 2px;
+  background: var(--fs-grad);
+  animation: fs-spop-load 1s ease-in-out infinite;
+}
+
+@keyframes fs-spop-load {
+  0%, 100% { opacity: .35; }
+  50% { opacity: 1; }
+}
+
+.fs-spop__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+.fs-spop__item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  text-decoration: none;
+  color: var(--fs-ink);
+  transition: background .15s;
+}
+
+.fs-spop__item:hover,
+.fs-spop__item:focus-visible {
+  background: var(--fs-brand-wash);
+  outline: none;
+}
+
+.fs-spop__thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--fs-bg-2);
+}
+
+.fs-spop__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fs-spop__title {
+  display: block;
+  font: 700 12px var(--fs-font);
+  color: var(--fs-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fs-spop__meta {
+  display: block;
+  margin-top: 3px;
+  font: 500 10px var(--fs-font);
+  color: var(--fs-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fs-spop__price {
+  flex: none;
+  font: 800 11.5px var(--fs-font);
+  color: var(--fs-brand-d);
+}
+
+.fs-spop__empty {
+  padding: 20px 16px;
+  text-align: center;
+  font: 500 11.5px/1.9 var(--fs-font);
+  color: var(--fs-ink-3);
+}
+
+.fs-spop__all {
+  display: block;
+  padding: 12px;
+  border-top: 1px solid var(--fs-line-2);
+  background: var(--fs-bg);
+  text-align: center;
+  font: 700 11px var(--fs-font);
+  color: var(--fs-brand-d);
+  text-decoration: none;
+}
+
+.fs-spop__all:hover { background: var(--fs-brand-wash); }
+
+@media (max-width: 767px) {
+  .fs-spop__price { display: none; }
+  .fs-search__pop { max-height: 60vh; }
+}
+
+/* ستاره‌ی امتیاز در فرم دیدگاه ---------------------------------------------- */
+/*
+ * ستاره‌ها در HTML از ۵ به ۱ چیده شده‌اند و اینجا با row-reverse به ترتیب
+ * درست دیده می‌شوند. سودش این است که با سلکتور «~» می‌شود گفت «هر ستاره‌ای که
+ * بعد از ستاره‌ی زیر نشانگر می‌آید هم پر شود» — بدون یک خط جاوااسکریپت.
+ */
+.fs-rate {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.fs-rate__legend {
+  padding: 0;
+  margin: 0 0 8px;
+  font: 700 12px var(--fs-font);
+  color: var(--fs-ink);
+}
+
+.fs-rate__stars {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.fs-rate__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fs-rate__star {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--fs-line);
+  cursor: pointer;
+  transition: color .15s, transform .15s;
+}
+
+.fs-rate__star:hover,
+.fs-rate__star:hover ~ .fs-rate__star,
+.fs-rate__input:checked ~ .fs-rate__star,
+.fs-rate__input:checked + .fs-rate__star {
+  color: #f59e0b;
+}
+
+.fs-rate__star:hover { transform: scale(1.12); }
+
+/* فوکوس کیبورد باید دیده شود؛ ورودی خودش پنهان است. */
+.fs-rate__input:focus-visible + .fs-rate__star {
+  outline: 2px solid var(--fs-brand);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* پاسخ‌ها زیر دیدگاه ------------------------------------------------------- */
+.fs-revcard__actions { margin-top: 10px; }
+
+.fs-revcard__actions a {
+  font: 700 10.5px var(--fs-font);
+  color: var(--fs-brand-d);
+  text-decoration: none;
+}
+
+.fs-revcard__actions a:hover { text-decoration: underline; }
+
+.fs-revcard__replies {
+  margin: 12px 0 0;
+  padding-inline-start: 14px;
+  border-inline-start: 2px solid var(--fs-line-2);
+  display: grid;
+  gap: 10px;
+}
+
+.fs-revcard--reply {
+  background: var(--fs-bg);
+  padding: 12px 13px;
+}
+
+/* پاسخ پشتیبانی باید از نظر یک خریدار دیگر جدا دیده شود. */
+.fs-revcard--staff {
+  background: var(--fs-brand-wash);
+  border-color: var(--fs-brand-edge);
+}
+
+.fs-revcard__badge {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--fs-brand);
+  color: #fff;
+  font: 700 9px var(--fs-font);
+  vertical-align: middle;
+}
+
+@media (max-width: 560px) {
+  .fs-revcard__replies { padding-inline-start: 9px; }
+}
+
+/* توضیح دسته، زیر عنوان ---------------------------------------------------- */
+.fs-cathero__about {
+  max-width: 780px;
+  margin-top: 12px;
+}
+
+.fs-cathero__about .fs-collapse__inner {
+  font: 400 12px/2.1 var(--fs-font);
+  color: var(--fs-ink-3);
 }
 
 /* تصویر راهنما و خط «آخرین به‌روزرسانی» ------------------------------------ */

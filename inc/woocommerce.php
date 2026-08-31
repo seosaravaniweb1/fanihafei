@@ -691,30 +691,190 @@ function fs_get_review_summary( $product ) {
  * @return array
  */
 function fs_get_product_reviews( $product_id, $limit = 20 ) {
+	/*
+	 * چرا type خالی است و نه 'review':
+	 *
+	 * ووکامرس دیدگاه سطح اول را با نوع «review» ثبت می‌کند، ولی پاسخی که مدیر
+	 * زیر همان دیدگاه می‌نویسد یک کامنت معمولی است. با فیلترِ type => review
+	 * پاسخ‌ها اصلاً از پایگاه داده بیرون نمی‌آمدند — به همین دلیل جواب‌های
+	 * پشتیبانی هیچ‌وقت زیر نظر کاربر دیده نمی‌شد.
+	 *
+	 * پس همه‌ی کامنت‌های محصول را می‌گیریم و خودمان درخت می‌سازیم.
+	 */
 	$comments = get_comments(
 		array(
 			'post_id' => $product_id,
 			'status'  => 'approve',
-			'type'    => 'review',
-			'number'  => $limit,
+			'order'   => 'ASC',
+			'orderby' => 'comment_date_gmt',
 		)
 	);
 
+	$children = array();
+
+	foreach ( $comments as $comment ) {
+		$parent = (int) $comment->comment_parent;
+
+		if ( $parent ) {
+			$children[ $parent ][] = $comment;
+		}
+	}
+
 	$out = array();
 
-	foreach ( $comments as $fs_comment ) {
-		$rating = (int) get_comment_meta( $fs_comment->comment_ID, 'rating', true );
-		$name   = $fs_comment->comment_author;
+	foreach ( $comments as $comment ) {
+		if ( (int) $comment->comment_parent ) {
+			continue; // پاسخ‌ها زیر والدشان می‌آیند، نه در فهرست اصلی.
+		}
 
-		$out[] = array(
-			'name'    => $name,
-			'initial' => function_exists( 'mb_substr' ) ? mb_substr( $name, 0, 1 ) : substr( $name, 0, 1 ),
-			'stars'   => $rating ? str_repeat( '★', $rating ) . str_repeat( '☆', 5 - $rating ) : '',
-			'date'    => fs_fa_num( date_i18n( get_option( 'date_format' ), strtotime( $fs_comment->comment_date ) ) ),
-			'text'    => $fs_comment->comment_content,
-			'tint'    => fs_tints()[ crc32( $name ) % count( fs_tints() ) ][1],
+		$out[] = fs_shape_review( $comment, $children );
+
+		if ( count( $out ) >= $limit ) {
+			break;
+		}
+	}
+
+	return $out;
+}
+
+/**
+ * تبدیل یک کامنت به داده‌ی آماده‌ی نمایش، همراه با پاسخ‌هایش.
+ *
+ * @param WP_Comment            $comment  کامنت.
+ * @param array<int, object[]>  $children پاسخ‌ها به تفکیک شناسه‌ی والد.
+ * @return array<string, mixed>
+ */
+function fs_shape_review( $comment, $children ) {
+	$rating = (int) get_comment_meta( $comment->comment_ID, 'rating', true );
+	$name   = $comment->comment_author;
+	$tints  = fs_tints();
+
+	$replies = array();
+
+	if ( ! empty( $children[ (int) $comment->comment_ID ] ) ) {
+		foreach ( $children[ (int) $comment->comment_ID ] as $child ) {
+			$replies[] = fs_shape_review( $child, $children );
+		}
+	}
+
+	return array(
+		'id'      => (int) $comment->comment_ID,
+		'name'    => $name,
+		'initial' => function_exists( 'mb_substr' ) ? mb_substr( $name, 0, 1 ) : substr( $name, 0, 1 ),
+		'rating'  => $rating,
+		'stars'   => $rating ? str_repeat( '★', $rating ) . str_repeat( '☆', 5 - $rating ) : '',
+		'date'    => fs_fa_num( date_i18n( get_option( 'date_format' ), strtotime( $comment->comment_date ) ) ),
+		'text'    => $comment->comment_content,
+		'tint'    => $tints[ crc32( $name ) % count( $tints ) ][1],
+		'staff'   => fs_review_is_staff( $comment ),
+		'replies' => $replies,
+	);
+}
+
+/**
+ * آیا این پاسخ از طرف تیم فروشگاه است؟
+ *
+ * پاسخ مدیر باید در ظاهر از نظر یک خریدار جدا باشد، وگرنه کاربر نمی‌فهمد
+ * جوابش را گرفته یا خریدار دیگری چیزی گفته.
+ *
+ * @param WP_Comment $comment کامنت.
+ * @return bool
+ */
+function fs_review_is_staff( $comment ) {
+	$user_id = (int) $comment->user_id;
+
+	if ( ! $user_id ) {
+		return false;
+	}
+
+	foreach ( array( 'manage_woocommerce', 'edit_posts', 'manage_options' ) as $cap ) {
+		if ( user_can( $user_id, $cap ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * پاسخ‌دهی تودرتو زیر دیدگاه محصول، مستقل از تنظیم عمومی سایت.
+ *
+ * «دیدگاه‌های تودرتو» در تنظیمات ← گفت‌وگوها پیش‌فرض خاموش است و اگر خاموش
+ * بماند وردپرس لینک پاسخ را اصلاً نمی‌سازد. چون پاسخ پشتیبانی زیر نظر خریدار،
+ * بخشی از کارکرد همین قالب است، برای محصول روشنش می‌کنیم و بقیه‌ی سایت را به
+ * حال خودش می‌گذاریم.
+ *
+ * @param mixed $value مقدار تنظیم.
+ * @return mixed
+ */
+function fs_thread_product_comments( $value ) {
+	return is_singular( 'product' ) ? 1 : $value;
+}
+add_filter( 'option_thread_comments', 'fs_thread_product_comments' );
+
+/**
+ * عمق مجاز پاسخ‌ها.
+ *
+ * @param mixed $value مقدار تنظیم.
+ * @return mixed
+ */
+function fs_thread_product_depth( $value ) {
+	return is_singular( 'product' ) ? max( 3, (int) $value ) : $value;
+}
+add_filter( 'option_thread_comments_depth', 'fs_thread_product_depth' );
+
+/**
+ * فیلد ستاره‌ی امتیاز برای فرم دیدگاه.
+ *
+ * ووکامرس این فیلد را فقط در قالب خودش (single-product/reviews.php) می‌سازد؛
+ * چون این قالب فرم را مستقیم با comment_form() می‌چیند، بدون این تابع هیچ
+ * ورودی امتیازی روی صفحه نبود و کاربر فقط می‌توانست متن بنویسد — به همین
+ * دلیل هیچ محصولی aggregateRating نمی‌گرفت.
+ *
+ * رادیو است نه select: با کیبورد و صفحه‌خوان کار می‌کند و روی موبایل هم
+ * ستاره‌ها مستقیم قابل لمس‌اند.
+ *
+ * @return string
+ */
+function fs_review_rating_field() {
+	if ( 'yes' !== get_option( 'woocommerce_enable_review_rating', 'yes' ) ) {
+		return '';
+	}
+
+	$required = 'yes' === get_option( 'woocommerce_review_rating_required', 'yes' );
+	$labels   = array(
+		1 => 'خیلی بد',
+		2 => 'بد',
+		3 => 'متوسط',
+		4 => 'خوب',
+		5 => 'عالی',
+	);
+
+	$out = '<fieldset class="fs-rate">';
+
+	$out .= '<legend class="fs-rate__legend">امتیاز شما' . ( $required ? ' <span class="required">*</span>' : '' ) . '</legend>';
+	$out .= '<div class="fs-rate__stars">';
+
+	/*
+	 * ستاره‌ها از ۵ به ۱ چیده می‌شوند تا با سلکتور «~» در CSS بتوان با هاورِ
+	 * هر ستاره، ستاره‌های کوچک‌تر را هم پر کرد — بدون یک خط جاوااسکریپت.
+	 */
+	for ( $i = 5; $i >= 1; $i-- ) {
+		$out .= sprintf(
+			'<input class="fs-rate__input" type="radio" id="fs-rate-%1$d" name="rating" value="%1$d"%2$s>' .
+			'<label class="fs-rate__star" for="fs-rate-%1$d" title="%3$s"><span class="fs-sr-only">%3$s</span>★</label>',
+			$i,
+			$required ? ' required' : '',
+			esc_attr( $labels[ $i ] )
 		);
 	}
+
+	$out .= '</div></fieldset>';
+
+	$out .= '<p class="comment-form-comment">';
+	$out .= '<label for="comment">دیدگاه شما <span class="required">*</span></label>';
+	$out .= '<textarea id="comment" name="comment" cols="45" rows="6" required placeholder="تجربه‌تان از این فایل را بنویسید…"></textarea>';
+	$out .= '</p>';
 
 	return $out;
 }
@@ -774,6 +934,22 @@ function fs_woo_unhook() {
 	remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_price', 10 );
 	remove_action( 'woocommerce_after_shop_loop_item', 'woocommerce_template_loop_product_link_close', 5 );
 	remove_action( 'woocommerce_after_shop_loop_item', 'woocommerce_template_loop_add_to_cart', 10 );
+
+	/*
+	 * سه سازوکار صفحه‌بندی هم‌زمان روی یک آرشیو بود: شماره‌گذاری ووکامرس،
+	 * بارگذاری خودکار با اسکرول، و دکمه‌ی «نمایش بیشتر». هر سه یک کار می‌کردند
+	 * و نتیجه‌اش برای کاربر گیج‌کننده بود و برای خزنده چند مسیر موازی به یک
+	 * محتوا.
+	 *
+	 * یکی می‌ماند: دکمه‌ای که یک <a href> واقعی به صفحه‌ی بعد است. گوگل همین را
+	 * توصیه می‌کند — نشانی یکتا برای هر صفحه و لینک واقعی بین‌شان — و
+	 * جاوااسکریپت همان لینک را برمی‌دارد تا برای کاربر درجا بارگذاری شود.
+	 *
+	 * توضیح دسته هم اینجا برداشته می‌شود: قالب خودش یک بار زیر H1 چاپش می‌کند.
+	 */
+	remove_action( 'woocommerce_after_shop_loop', 'woocommerce_pagination', 10 );
+	remove_action( 'woocommerce_archive_description', 'woocommerce_taxonomy_archive_description', 10 );
+	remove_action( 'woocommerce_archive_description', 'woocommerce_product_archive_description', 10 );
 }
 add_action( 'init', 'fs_woo_unhook' );
 
@@ -903,7 +1079,13 @@ function fs_bump_product_views( $product_id ) {
  * @return int
  */
 function fs_products_per_page() {
-	return (int) apply_filters( 'fs_products_per_page', 12 );
+	/*
+	 * ۱۲ تا در هر صفحه یعنی یک دسته‌ی ۲۰۰ تایی هفده صفحه می‌شود و تقریباً هیچ
+	 * محصولی جز صفحه‌ی اول لینک نزدیک نمی‌گیرد. ۴۸ تا بیشترِ دسته‌ها را در یک
+	 * صفحه جا می‌دهد بی‌آنکه صفحه‌ای بی‌انتها بسازد؛ کارت‌ها سبک‌اند (تصویر
+	 * lazy و بدون کوئری اضافه) پس هزینه‌ی رندرش محسوس نیست.
+	 */
+	return max( 1, (int) apply_filters( 'fs_products_per_page', 48 ) );
 }
 add_filter( 'loop_shop_per_page', 'fs_products_per_page', 20 );
 

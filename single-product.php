@@ -407,23 +407,18 @@ while ( have_posts() ) :
 									</aside>
 
 									<div class="fs-revs__list">
-										<?php foreach ( $fs_reviews as $fs_r ) : ?>
-											<div class="fs-revcard">
-												<div class="fs-revcard__top">
-													<div class="fs-revcard__who">
-														<span class="fs-revcard__avatar" style="background:<?php echo esc_attr( $fs_r['tint'] ); ?>">
-															<?php echo esc_html( $fs_r['initial'] ); ?>
-														</span>
-														<span>
-															<span class="fs-revcard__name"><?php echo esc_html( $fs_r['name'] ); ?></span>
-															<span class="fs-revcard__date">خرید تاییدشده · <?php echo esc_html( $fs_r['date'] ); ?></span>
-														</span>
-													</div>
-													<span class="fs-revcard__stars"><?php echo esc_html( $fs_r['stars'] ); ?></span>
-												</div>
-												<div class="fs-revcard__text"><?php echo esc_html( $fs_r['text'] ); ?></div>
-											</div>
-										<?php endforeach; ?>
+										<?php
+										foreach ( $fs_reviews as $fs_r ) {
+											get_template_part(
+												'template-parts/product/review',
+												null,
+												array(
+													'review'     => $fs_r,
+													'product_id' => $fs_id,
+												)
+											);
+										}
+										?>
 									</div>
 
 								</div>
@@ -434,10 +429,16 @@ while ( have_posts() ) :
 									<?php
 									comment_form(
 										array(
-											'title_reply'         => $fs_rev_summary ? 'دیدگاه خود را بنویسید' : 'اولین نفری باشید که نظر می‌دهد',
-											'comment_notes_after' => '',
-											'label_submit'        => 'ثبت دیدگاه',
-											'class_submit'        => 'fs-revform__submit',
+											'title_reply'          => $fs_rev_summary ? 'دیدگاه خود را بنویسید' : 'اولین نفری باشید که نظر می‌دهد',
+											'title_reply_to'       => 'پاسخ به %s',
+											'cancel_reply_link'    => 'انصراف از پاسخ',
+											'comment_notes_before' => '',
+											'comment_notes_after'  => '',
+											'label_submit'         => 'ثبت دیدگاه',
+											'class_submit'         => 'fs-revform__submit',
+											// ستاره‌ی امتیاز و کادر متن با هم، چون comment_field هر دو را
+											// جایگزین می‌کند؛ اگر فقط ستاره را بدهیم کادر متن حذف می‌شود.
+											'comment_field'        => fs_review_rating_field(),
 										)
 									);
 									?>
