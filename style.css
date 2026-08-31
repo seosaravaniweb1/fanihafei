@@ -6672,83 +6672,153 @@ body.fs-noscroll { overflow: hidden; }
 
 /* سه مرحله‌ی تصویری خرید --------------------------------------------------- */
 /*
- * اینجا شماره‌ی مرحله داخل خود تصویر است، پس برخلاف .fs-bigsteps هیچ
+ * سه کارت افقی، کنار هم، با یک رابط خط‌چین بین‌شان تا چشم مسیر ۱ ← ۲ ← ۳ را
+ * دنبال کند. شماره‌ی مرحله داخل خود تصویر است، پس برخلاف .fs-bigsteps هیچ
  * counter‌ای نمی‌گذاریم؛ وگرنه کاربر دو تا «۱» کنار هم می‌دید.
  */
 .fs-page__body .fs-steps3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin: 0 0 2em;
+  gap: 30px;
+  margin: 0 0 2.2em;
 }
 
 .fs-page__body .fs-steps3__item {
+  position: relative;
   margin: 0;
-  padding: 24px 18px 20px;
+  padding: 28px 20px 24px;
   background: #fff;
   border: 1px solid var(--fs-line-2);
-  border-radius: 18px;
+  border-radius: 20px;
   text-align: center;
-  transition: transform .2s, box-shadow .2s, border-color .2s;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, .05);
+  transition: transform .22s, box-shadow .22s, border-color .22s;
 }
 
 .fs-page__body .fs-steps3__item:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: var(--fs-brand-edge);
-  box-shadow: 0 12px 26px rgba(var(--fs-brand-rgb), .12);
+  box-shadow: 0 16px 34px rgba(var(--fs-brand-rgb), .14);
 }
 
+/*
+ * رابط بین کارت‌ها. کارت بعدی همیشه سمت inline-end است — در فارسی چپ، در
+ * انگلیسی راست — پس با inset-inline-end بدون شرط جهت، هر دو حالت درست می‌افتد.
+ */
+.fs-page__body .fs-steps3__item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 62px;
+  inset-inline-end: -30px;
+  width: 30px;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to left,
+    var(--fs-brand-edge) 0 6px,
+    transparent 6px 11px
+  );
+}
+
+/* قاب گرد پشت تصویر: هر آیکونی داخلش بنشیند، عمدی به نظر می‌رسد. */
 .fs-page__body .fs-steps3__img {
-  width: 96px;
-  margin: 0 auto 14px;
+  width: 108px;
+  height: 108px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 30px;
+  background: var(--fs-brand-wash);
+  box-shadow: inset 0 0 0 1px var(--fs-brand-edge);
 }
 
 .fs-page__body .fs-steps3__img img {
-  width: 96px;
-  height: 96px;
+  width: 78px;
+  height: 78px;
   object-fit: contain;
 }
 
-.fs-page__body .fs-steps3 h3 { font-size: 14px; margin: 0 0 6px; }
-.fs-page__body .fs-steps3 p { font-size: 11.5px; line-height: 2; margin: 0; }
+.fs-page__body .fs-steps3 h3 {
+  font-size: 14.5px;
+  margin: 0 0 8px;
+}
+
+.fs-page__body .fs-steps3 p {
+  font-size: 11.5px;
+  line-height: 2;
+  margin: 0;
+  color: var(--fs-ink-2);
+}
 
 /* باکس‌های اعتماد ---------------------------------------------------------- */
 .fs-page__body .fs-trustgrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin: 0 0 2em;
+  gap: 14px;
+  margin: 0 0 2.2em;
 }
 
 .fs-page__body .fs-trustgrid__item {
+  position: relative;
   margin: 0;
-  padding: 22px 16px;
+  padding: 26px 16px 22px;
   background: #fff;
   border: 1px solid var(--fs-line-2);
-  border-radius: 16px;
+  border-radius: 18px;
   text-align: center;
-  transition: transform .2s, box-shadow .2s, border-color .2s;
+  overflow: hidden;
+  transition: transform .22s, box-shadow .22s, border-color .22s;
+}
+
+/* نوار باریک بالای کارت که فقط موقع hover پیدا می‌شود. */
+.fs-page__body .fs-trustgrid__item::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 3px;
+  background: var(--fs-grad);
+  transform: scaleX(0);
+  transition: transform .25s;
 }
 
 .fs-page__body .fs-trustgrid__item:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: var(--fs-brand-edge);
-  box-shadow: 0 12px 26px rgba(var(--fs-brand-rgb), .12);
+  box-shadow: 0 16px 32px rgba(var(--fs-brand-rgb), .13);
 }
 
+.fs-page__body .fs-trustgrid__item:hover::before { transform: scaleX(1); }
+
 .fs-page__body .fs-trustgrid__icon {
-  width: 64px;
-  margin: 0 auto 12px;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22px;
+  background: var(--fs-brand-wash);
+  box-shadow: inset 0 0 0 1px var(--fs-brand-edge);
 }
 
 .fs-page__body .fs-trustgrid__icon img {
-  width: 64px;
-  height: 64px;
+  width: 46px;
+  height: 46px;
   object-fit: contain;
 }
 
-.fs-page__body .fs-trustgrid h3 { font-size: 13px; margin: 0 0 8px; }
-.fs-page__body .fs-trustgrid p { font-size: 11.5px; line-height: 2; margin: 0; }
+.fs-page__body .fs-trustgrid h3 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.fs-page__body .fs-trustgrid p {
+  font-size: 11.5px;
+  line-height: 2;
+  margin: 0;
+  color: var(--fs-ink-2);
+}
 
 /*
  * تا وقتی تصویر انتخاب نشده، img بدون src است. بدون این قاعده مرورگر آیکون
@@ -6759,9 +6829,9 @@ body.fs-noscroll { overflow: hidden; }
 .fs-page__body .fs-steps3__img img:not([src]),
 .fs-page__body .fs-trustgrid__icon img:not([src]) {
   display: block;
-  border: 2px dashed var(--fs-line-2);
-  border-radius: 16px;
-  background: var(--fs-bg-2);
+  border: 2px dashed var(--fs-brand-edge);
+  border-radius: 14px;
+  background: #fff;
   overflow: hidden;
   font-size: 9px;
   line-height: 1.5;
@@ -6823,6 +6893,17 @@ body.fs-noscroll { overflow: hidden; }
 @media (max-width: 1023px) {
   .fs-page__body .fs-features { grid-template-columns: repeat(2, 1fr); }
   .fs-page__body .fs-trustgrid { grid-template-columns: repeat(2, 1fr); }
+
+  /* سه مرحله کنار هم می‌مانند، فقط جمع‌وجورتر؛ رابط هم کوتاه‌تر می‌شود. */
+  .fs-page__body .fs-steps3 { gap: 18px; }
+  .fs-page__body .fs-steps3__item { padding: 22px 14px 18px; }
+  .fs-page__body .fs-steps3__img { width: 86px; height: 86px; border-radius: 24px; }
+  .fs-page__body .fs-steps3__img img { width: 62px; height: 62px; }
+  .fs-page__body .fs-steps3__item:not(:last-child)::after {
+    top: 52px;
+    inset-inline-end: -18px;
+    width: 18px;
+  }
 }
 
 @media (max-width: 767px) {
@@ -6834,16 +6915,55 @@ body.fs-noscroll { overflow: hidden; }
   .fs-page__body .fs-bigsteps { grid-template-columns: 1fr; gap: 14px; }
   .fs-page__body .fs-features > .wp-block-group { padding: 15px 12px; }
   .fs-page__body .fs-bigsteps > .wp-block-group::before { width: 48px; height: 48px; font-size: 21px; }
-  .fs-page__body .fs-steps3 { grid-template-columns: 1fr; gap: 12px; }
-  .fs-page__body .fs-steps3__item { padding: 18px 14px 16px; }
-  .fs-page__body .fs-steps3__img,
-  .fs-page__body .fs-steps3__img img { width: 76px; }
-  .fs-page__body .fs-steps3__img img { height: 76px; }
-  .fs-page__body .fs-trustgrid { grid-template-columns: 1fr 1fr; gap: 9px; }
-  .fs-page__body .fs-trustgrid__item { padding: 16px 12px; }
-  .fs-page__body .fs-trustgrid__icon,
-  .fs-page__body .fs-trustgrid__icon img { width: 52px; }
-  .fs-page__body .fs-trustgrid__icon img { height: 52px; }
+  /*
+   * زیر ۷۶۸ پیکسل سه ستون خیلی باریک می‌شد؛ هر مرحله یک ردیف افقی می‌شود:
+   * تصویر یک طرف، متن طرف دیگر. رابط عمودی هم بین ردیف‌ها می‌افتد.
+   */
+  .fs-page__body .fs-steps3 { grid-template-columns: 1fr; gap: 22px; }
+
+  /*
+   * گرید و نه flex: عنوان و پاراگراف هر کدام یک فرزند مستقل‌اند، پس با flex
+   * سه ستون کنار هم می‌شدند و عنوان کلمه‌به‌کلمه می‌شکست. اینجا تصویر هر دو
+   * ردیف را می‌گیرد و متن ستون دوم را کامل در اختیار دارد.
+   */
+  .fs-page__body .fs-steps3__item {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 4px;
+    padding: 16px;
+    text-align: start;
+  }
+
+  .fs-page__body .fs-steps3__img {
+    grid-row: 1 / 3;
+    width: 72px;
+    height: 72px;
+    margin: 0;
+    border-radius: 20px;
+  }
+
+  .fs-page__body .fs-steps3__img img { width: 52px; height: 52px; }
+  .fs-page__body .fs-steps3 h3 { font-size: 13px; }
+
+  .fs-page__body .fs-steps3__item:not(:last-child)::after {
+    top: auto;
+    bottom: -22px;
+    inset-inline-start: 51px;
+    width: 2px;
+    height: 22px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--fs-brand-edge) 0 6px,
+      transparent 6px 11px
+    );
+  }
+
+  .fs-page__body .fs-trustgrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fs-page__body .fs-trustgrid__item { padding: 18px 12px 15px; }
+  .fs-page__body .fs-trustgrid__icon { width: 58px; height: 58px; border-radius: 18px; }
+  .fs-page__body .fs-trustgrid__icon img { width: 36px; height: 36px; }
 }
 
 /* =========================================================================
