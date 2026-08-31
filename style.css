@@ -6670,6 +6670,104 @@ body.fs-noscroll { overflow: hidden; }
 .fs-page__body .fs-bigsteps h3 { font-size: 13.5px; margin: 0 0 6px; }
 .fs-page__body .fs-bigsteps p { font-size: 11.5px; margin: 0; }
 
+/* سه مرحله‌ی تصویری خرید --------------------------------------------------- */
+/*
+ * اینجا شماره‌ی مرحله داخل خود تصویر است، پس برخلاف .fs-bigsteps هیچ
+ * counter‌ای نمی‌گذاریم؛ وگرنه کاربر دو تا «۱» کنار هم می‌دید.
+ */
+.fs-page__body .fs-steps3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 0 0 2em;
+}
+
+.fs-page__body .fs-steps3__item {
+  margin: 0;
+  padding: 24px 18px 20px;
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 18px;
+  text-align: center;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+
+.fs-page__body .fs-steps3__item:hover {
+  transform: translateY(-3px);
+  border-color: var(--fs-brand-edge);
+  box-shadow: 0 12px 26px rgba(var(--fs-brand-rgb), .12);
+}
+
+.fs-page__body .fs-steps3__img {
+  width: 96px;
+  margin: 0 auto 14px;
+}
+
+.fs-page__body .fs-steps3__img img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.fs-page__body .fs-steps3 h3 { font-size: 14px; margin: 0 0 6px; }
+.fs-page__body .fs-steps3 p { font-size: 11.5px; line-height: 2; margin: 0; }
+
+/* باکس‌های اعتماد ---------------------------------------------------------- */
+.fs-page__body .fs-trustgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 0 0 2em;
+}
+
+.fs-page__body .fs-trustgrid__item {
+  margin: 0;
+  padding: 22px 16px;
+  background: #fff;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 16px;
+  text-align: center;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+
+.fs-page__body .fs-trustgrid__item:hover {
+  transform: translateY(-3px);
+  border-color: var(--fs-brand-edge);
+  box-shadow: 0 12px 26px rgba(var(--fs-brand-rgb), .12);
+}
+
+.fs-page__body .fs-trustgrid__icon {
+  width: 64px;
+  margin: 0 auto 12px;
+}
+
+.fs-page__body .fs-trustgrid__icon img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.fs-page__body .fs-trustgrid h3 { font-size: 13px; margin: 0 0 8px; }
+.fs-page__body .fs-trustgrid p { font-size: 11.5px; line-height: 2; margin: 0; }
+
+/*
+ * تا وقتی تصویر انتخاب نشده، img بدون src است. بدون این قاعده مرورگر آیکون
+ * «تصویر شکسته» را نشان می‌داد؛ با آن، یک جای خالی نقطه‌چین دیده می‌شود که هم
+ * در ویرایشگر پیدا است و هم اگر مدیر فراموش کرد، صفحه زشت نمی‌شود.
+ */
+.fs-page__body .fs-split .wp-block-image img:not([src]),
+.fs-page__body .fs-steps3__img img:not([src]),
+.fs-page__body .fs-trustgrid__icon img:not([src]) {
+  display: block;
+  border: 2px dashed var(--fs-line-2);
+  border-radius: 16px;
+  background: var(--fs-bg-2);
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--fs-ink-3);
+}
+
 /* جعبه‌ی تماس/پیام‌رسان ---------------------------------------------------- */
 .fs-page__body .fs-contactbox {
   background: #fff;
@@ -6692,6 +6790,7 @@ body.fs-noscroll { overflow: hidden; }
 
 @media (max-width: 1023px) {
   .fs-page__body .fs-features { grid-template-columns: repeat(2, 1fr); }
+  .fs-page__body .fs-trustgrid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 767px) {
@@ -6703,6 +6802,16 @@ body.fs-noscroll { overflow: hidden; }
   .fs-page__body .fs-bigsteps { grid-template-columns: 1fr; gap: 14px; }
   .fs-page__body .fs-features > .wp-block-group { padding: 15px 12px; }
   .fs-page__body .fs-bigsteps > .wp-block-group::before { width: 48px; height: 48px; font-size: 21px; }
+  .fs-page__body .fs-steps3 { grid-template-columns: 1fr; gap: 12px; }
+  .fs-page__body .fs-steps3__item { padding: 18px 14px 16px; }
+  .fs-page__body .fs-steps3__img,
+  .fs-page__body .fs-steps3__img img { width: 76px; }
+  .fs-page__body .fs-steps3__img img { height: 76px; }
+  .fs-page__body .fs-trustgrid { grid-template-columns: 1fr 1fr; gap: 9px; }
+  .fs-page__body .fs-trustgrid__item { padding: 16px 12px; }
+  .fs-page__body .fs-trustgrid__icon,
+  .fs-page__body .fs-trustgrid__icon img { width: 52px; }
+  .fs-page__body .fs-trustgrid__icon img { height: 52px; }
 }
 
 /* =========================================================================
