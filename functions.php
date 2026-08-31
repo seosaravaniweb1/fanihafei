@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '2.1.0' );
+define( 'FS_VERSION', '2.2.0' );
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );
@@ -20,6 +20,7 @@ require_once get_theme_file_path( 'inc/pages.php' );
 require_once get_theme_file_path( 'inc/woocommerce.php' );
 require_once get_theme_file_path( 'inc/seo.php' );
 require_once get_theme_file_path( 'inc/auth.php' );
+require_once get_theme_file_path( 'inc/auth-guard.php' );
 require_once get_theme_file_path( 'inc/sms.php' );
 require_once get_theme_file_path( 'inc/cart.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
@@ -121,8 +122,18 @@ function fs_assets() {
 			'cartNonce'   => wp_create_nonce( 'fs_cart' ),
 			'loginUrl'    => fs_account_url(),
 			'checkoutUrl' => fs_has_woo() ? wc_get_checkout_url() : '',
+			'otpLength'   => fs_otp_length(),
+			'captcha'     => fs_captcha_config(),
 		)
 	);
+
+	// اسکریپت کپچا فقط روی صفحه‌ی ورود بارگذاری می‌شود؛ روی بقیه‌ی صفحه‌ها یک
+	// درخواست اضافه به گوگل است بی‌آنکه به کاری بیاید.
+	$captcha = fs_is_auth_screen() ? fs_captcha_config() : null;
+
+	if ( $captcha ) {
+		wp_enqueue_script( 'fs-captcha', $captcha['script'], array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
+	}
 }
 add_action( 'wp_enqueue_scripts', 'fs_assets' );
 

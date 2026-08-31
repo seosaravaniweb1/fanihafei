@@ -685,6 +685,41 @@
 		} );
 	}
 
+	/*
+	 * توکن کپچا.
+	 *
+	 * v3 نامرئی است و برای هر اقدام یک توکن تازه می‌سازد (توکن‌ها دوبار مصرف
+	 * نمی‌شوند و دو دقیقه بیشتر اعتبار ندارند، پس نمی‌شود یکی را نگه داشت).
+	 * v2 و hCaptcha ویجت دارند و توکن را در فیلد پنهان خودشان می‌گذارند.
+	 */
+	function captchaToken() {
+		var cfg = window.fsData && fsData.captcha;
+
+		if ( ! cfg ) {
+			return Promise.resolve( '' );
+		}
+
+		if ( 'recaptcha_v3' === cfg.provider ) {
+			if ( ! window.grecaptcha || ! window.grecaptcha.execute ) {
+				return Promise.resolve( '' );
+			}
+
+			return new Promise( function ( resolve ) {
+				window.grecaptcha.ready( function () {
+					window.grecaptcha.execute( cfg.sitekey, { action: 'login' } )
+						.then( resolve )
+						.catch( function () {
+							resolve( '' );
+						} );
+				} );
+			} );
+		}
+
+		var field = document.querySelector( '[name="' + cfg.field + '"]' );
+
+		return Promise.resolve( field ? field.value : '' );
+	}
+
 	function post( action, payload ) {
 		var body = new URLSearchParams();
 
@@ -714,7 +749,7 @@
 		var steps = root.querySelectorAll( '[data-step]' );
 		var error = root.querySelector( '[data-error]' );
 		var redirect = root.getAttribute( 'data-redirect' ) || '';
-		var state = { phone: '', ticket: '', timer: null };
+		var state = { phone: '', ticket: '', timer: null, otpAbort: null };
 
 		function show( name ) {
 			Array.prototype.forEach.call( steps, function ( step ) {
@@ -808,12 +843,7 @@
 				}
 
 				e.preventDefault();
-
-				Array.prototype.forEach.call( otpBoxes, function ( target, k ) {
-					target.value = text[ k ] || '';
-				} );
-
-				otpBoxes[ Math.min( text.length, otpBoxes.length ) - 1 ].focus();
+				fillOtp( text );
 			} );
 		} );
 
@@ -821,6 +851,67 @@
 			return Array.prototype.map.call( otpBoxes, function ( box ) {
 				return box.value;
 			} ).join( '' );
+		}
+
+		function fillOtp( digits ) {
+			Array.prototype.forEach.call( otpBoxes, function ( box, k ) {
+				box.value = digits[ k ] || '';
+			} );
+
+			otpBoxes[ Math.min( digits.length, otpBoxes.length ) - 1 ].focus();
+		}
+
+		/*
+		 * پرکردن خودکار کد از روی پیامک (WebOTP).
+		 *
+		 * شرط‌های مرورگر سخت‌گیرانه است و همه باید با هم برقرار باشند: صفحه
+		 * روی HTTPS، و متن پیامک با یک خط جدا به شکل «@دامنه #کد» تمام شود.
+		 * اگر هر کدام نباشد، مرورگر بی‌صدا چیزی نمی‌دهد و کاربر مثل قبل دستی
+		 * وارد می‌کند — پس این فقط یک راحتی اضافه است، نه مسیر اصلی.
+		 *
+		 * فعلاً کروم اندروید پشتیبانی می‌کند.
+		 */
+		function listenForSms() {
+			if ( ! ( 'OTPCredential' in window ) || ! navigator.credentials ) {
+				return;
+			}
+
+			// درخواست قبلی باید لغو شود، وگرنه «ارسال دوباره» دو شنونده‌ی
+			// هم‌زمان می‌ساخت و مرورگر دومی را رد می‌کرد.
+			if ( state.otpAbort ) {
+				state.otpAbort.abort();
+			}
+
+			state.otpAbort = new AbortController();
+
+			navigator.credentials.get( {
+				otp: { transport: [ 'sms' ] },
+				signal: state.otpAbort.signal
+			} ).then( function ( otp ) {
+				if ( ! otp || ! otp.code ) {
+					return;
+				}
+
+				var digits = String( otp.code ).replace( /\D/g, '' );
+
+				if ( ! digits ) {
+					return;
+				}
+
+				fillOtp( digits );
+
+				// کد کامل است و از خود پیامک آمده؛ دیگر دلیلی برای منتظرماندن
+				// نیست. تایید را خودمان می‌زنیم.
+				if ( digits.length === otpBoxes.length ) {
+					var submit = root.querySelector( '[data-action="otp"]' );
+
+					if ( submit ) {
+						submit.click();
+					}
+				}
+			} ).catch( function () {
+				// کاربر رد کرد، مهلت تمام شد، یا مرورگر پشتیبانی نکرد.
+			} );
 		}
 
 		function done( data ) {
@@ -837,7 +928,12 @@
 
 				busy( button, true );
 
-				post( 'fs_auth_entry', { login: login, redirect: redirect } ).then( function ( res ) {
+				// توکن کپچا تازه گرفته می‌شود، نه در بارگذاری صفحه: توکن v3
+				// دو دقیقه بیشتر اعتبار ندارد و کاربری که فرم را باز گذاشته
+				// با توکن کهنه رد می‌شد.
+				captchaToken().then( function ( token ) {
+					return post( 'fs_auth_entry', { login: login, redirect: redirect, captcha_token: token } );
+				} ).then( function ( res ) {
 					busy( button, false );
 
 					if ( ! res.success ) {
@@ -848,6 +944,10 @@
 						root.querySelector( '[data-step="password"] [data-field="login"]' ).value = login;
 						show( 'password' );
 
+						if ( res.data.notice ) {
+							fail( res.data.notice );
+						}
+
 						return;
 					}
 
@@ -855,6 +955,7 @@
 					root.querySelector( '[data-phone-label]' ).textContent = 'کد به ' + faNum( res.data.phone ) + ' پیامک شد';
 					show( 'otp' );
 					startTimer( res.data.resendIn );
+					listenForSms();
 				} ).catch( function () {
 					busy( button, false );
 					fail();
@@ -864,7 +965,9 @@
 			resend: function ( button ) {
 				button.disabled = true;
 
-				post( 'fs_auth_resend', { phone: state.phone } ).then( function ( res ) {
+				captchaToken().then( function ( token ) {
+					return post( 'fs_auth_resend', { phone: state.phone, captcha_token: token } );
+				} ).then( function ( res ) {
 					button.disabled = false;
 
 					if ( ! res.success ) {
@@ -881,8 +984,8 @@
 			otp: function ( button ) {
 				var code = otpValue();
 
-				if ( 5 !== code.length ) {
-					return fail( 'کد ۵ رقمی را کامل وارد کنید.' );
+				if ( otpBoxes.length !== code.length ) {
+					return fail( 'کد ' + faNum( otpBoxes.length ) + ' رقمی را کامل وارد کنید.' );
 				}
 
 				busy( button, true );

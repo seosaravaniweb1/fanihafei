@@ -269,3 +269,89 @@ function fs_backfill_auto_email_flag( $user_id ) {
 }
 add_action( 'profile_update', 'fs_backfill_auto_email_flag' );
 add_action( 'woocommerce_save_account_details', 'fs_backfill_auto_email_flag' );
+
+/* -------------------------------------------------------------------------
+   ۴) هم‌ترازی نام حساب با فرم پرداخت
+   ------------------------------------------------------------------------- */
+
+/**
+ * به‌روزرسانی نام و ایمیل حساب از روی اطلاعات فرم پرداخت.
+ *
+ * کاربری که با موبایل ثبت‌نام کرده ممکن است هنوز نامی نداشته باشد، یا نامی که
+ * موقع ثبت‌نام داده با آنچه در فاکتور می‌خواهد فرق کند. هر بار که سفارشی ثبت
+ * می‌شود، فرم پرداخت تازه‌ترین چیزی است که خود کاربر نوشته؛ پس همان مرجع است.
+ *
+ * دو محافظ دارد:
+ *
+ * ۱. فقط مقدارهای ناخالی از سفارش برداشته می‌شوند — یک فیلد خالی نباید نام
+ *    قبلی را پاک کند.
+ * ۲. ایمیل ساختگی (همان {موبایل}@دامنه) هیچ‌وقت جای ایمیل واقعی را نمی‌گیرد،
+ *    و ایمیل واقعیِ سفارش هم فقط وقتی روی حساب می‌نشیند که حساب هنوز ایمیل
+ *    ساختگی داشته باشد؛ وگرنه یک تایپ اشتباه در فاکتور، نشانی ورود کاربر را
+ *    عوض می‌کرد.
+ *
+ * @param int $order_id شناسه سفارش.
+ * @return void
+ */
+function fs_sync_profile_from_order( $order_id ) {
+	if ( ! function_exists( 'wc_get_order' ) ) {
+		return;
+	}
+
+	$order = wc_get_order( $order_id );
+
+	if ( ! $order ) {
+		return;
+	}
+
+	$user_id = (int) $order->get_customer_id();
+
+	if ( ! $user_id ) {
+		return;
+	}
+
+	$user = get_user_by( 'id', $user_id );
+
+	if ( ! $user ) {
+		return;
+	}
+
+	$first = trim( (string) $order->get_billing_first_name() );
+	$last  = trim( (string) $order->get_billing_last_name() );
+	$email = trim( (string) $order->get_billing_email() );
+	$phone = fs_normalize_phone( (string) $order->get_billing_phone() );
+
+	$fields = array();
+
+	if ( '' !== $first && $first !== $user->first_name ) {
+		$fields['first_name'] = $first;
+	}
+
+	if ( '' !== $last && $last !== $user->last_name ) {
+		$fields['last_name'] = $last;
+	}
+
+	// ایمیل واقعی فقط جای ایمیل ساختگی را می‌گیرد.
+	if ( '' !== $email && ! fs_is_auto_email( $email ) && fs_is_auto_email( $user->user_email ) && ! email_exists( $email ) ) {
+		$fields['user_email'] = $email;
+	}
+
+	if ( $fields ) {
+		$fields['ID'] = $user_id;
+
+		// این تابع profile_update را می‌زند، که fs_backfill_auto_email_flag و
+		// fs_sync_on_profile_save هر دو به آن گوش می‌دهند؛ پس فلگ ایمیل
+		// ساختگی و متاهای صورتحساب خودشان هم‌تراز می‌شوند.
+		wp_update_user( $fields );
+	}
+
+	fs_sync_user_billing(
+		$user_id,
+		$phone,
+		'' !== $first ? $first : '',
+		'' !== $last ? $last : '',
+		isset( $fields['user_email'] ) ? $fields['user_email'] : ''
+	);
+}
+add_action( 'woocommerce_checkout_order_processed', 'fs_sync_profile_from_order', 20 );
+add_action( 'woocommerce_store_api_checkout_order_processed', 'fs_sync_profile_from_order', 20 );

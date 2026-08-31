@@ -23,8 +23,6 @@ const FS_PHONE_META   = 'billing_phone';
  * دور می‌زد و می‌توانست هزاران پیامک به حساب شما بفرستد. سقف زیر روی آی‌پی
  * است، مستقل از اینکه چه شماره‌ای وارد می‌شود.
  */
-const FS_OTP_IP_MAX      = 5;                  // پیامک از یک آی‌پی
-const FS_OTP_IP_WINDOW   = 15 * MINUTE_IN_SECONDS;
 const FS_LOGIN_MAX       = 8;                  // تلاش ناموفق رمز
 const FS_LOGIN_WINDOW    = 15 * MINUTE_IN_SECONDS;
 
@@ -150,15 +148,22 @@ function fs_otp_key( $phone ) {
  * @param string $phone شماره.
  * @return true|WP_Error
  */
-function fs_otp_send( $phone ) {
-	// سقف روی آی‌پی، پیش از هر کار دیگری: هر پیامک برای شما هزینه دارد.
-	$blocked = fs_rate_limit_hit( 'otp_ip', fs_client_ip(), FS_OTP_IP_MAX, FS_OTP_IP_WINDOW );
+function fs_otp_send( $phone, $token = '' ) {
+	// اینجا تنها جایی است که کد ساخته می‌شود، پس مرزِ حساب‌های مدیریتی باید
+	// همین‌جا باشد نه در fs_ajax_auth_entry؛ وگرنه مسیر «ارسال دوباره» که
+	// شماره‌ی خام می‌گیرد، دور می‌خورد.
+	$owner = fs_find_user_by_phone( $phone );
 
-	if ( $blocked ) {
-		return new WP_Error(
-			'fs_otp_flood',
-			sprintf( 'درخواست بیش از حد. %s دقیقه دیگر تلاش کنید.', fs_fa_num( (int) ceil( $blocked / 60 ) ) )
-		);
+	if ( $owner && ! fs_user_may_otp( $owner ) ) {
+		return new WP_Error( 'fs_otp_privileged', 'برای این حساب، ورود فقط با رمز عبور ممکن است.' );
+	}
+
+	// همه‌ی سدها پیش از خرج‌کردن یک پیامک: بن، ساعت مجاز، سقف آی‌پی، سقف
+	// شماره، فاصله‌ی اجباری و کپچا.
+	$allowed = fs_guard_check_send( $phone, $token );
+
+	if ( is_wp_error( $allowed ) ) {
+		return $allowed;
 	}
 
 	$key   = fs_otp_key( $phone );
@@ -171,7 +176,7 @@ function fs_otp_send( $phone ) {
 		);
 	}
 
-	$code = (string) wp_rand( 10000, 99999 );
+	$code = fs_otp_make_code();
 
 	set_transient(
 		$key,
@@ -243,12 +248,47 @@ function fs_otp_verify( $phone, $code ) {
 		++$saved['tries'];
 		set_transient( $key, $saved, FS_OTP_TTL );
 
+		// شمارنده‌ی بن جدا از tries است: tries با گرفتن کد تازه صفر می‌شود،
+		// این یکی نمی‌شود. وگرنه مهاجم فقط کافی بود هر پنج حدس یک کد تازه
+		// بگیرد و بی‌نهایت ادامه دهد.
+		fs_guard_note_failure( $phone );
+
 		return new WP_Error( 'fs_otp_wrong', 'کد واردشده درست نیست.' );
 	}
 
 	delete_transient( $key );
+	fs_guard_clear( $phone );
 
 	return true;
+}
+
+/**
+ * ساخت کد یکبارمصرف.
+ *
+ * از wp_rand استفاده می‌شود که روی CSPRNG سیستم سوار است، نه rand ساده؛ کدی
+ * که با مولد ضعیف ساخته شود از روی کدهای قبلی قابل حدس است.
+ *
+ * @return string
+ */
+function fs_otp_make_code() {
+	$length = fs_otp_length();
+	$min    = (int) pow( 10, $length - 1 );
+	$max    = (int) pow( 10, $length ) - 1;
+
+	return (string) wp_rand( $min, $max );
+}
+
+/**
+ * طول کد یکبارمصرف.
+ *
+ * باید با تعداد رقم‌هایی که در الگوی پنل پیامک نوشته‌اید یکی باشد.
+ *
+ * @return int
+ */
+function fs_otp_length() {
+	$length = function_exists( 'fs_get_sms_settings' ) ? (int) fs_get_sms_settings()['code_length'] : 5;
+
+	return min( 8, max( 4, $length ) );
 }
 
 /* -------------------------------------------------------------------------
@@ -440,6 +480,24 @@ function fs_auth_check_nonce() {
 }
 
 /**
+ * توکن کپچا از درخواست جاری.
+ *
+ * هر سرویس نام فیلد خودش را دارد؛ هر دو را می‌پذیریم تا تغییر سرویس در
+ * تنظیمات، نیازی به تغییر جاوااسکریپت نداشته باشد.
+ *
+ * @return string
+ */
+function fs_captcha_token() {
+	foreach ( array( 'captcha_token', 'g-recaptcha-response', 'h-captcha-response' ) as $field ) {
+		if ( ! empty( $_POST[ $field ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			return sanitize_text_field( wp_unslash( $_POST[ $field ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		}
+	}
+
+	return '';
+}
+
+/**
  * گام اول: تشخیص اینکه شماره ثبت شده یا نه.
  *
  * @return void
@@ -464,7 +522,20 @@ function fs_ajax_auth_entry() {
 		);
 	}
 
-	$sent = fs_otp_send( $resolved['phone'] );
+	// حساب‌های مدیریتی از فرم پیامکی وارد نمی‌شوند؛ به رمز عبور هدایت می‌شوند.
+	// پیام عمداً نمی‌گوید «این شماره مدیر است» تا از همین فرم نشود فهمید کدام
+	// شماره حساب مدیریتی دارد.
+	if ( $resolved['user'] && ! fs_user_may_otp( $resolved['user'] ) ) {
+		wp_send_json_success(
+			array(
+				'step'   => 'password',
+				'login'  => $login,
+				'notice' => 'برای این حساب، ورود فقط با رمز عبور ممکن است.',
+			)
+		);
+	}
+
+	$sent = fs_otp_send( $resolved['phone'], fs_captcha_token() );
 
 	if ( is_wp_error( $sent ) ) {
 		wp_send_json_error( array( 'message' => $sent->get_error_message() ) );
@@ -497,7 +568,7 @@ function fs_ajax_auth_resend() {
 		wp_send_json_error( array( 'message' => 'شماره موبایل درست نیست.' ) );
 	}
 
-	$sent = fs_otp_send( $phone );
+	$sent = fs_otp_send( $phone, fs_captcha_token() );
 
 	if ( is_wp_error( $sent ) ) {
 		wp_send_json_error( array( 'message' => $sent->get_error_message() ) );
@@ -626,7 +697,19 @@ function fs_ajax_auth_password() {
 	 * می‌کند. سقف هم روی آی‌پی است و هم روی خودِ نام کاربری، تا نه یک آی‌پی
 	 * بتواند چند حساب را بکوبد و نه چند آی‌پی یک حساب را.
 	 */
-	$ip = fs_client_ip();
+	$ip  = fs_client_ip();
+	$ban = fs_guard_banned();
+
+	// کسی که با حدس‌زدن کد پیامکی بن شده، نباید بتواند فقط با عوض‌کردن فرم
+	// سراغ حدس‌زدن رمز برود.
+	if ( $ban ) {
+		wp_send_json_error(
+			array(
+				'message' => sprintf( 'به دلیل تلاش‌های ناموفق، تا %s دقیقه امکان ورود نیست.', fs_fa_num( (int) ceil( $ban / 60 ) ) ),
+			),
+			429
+		);
+	}
 
 	foreach ( array( array( 'login_ip', $ip ), array( 'login_user', strtolower( $login ) ) ) as $gate ) {
 		$blocked = fs_rate_limit_hit( $gate[0], $gate[1], FS_LOGIN_MAX, FS_LOGIN_WINDOW );

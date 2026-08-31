@@ -33,6 +33,20 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 			<input class="fs-auth__input" id="fs-auth-login" type="text" inputmode="tel" autocomplete="username"
 				placeholder="۰۹۱۲۱۲۳۴۵۶۷" data-field="login">
 
+			<?php
+			/*
+			 * ویجت کپچا فقط برای v2 و hCaptcha لازم است؛ reCAPTCHA v3 نامرئی
+			 * است و توکنش را جاوااسکریپت موقع ارسال می‌گیرد.
+			 */
+			$fs_captcha = fs_captcha_config();
+
+			if ( $fs_captcha && 'recaptcha_v3' !== $fs_captcha['provider'] ) :
+				$fs_widget = 'hcaptcha' === $fs_captcha['provider'] ? 'h-captcha' : 'g-recaptcha';
+				?>
+				<div class="fs-auth__captcha <?php echo esc_attr( $fs_widget ); ?>"
+					data-sitekey="<?php echo esc_attr( $fs_captcha['sitekey'] ); ?>"></div>
+			<?php endif; ?>
+
 			<button class="fs-auth__submit" type="button" data-action="entry">
 				<span class="fs-auth__submit-text">ادامه</span>
 				<?php fs_the_icon( 'chevron-prev', 15, array( 'stroke' => '#fff', 'width' => '2.4' ) ); ?>
@@ -58,19 +72,28 @@ $fs_redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 			</button>
 
 			<h2 class="fs-auth__title">تایید شماره</h2>
-			<p class="fs-auth__sub">کد پنج‌رقمی پیامک‌شده را وارد کنید.</p>
+			<p class="fs-auth__sub">کد <?php echo esc_html( fs_fa_num( fs_otp_length() ) ); ?> رقمی پیامک‌شده را وارد کنید.</p>
 
 			<div class="fs-auth__phone">
 				<span data-phone-label></span>
 				<button class="fs-auth__link" type="button" data-goto="entry">تغییر شماره</button>
 			</div>
 
+			<?php
+			/*
+			 * تعداد خانه‌ها از همان تنظیمی می‌آید که طول کد ساخته‌شده را تعیین
+			 * می‌کند، تا هیچ‌وقت فرم و پیامک با هم نخوانند.
+			 *
+			 * autocomplete="one-time-code" فقط روی خانه‌ی اول است: سافاری کل کد
+			 * را در همان اولی می‌ریزد و جاوااسکریپت پخشش می‌کند.
+			 */
+			$fs_otp_len = fs_otp_length();
+			?>
 			<div class="fs-auth__otp" data-otp dir="ltr">
-				<input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
-				<input type="text" inputmode="numeric" maxlength="1">
-				<input type="text" inputmode="numeric" maxlength="1">
-				<input type="text" inputmode="numeric" maxlength="1">
-				<input type="text" inputmode="numeric" maxlength="1">
+				<?php for ( $fs_i = 0; $fs_i < $fs_otp_len; $fs_i++ ) : ?>
+					<input type="text" inputmode="numeric" maxlength="1"
+						<?php echo 0 === $fs_i ? 'autocomplete="one-time-code"' : ''; ?>>
+				<?php endfor; ?>
 			</div>
 
 			<div class="fs-auth__resend">
