@@ -252,7 +252,6 @@ function fs_theme_settings_tabs() {
 		'product'   => 'صفحه محصول',
 		'header'    => 'سربرگ و پشتیبانی',
 		'footer'    => 'فوتر',
-		'pages'     => 'برگه‌ها',
 		'sms'       => 'پیامک',
 		'dashboard' => 'پیشخوان کاربری',
 	);
@@ -577,10 +576,6 @@ function fs_theme_settings_page() {
 		<?php elseif ( 'footer' === $tab ) : ?>
 
 			<?php fs_footer_tab_content(); ?>
-
-		<?php elseif ( 'pages' === $tab ) : ?>
-
-			<?php fs_pages_tab_content(); ?>
 
 		<?php elseif ( 'sms' === $tab ) : ?>
 

@@ -6768,6 +6768,38 @@ body.fs-noscroll { overflow: hidden; }
   color: var(--fs-ink-3);
 }
 
+/* تصویر راهنما و خط «آخرین به‌روزرسانی» ------------------------------------ */
+/*
+ * تصویرهای راهنما (اسکرین‌شات مراحل) عرض کامل می‌گیرند ولی قاب و گوشه‌ی گرد
+ * دارند تا از متن جدا دیده شوند و لبه‌شان با پس‌زمینه قاطی نشود.
+ */
+.fs-page__body .fs-guideimg {
+  margin: 1.2em 0;
+}
+
+.fs-page__body .fs-guideimg img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, .06);
+}
+
+.fs-page__body .fs-guideimg img:not([src]) {
+  display: block;
+  min-height: 120px;
+  border: 2px dashed var(--fs-line-2);
+  background: var(--fs-bg-2);
+  font-size: 10px;
+  color: var(--fs-ink-3);
+}
+
+.fs-page__body .fs-updated {
+  font-size: 11px;
+  color: var(--fs-ink-3);
+  margin: 0 0 1.4em;
+}
+
 /* جعبه‌ی تماس/پیام‌رسان ---------------------------------------------------- */
 .fs-page__body .fs-contactbox {
   background: #fff;
