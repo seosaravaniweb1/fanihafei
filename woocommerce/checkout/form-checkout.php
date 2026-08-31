@@ -78,6 +78,20 @@ $fs_cart = WC()->cart;
 								<?php endif; ?>
 								<?php echo wp_kses_post( fs_fa_num_html( $fs_cart->get_product_subtotal( $fs_product, $fs_item['quantity'] ) ) ); ?>
 							</span>
+
+							<?php
+							/*
+							 * حذف از همین‌جا. تا پیش از این، کاربری که سر صفحه‌ی
+							 * پرداخت پشیمان می‌شد راهی جز برگشتن به سبد نداشت —
+							 * و برگشتن از صفحه‌ی پرداخت یعنی رهاکردن خرید.
+							 * همان نقطه‌ی fs_cart_remove سبد خرید صدا زده می‌شود.
+							 */
+							?>
+							<button class="fs-citem__del" type="button"
+								data-checkout-remove="<?php echo esc_attr( $fs_key ); ?>"
+								aria-label="حذف <?php echo esc_attr( $fs_product->get_name() ); ?> از سفارش">
+								<?php fs_the_icon( 'trash', 15, array( 'width' => '1.8' ) ); ?>
+							</button>
 						</div>
 					<?php endforeach; ?>
 

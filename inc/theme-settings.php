@@ -254,6 +254,7 @@ function fs_theme_settings_tabs() {
 		'footer'    => 'فوتر',
 		'sms'       => 'پیامک',
 		'security'  => 'امنیت ورود',
+		'downloads' => 'دانلودها',
 		'dashboard' => 'پیشخوان کاربری',
 	);
 }
@@ -585,6 +586,10 @@ function fs_theme_settings_page() {
 		<?php elseif ( 'security' === $tab ) : ?>
 
 			<?php fs_guard_tab_content(); ?>
+
+		<?php elseif ( 'downloads' === $tab ) : ?>
+
+			<?php fs_dl_tab_content(); ?>
 
 		<?php elseif ( 'dashboard' === $tab ) : ?>
 

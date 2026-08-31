@@ -49,10 +49,7 @@ if ( ! $order ) {
 							<span class="fs-ditem__title"><?php echo esc_html( $fs_dl['product_name'] ); ?></span>
 							<span class="fs-ditem__meta">دسترسی مادام‌العمر</span>
 						</span>
-						<a class="fs-ditem__btn" href="<?php echo esc_url( $fs_dl['download_url'] ); ?>">
-							<?php fs_the_icon( 'download', 14, array( 'stroke' => '#fff' ) ); ?>
-							دانلود
-						</a>
+						<?php fs_the_download_button( $fs_dl['download_url'] ); ?>
 					</div>
 					<?php
 					++$fs_i;
@@ -60,9 +57,22 @@ if ( ! $order ) {
 				?>
 			</div>
 
+			<div class="fs-thanks__note fs-thanks__note--warn">
+				<?php fs_the_icon( 'info', 16, array( 'stroke' => '#be185d', 'width' => '1.9' ) ); ?>
+				<span>
+					<b>فایل‌ها پیامک یا ایمیل نمی‌شوند.</b>
+					همین حالا از دکمه‌های بالا دانلود کنید. اگر فرصت نکردید، هر وقت خواستید از
+					<a href="<?php echo esc_url( wc_get_account_endpoint_url( 'downloads' ) ); ?>">دانلودهای من</a>
+					در پیشخوان حسابتان بگیرید — دسترسی‌تان همیشگی است.
+				</span>
+			</div>
+
 			<div class="fs-thanks__note">
-				<?php fs_the_icon( 'user', 16, array( 'stroke' => '#6d28d9', 'width' => '1.9' ) ); ?>
-				<span>لینک دانلود به ایمیل و شماره‌ی شما هم ارسال شد. همیشه از «دانلودهای من» در پیشخوان قابل دسترسی است.</span>
+				<?php fs_the_icon( 'download', 16, array( 'stroke' => '#6d28d9', 'width' => '1.9' ) ); ?>
+				<span>
+					فایل‌های حجیم چند ثانیه طول می‌کشد تا شروع شوند. بعد از کلیک، دکمه حالت
+					«در حال آماده‌سازی» می‌گیرد؛ <b>صفحه را نبندید</b> تا دانلود شروع شود.
+				</span>
 			</div>
 		</div>
 	</div>

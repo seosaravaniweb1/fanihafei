@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '2.2.1' );
+define( 'FS_VERSION', '2.3.0' );
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );
@@ -22,6 +22,7 @@ require_once get_theme_file_path( 'inc/seo.php' );
 require_once get_theme_file_path( 'inc/auth.php' );
 require_once get_theme_file_path( 'inc/auth-guard.php' );
 require_once get_theme_file_path( 'inc/sms.php' );
+require_once get_theme_file_path( 'inc/downloads.php' );
 require_once get_theme_file_path( 'inc/cart.php' );
 require_once get_theme_file_path( 'inc/checkout.php' );
 require_once get_theme_file_path( 'inc/checkout-repair.php' );
@@ -122,6 +123,7 @@ function fs_assets() {
 			'cartNonce'   => wp_create_nonce( 'fs_cart' ),
 			'loginUrl'    => fs_account_url(),
 			'checkoutUrl' => fs_has_woo() ? wc_get_checkout_url() : '',
+			'shopUrl'     => fs_has_woo() ? get_permalink( wc_get_page_id( 'shop' ) ) : home_url( '/' ),
 			'otpLength'   => fs_otp_length(),
 			'captcha'     => fs_captcha_config(),
 		)

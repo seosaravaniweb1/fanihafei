@@ -739,6 +739,155 @@
 		} );
 	}
 
+	/*
+	 * حذف یک قلم از داخل صفحه‌ی پرداخت.
+	 *
+	 * از همان نقطه‌ی سبد خرید استفاده می‌کند، ولی برخلاف کشوی سبد که فقط یک
+	 * تکه HTML را عوض می‌کند، اینجا کل صفحه بازخوانی می‌شود: مبلغ قابل پرداخت،
+	 * لیست فایل‌ها و فرم درگاه همه به سبد وابسته‌اند و به‌روزکردن تکه‌تکه‌شان
+	 * راهی است برای اینکه یکی‌شان از قلم بیفتد و کاربر مبلغ اشتباه ببیند.
+	 */
+	function initCheckoutRemove() {
+		var list = document.querySelector( '.fs-checkout__main' );
+
+		if ( ! list ) {
+			return;
+		}
+
+		list.addEventListener( 'click', function ( e ) {
+			var button = e.target.closest ? e.target.closest( '[data-checkout-remove]' ) : null;
+
+			if ( ! button || button.disabled ) {
+				return;
+			}
+
+			e.preventDefault();
+
+			var row = button.closest( '.fs-citem' );
+
+			button.disabled = true;
+
+			if ( row ) {
+				row.classList.add( 'is-removing' );
+			}
+
+			var body = new URLSearchParams();
+
+			body.append( 'action', 'fs_cart_remove' );
+			body.append( 'nonce', window.fsData ? fsData.cartNonce : '' );
+			body.append( 'key', button.getAttribute( 'data-checkout-remove' ) );
+
+			fetch( window.fsData ? fsData.ajaxUrl : '/wp-admin/admin-ajax.php', {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: body
+			} ).then( function ( r ) {
+				return r.json();
+			} ).then( function ( res ) {
+				if ( ! res.success ) {
+					throw new Error( 'failed' );
+				}
+
+				// سبد خالی شد: ماندن روی صفحه‌ی پرداختِ بی‌محصول بی‌معنی است.
+				window.location.href = ( 0 === res.data.count && window.fsData && fsData.shopUrl )
+					? fsData.shopUrl
+					: window.location.href;
+			} ).catch( function () {
+				button.disabled = false;
+
+				if ( row ) {
+					row.classList.remove( 'is-removing' );
+				}
+			} );
+		} );
+	}
+
+	/*
+	 * حالت انتظار دکمه‌های دانلود.
+	 *
+	 * کلیک روی لینک دانلود از نظر مرورگر یک ناوبری معمولی است و هیچ رویدادی
+	 * برای «شروع شد» نمی‌دهد؛ صفحه فقط بی‌حرکت می‌ماند. برای فایل‌های بزرگ که
+	 * سرور باید اول کاملشان را بخواند، این سکوت ده‌ها ثانیه طول می‌کشد و کاربر
+	 * صفحه را می‌بندد.
+	 *
+	 * راه استانداردِ فهمیدنِ شروع دانلود همین است: سرور همراه پاسخِ فایل یک
+	 * کوکی با همان نشانه می‌فرستد و ما دنبالش می‌گردیم. تا وقتی پیدا نشده،
+	 * دکمه «در حال آماده‌سازی» می‌ماند.
+	 */
+	function initDownloads() {
+		var buttons = document.querySelectorAll( '[data-download]' );
+
+		if ( ! buttons.length ) {
+			return;
+		}
+
+		Array.prototype.forEach.call( buttons, function ( button ) {
+			button.addEventListener( 'click', function () {
+				var token = button.getAttribute( 'data-download' );
+
+				if ( button.classList.contains( 'is-waiting' ) ) {
+					return;
+				}
+
+				button.classList.add( 'is-waiting' );
+				setBusy( button, true );
+
+				var started = Date.now();
+				var timer   = setInterval( function () {
+					var done    = document.cookie.indexOf( 'fs_dl_' + token + '=' ) > -1;
+					var expired = Date.now() - started > 120000;
+
+					if ( ! done && ! expired ) {
+						return;
+					}
+
+					clearInterval( timer );
+					button.classList.remove( 'is-waiting' );
+					setBusy( button, false );
+
+					// کوکی مصرف شد؛ پاکش می‌کنیم تا کلیک بعدی روی همان دکمه
+					// بلافاصله «تمام‌شده» به نظر نرسد.
+					document.cookie = 'fs_dl_' + token + '=; Max-Age=0; path=/';
+
+					if ( done ) {
+						showHint( button );
+					}
+				}, 500 );
+			} );
+		} );
+
+		function setBusy( button, busy ) {
+			var idle = button.querySelector( '.fs-dlbtn__idle' );
+			var wait = button.querySelector( '.fs-dlbtn__wait' );
+
+			if ( idle ) {
+				idle.hidden = busy;
+			}
+
+			if ( wait ) {
+				wait.hidden = ! busy;
+			}
+		}
+
+		function showHint( button ) {
+			var row = button.closest( '.fs-ditem' ) || button.parentNode;
+
+			if ( ! row || row.querySelector( '.fs-dlhint' ) ) {
+				return;
+			}
+
+			var hint = document.createElement( 'div' );
+
+			hint.className   = 'fs-dlhint';
+			hint.textContent = 'دانلود شروع شد. اگر چیزی ذخیره نشد، پوشه‌ی دانلودهای مرورگر را ببینید.';
+			row.appendChild( hint );
+
+			setTimeout( function () {
+				hint.remove();
+			}, 8000 );
+		}
+	}
+
 	function initAuth() {
 		var root = document.querySelector( '[data-auth]' );
 
@@ -1534,6 +1683,8 @@
 		initAuth();
 		initFooterTabs();
 		initCart();
+		initCheckoutRemove();
+		initDownloads();
 		initWishlist();
 		initProfileForm();
 		initInfinite();

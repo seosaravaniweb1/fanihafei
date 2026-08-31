@@ -3,7 +3,7 @@ Theme Name: لوکسو فایل
 Theme URI: https://github.com/seosaravaniweb1/fanihafei
 Author: Saravani Web
 Description: قالب فروشگاه فایل «لوکسو فایل» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
-Version: 2.2.1
+Version: 2.3.0
 Requires at least: 6.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
@@ -4742,6 +4742,74 @@ a.fs-fcontact:hover {
 
 .fs-ditem__btn:hover { background: var(--fs-brand-d); color: #fff; }
 
+/* حالت انتظار دانلود ------------------------------------------------------- */
+/*
+ * دکمه در حالت انتظار نباید عرضش بپرد، وگرنه کل ردیف تکان می‌خورد. هر دو
+ * حالت داخل همان دکمه‌اند و فقط یکی دیده می‌شود؛ min-width از پریدن عرض
+ * جلوگیری می‌کند.
+ */
+.fs-ditem__btn {
+  min-width: 158px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.fs-dlbtn__idle,
+.fs-dlbtn__wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fs-dlbtn__idle[hidden],
+.fs-dlbtn__wait[hidden] { display: none; }
+
+.fs-ditem__btn.is-waiting {
+  background: var(--fs-brand-d);
+  cursor: progress;
+}
+
+.fs-dlbtn__spin {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, .35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: fs-dlspin .7s linear infinite;
+}
+
+@keyframes fs-dlspin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-dlbtn__spin { animation-duration: 2.4s; }
+}
+
+.fs-dlhint {
+  flex-basis: 100%;
+  margin-top: 9px;
+  font: 600 10px/1.7 var(--fs-font);
+  color: var(--fs-brand-d);
+}
+
+/*
+ * روی موبایل دکمه‌ی «در حال آماده‌سازی» پهن است و اگر کنار عنوان بماند، نام
+ * فایل کلمه‌به‌کلمه می‌شکند. اینجا ردیف را می‌شکنیم: عنوان بالا، دکمه‌ی تمام‌عرض
+ * زیرش — که برای انگشت هم هدف بهتری است.
+ */
+@media (max-width: 560px) {
+  .fs-ditem { flex-wrap: wrap; }
+
+  .fs-ditem__body { min-width: 0; }
+
+  .fs-ditem__btn {
+    flex: 1 0 100%;
+    min-width: 0;
+    margin-top: 4px;
+  }
+}
+
 .fs-ditem__btn--ghost {
   background: #fff;
   border: 1px solid var(--fs-line);
@@ -4904,6 +4972,36 @@ a.fs-otable__row:last-child { border-bottom: 0; }
 }
 
 .fs-citem:last-of-type { margin-bottom: 0; }
+
+/* دکمه‌ی حذف قلم در صفحه‌ی پرداخت ------------------------------------------ */
+.fs-citem__del {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--fs-ink-3);
+  cursor: pointer;
+  transition: all .18s;
+}
+
+.fs-citem__del:hover:not(:disabled) {
+  border-color: var(--fs-accent-edge);
+  background: var(--fs-accent-wash);
+  color: var(--fs-accent-d);
+}
+
+.fs-citem__del:disabled { cursor: default; opacity: .5; }
+
+/* در حال حذف: ردیف کم‌رنگ می‌شود تا معلوم باشد درخواست رفته است. */
+.fs-citem.is-removing {
+  opacity: .45;
+  pointer-events: none;
+}
 
 .fs-citem__thumb {
   width: 52px;
@@ -5951,7 +6049,7 @@ a.fs-otable__row:last-child { border-bottom: 0; }
 
 .fs-thanks__note {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   background: #f5f3ff;
   border: 1px solid #ddd6fe;
@@ -5960,6 +6058,20 @@ a.fs-otable__row:last-child { border-bottom: 0; }
   margin-top: 14px;
   font: 600 10.5px/1.8 var(--fs-font);
   color: #5b21b6;
+}
+
+.fs-thanks__note svg { flex: none; margin-top: 2px; }
+.fs-thanks__note a { color: inherit; text-decoration: underline; }
+
+/*
+ * یادداشت «فایل پیامک نمی‌شود» رنگ هشدار می‌گیرد، نه رنگ برند: این تنها جمله‌ی
+ * صفحه است که اگر خوانده نشود، کاربر منتظر پیامکی می‌ماند که هیچ‌وقت نمی‌آید و
+ * سر از پشتیبانی درمی‌آورد.
+ */
+.fs-thanks__note--warn {
+  background: var(--fs-accent-wash);
+  border-color: var(--fs-accent-edge);
+  color: var(--fs-accent-t);
 }
 
 .fs-thanks__side { position: sticky; top: 16px; }

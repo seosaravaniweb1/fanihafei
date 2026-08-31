@@ -138,6 +138,7 @@ function fs_icon( $name, $size = 16, $args = array() ) {
 	$paths = array(
 		'book'        => '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>',
 		'search'      => '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>',
+		'info'        => '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 7.6v.1"></path>',
 		'cart'        => '<circle cx="9" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"></path>',
 		'user'        => '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>',
 		'menu'        => '<path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path>',
