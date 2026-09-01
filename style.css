@@ -3,7 +3,7 @@ Theme Name: لوکسو فایل
 Theme URI: https://github.com/seosaravaniweb1/fanihafei
 Author: Saravani Web
 Description: قالب فروشگاه فایل «لوکسو فایل» — فروش فایل دانلودی و دیجیتال (کتاب، جزوه، خلاصه کتاب، رمان، فرم و قرارداد آماده، فایل لایه‌باز، مقاله، پاورپوینت، نرم‌افزار و پروژه) روی وردپرس و ووکامرس؛ سبک، ریسپانسیو و کاملاً راست‌به‌چپ.
-Version: 2.4.1
+Version: 2.5.0
 Requires at least: 6.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
@@ -7111,6 +7111,146 @@ body.fs-noscroll { overflow: hidden; }
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* -------------------------------------------------------------------------
+   جبران شیت‌های حذف‌شده‌ی ووکامرس
+   -------------------------------------------------------------------------
+   قالب همه‌ی صفحه‌های ووکامرس را بازنویسی کرده جز چند نمای کوچک داخل حساب
+   کاربری که هنوز از قالب خود ووکامرس می‌آیند. این بخش فقط همان‌ها را می‌پوشاند
+   تا حذف سه شیت ووکامرس چیزی را بی‌قواره نگذارد.
+   ------------------------------------------------------------------------- */
+
+.woocommerce-MyAccount-content table.shop_table,
+.woocommerce-orders-table,
+.woocommerce-MyAccount-downloads {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--fs-line-2);
+  border-radius: 14px;
+  overflow: hidden;
+  font: 500 11.5px var(--fs-font);
+}
+
+.woocommerce-MyAccount-content table.shop_table th,
+.woocommerce-orders-table th,
+.woocommerce-MyAccount-downloads th {
+  background: var(--fs-bg);
+  color: var(--fs-ink);
+  font-weight: 800;
+  text-align: start;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fs-line-2);
+}
+
+.woocommerce-MyAccount-content table.shop_table td,
+.woocommerce-orders-table td,
+.woocommerce-MyAccount-downloads td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fs-line-2);
+  vertical-align: middle;
+}
+
+.woocommerce-MyAccount-content table.shop_table tr:last-child td,
+.woocommerce-orders-table tr:last-child td,
+.woocommerce-MyAccount-downloads tr:last-child td { border-bottom: 0; }
+
+/* روی موبایل جدول به کارت تبدیل می‌شود؛ شیت smallscreen ووکامرس همین کار را
+   می‌کرد و حالا دیگر بارگذاری نمی‌شود. */
+@media (max-width: 640px) {
+  .woocommerce-MyAccount-content table.shop_table,
+  .woocommerce-orders-table,
+  .woocommerce-MyAccount-downloads { border: 0; }
+
+  .woocommerce-MyAccount-content table.shop_table thead,
+  .woocommerce-orders-table thead,
+  .woocommerce-MyAccount-downloads thead { display: none; }
+
+  .woocommerce-MyAccount-content table.shop_table tr,
+  .woocommerce-orders-table tr,
+  .woocommerce-MyAccount-downloads tr {
+    display: block;
+    margin-bottom: 10px;
+    border: 1px solid var(--fs-line-2);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .woocommerce-MyAccount-content table.shop_table td,
+  .woocommerce-orders-table td,
+  .woocommerce-MyAccount-downloads td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 13px;
+  }
+
+  /* عنوان ستون از data-title می‌آید — ووکامرس آن را روی هر سلول می‌گذارد. */
+  .woocommerce-MyAccount-content table.shop_table td::before,
+  .woocommerce-orders-table td::before,
+  .woocommerce-MyAccount-downloads td::before {
+    content: attr(data-title);
+    font-weight: 800;
+    color: var(--fs-ink-3);
+  }
+}
+
+/*
+ * ستاره‌ی امتیاز.
+ *
+ * ووکامرس این را با یک فونت آیکونی و content می‌ساخت. قالب خودش ستاره‌ها را
+ * به‌شکل کاراکتر چاپ می‌کند، ولی اگر افزونه‌ای این نشانه‌گذاری را بیرون بدهد
+ * بدون شیت ووکامرس یک متن خام «Rated 4 out of 5» دیده می‌شد.
+ */
+/*
+ * عرض ثابت (مثلاً 5.4em) اینجا جواب نمی‌دهد: پهنای واقعی ★ به فونت بستگی
+ * دارد و اگر قاب پهن‌تر از پنج ستاره باشد، درصدی که ووکامرس روی span
+ * می‌گذارد همه‌ی ستاره‌ها را می‌پوشاند و همیشه پنج‌تا پر دیده می‌شود.
+ * پس عرض را خودِ محتوا تعیین می‌کند تا درصد دقیقاً روی پنج ستاره بیفتد.
+ */
+.star-rating {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  line-height: 1;
+  font-size: 13px;
+  direction: ltr;
+  white-space: nowrap;
+}
+
+/* ستاره‌های خالی: هم زمینه‌اند، هم عرض قاب را می‌سازند. */
+.star-rating::before {
+  content: "★★★★★";
+  display: block;
+  color: var(--fs-line);
+}
+
+/*
+ * ستاره‌های پر. ووکامرس درصد را روی همین span می‌گذارد و متن «Rated x out of
+ * 5» را داخلش می‌نویسد؛ font-size صفر آن متن را محو می‌کند و ::before با
+ * اندازه‌ی صریح خودش ستاره‌ها را می‌کشد. بدون اندازه‌ی صریح، ستاره‌ها هم صفر
+ * می‌شدند.
+ */
+.star-rating span {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  /* درصد است نه em: با font-size صفر، هر مقدار em هم صفر می‌شد و کل ردیف
+     ستاره‌های پر بریده می‌شد. */
+  height: 100%;
+  overflow: hidden;
+  font-size: 0;
+}
+
+.star-rating span::before {
+  content: "★★★★★";
+  display: block;
+  font-size: 13px;
+  line-height: 1;
+  color: #f59e0b;
+  white-space: nowrap;
 }
 
 /* پوشش انتظار دانلود -------------------------------------------------------- */

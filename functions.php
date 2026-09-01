@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FS_VERSION', '2.4.1' );
+define( 'FS_VERSION', '2.5.0' );
 
 require_once get_theme_file_path( 'inc/helpers.php' );
 require_once get_theme_file_path( 'inc/jalali.php' );
@@ -51,6 +51,9 @@ function fs_setup() {
 
 	add_theme_support( 'title-tag' );
 	add_theme_support( 'post-thumbnails' );
+
+	// دو برابر بزرگ‌ترین جای نمایش لوگو (۱۲۴px)، برای صفحه‌های رتینا.
+	add_image_size( 'fs-logo', 260, 160, false );
 	add_theme_support( 'automatic-feed-links' );
 	add_theme_support( 'responsive-embeds' );
 
@@ -244,6 +247,26 @@ function fs_dequeue_bloat() {
 
 	// اموجی هسته: یک اسکریپت و یک شیت که این قالب لازمشان ندارد.
 	wp_dequeue_style( 'wp-emoji-styles' );
+
+	/*
+	 * سه شیت اصلی ووکامرس.
+	 *
+	 * این‌ها ظاهرِ قالب‌های پیش‌فرض ووکامرس را می‌سازند — همان قالب‌هایی که این
+	 * پوسته هیچ‌کدامشان را استفاده نمی‌کند: آرشیو، محصول، سبد، تسویه‌حساب و
+	 * حساب کاربری همه بازنویسی شده‌اند و استایلشان در style.css است.
+	 *
+	 * در گزارش پیج‌اسپید همین سه تا ۱۶٫۷ کیلوبایت و حدود ۱۶۵۰ میلی‌ثانیه از
+	 * زمان مسدودکننده‌ی رندر بودند. حجمشان کم است ولی هر کدام یک رفت‌وبرگشت
+	 * جداگانه به سروری‌اند که TTFB بالایی دارد؛ هزینه‌ی واقعی همان انتظار است،
+	 * نه بایت‌ها.
+	 *
+	 * چیزهایی که این شیت‌ها پوشش می‌دادند و قالب ندارد (جدول دانلودها و
+	 * سفارش‌های حساب کاربری، و ستاره‌ی امتیاز) در style.css جبران شده‌اند.
+	 */
+	foreach ( array( 'woocommerce-general', 'woocommerce-layout', 'woocommerce-smallscreen' ) as $handle ) {
+		wp_dequeue_style( $handle );
+		wp_deregister_style( $handle );
+	}
 }
 add_action( 'wp_enqueue_scripts', 'fs_dequeue_bloat', 100 );
 
@@ -398,13 +421,27 @@ function fs_the_logo( $variant = 'header' ) {
 	echo '<a class="' . esc_attr( $is_footer ? 'fs-footer__brand' : 'fs-brand' ) . '" href="' . esc_url( home_url( '/' ) ) . '" rel="home">';
 
 	if ( $logo_id ) {
+		/*
+		 * لوگو در سربرگ حدود ۱۲۴ پیکسل عرض دارد. با اندازه‌ی full، مرورگر
+		 * تصویر ۳۸۰ پیکسلی را می‌گرفت — در گزارش پیج‌اسپید همین یکی ۳۴
+		 * کیلوبایت هدررفت بود، بیشتر از همه‌ی تصویرهای دیگر صفحه.
+		 *
+		 * اندازه‌ی fs-logo برای همین ثبت شده. اگر هنوز ساخته نشده باشد
+		 * (لوگویی که پیش از این نسخه آپلود شده)، وردپرس خودش به full
+		 * برمی‌گردد و چیزی خراب نمی‌شود؛ فقط صرفه‌جویی انجام نمی‌شود تا وقتی
+		 * تصویر دوباره ساخته شود.
+		 *
+		 * sizes هم صریح داده می‌شود: بدون آن وردپرس 100vw می‌گذارد و مرورگر
+		 * روی موبایل بزرگ‌ترین نسخه را برمی‌دارد.
+		 */
 		echo wp_get_attachment_image(
 			$logo_id,
-			'full',
+			'fs-logo',
 			false,
 			array(
 				'class' => 'fs-logo fs-logo--' . esc_attr( $variant ),
 				'alt'   => esc_attr( get_bloginfo( 'name' ) ),
+				'sizes' => $is_footer ? '110px' : '(max-width: 767px) 104px, 124px',
 			)
 		);
 	} else {

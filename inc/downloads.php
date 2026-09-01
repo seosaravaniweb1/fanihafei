@@ -26,34 +26,52 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const FS_DL_OPTION = 'fs_downloads';
-
-/**
- * تنظیمات تحویل فایل.
- *
- * @return array<string, string>
- */
-function fs_dl_settings() {
-	$saved = get_option( FS_DL_OPTION, array() );
-
-	return wp_parse_args(
-		is_array( $saved ) ? $saved : array(),
-		array(
-			'base_url'  => '',
-			'base_path' => '',
-		)
-	);
-}
-
 /* -------------------------------------------------------------------------
    ترجمه‌ی نشانی به مسیر محلی
    ------------------------------------------------------------------------- */
 
 /**
+ * ریشه‌هایی که فایل مجاز است داخلشان باشد.
+ *
+ * روی هاست‌های اشتراکی (دایرکت‌ادمین و سی‌پنل) همه‌ی دامنه‌ها و زیردامنه‌های یک
+ * حساب زیر یک پوشه‌ی مشترک‌اند؛ همان می‌شود مرز مجاز. هر مسیری که بیرون از
+ * این ریشه‌ها بیفتد رد می‌شود، حتی اگر فایل واقعاً آنجا باشد.
+ *
+ * @return string[]
+ */
+function fs_dl_roots() {
+	$docroot = untrailingslashit( ABSPATH );
+
+	$roots = array(
+		realpath( $docroot ),                 // خود سایت
+		realpath( dirname( $docroot ) ),      // پوشه‌ی دامنه
+		realpath( dirname( dirname( $docroot ) ) ), // .../domains
+	);
+
+	return array_values( array_unique( array_filter( (array) apply_filters( 'fs_dl_roots', $roots ) ) ) );
+}
+
+/**
+ * میزبان نشانی، بدون www.
+ *
+ * این یک جزئیات کوچک با اثر بزرگ است: نشانی فایل‌ها با www ذخیره شده
+ * (www.dl.luxu.ir) ولی پوشه روی سرور بدون آن است (dl.luxu.ir). بدون این
+ * پاک‌سازی هیچ‌کدام از مسیرهای حدس‌زده‌شده به فایل نمی‌رسید و ترجمه همیشه
+ * شکست می‌خورد — بی‌آنکه خطایی بدهد، چون عقب‌نشینی به همان مسیر دور بی‌صداست.
+ *
+ * @param string $host میزبان.
+ * @return string
+ */
+function fs_dl_bare_host( $host ) {
+	return preg_replace( '/^www\./i', '', (string) $host );
+}
+
+/**
  * مسیرهای محتملی که یک نشانی می‌تواند روی دیسک داشته باشد.
  *
- * ترتیب مهم است: اول نگاشت دستی مدیر (اگر داده باشد)، بعد چیدمان‌های رایج
- * دایرکت‌ادمین و سی‌پنل. اولین مسیری که واقعاً فایل در آن باشد برنده است.
+ * چیدمان‌های رایج هاست ایرانی همه امتحان می‌شوند و در آخر، اگر هیچ‌کدام
+ * نگرفت، بین دامنه‌های همان حساب می‌گردیم. ترتیب از دقیق به عمومی است تا
+ * جست‌وجوی پرهزینه فقط وقتی اجرا شود که لازم باشد.
  *
  * @param string $url نشانی فایل.
  * @return string[]
@@ -65,65 +83,85 @@ function fs_dl_candidate_paths( $url ) {
 		return array();
 	}
 
-	$host = $parts['host'];
+	$host = fs_dl_bare_host( $parts['host'] );
 	$path = ltrim( rawurldecode( $parts['path'] ), '/' );
 
-	$candidates = array();
+	$docroot = untrailingslashit( ABSPATH );
+	$domains = dirname( dirname( $docroot ) );
 
-	// ۱) نگاشت دستی.
-	$settings = fs_dl_settings();
+	// اولین برچسب میزبان: برای dl.luxu.ir می‌شود dl.
+	$label = strtok( $host, '.' );
 
-	if ( $settings['base_url'] && $settings['base_path'] ) {
-		$base_url = trailingslashit( $settings['base_url'] );
+	$candidates = array(
+		// زیردامنه پوشه‌ی مستقل دارد.
+		$domains . '/' . $host . '/public_html/' . $path,
+		$domains . '/' . $host . '/' . $path,
+		// چیدمان پیش‌فرض دایرکت‌ادمین: زیردامنه، پوشه‌ای داخل دامنه‌ی اصلی.
+		$docroot . '/' . $label . '/' . $path,
+		// فایل روی خود دامنه.
+		$docroot . '/' . $path,
+	);
 
-		if ( 0 === strpos( $url, $base_url ) ) {
-			$candidates[] = trailingslashit( $settings['base_path'] ) . ltrim( substr( $url, strlen( $base_url ) ), '/' );
+	return (array) apply_filters( 'fs_dl_candidate_paths', $candidates, $url );
+}
+
+/**
+ * گشتن بین دامنه‌های همان حساب.
+ *
+ * آخرین چاره، وقتی هیچ‌کدام از چیدمان‌های شناخته‌شده نگرفت. نتیجه — چه پیدا
+ * شود چه نشود — کش می‌شود، چون این جست‌وجو به دیسک می‌زند و نباید سر هر
+ * دانلود تکرار شود.
+ *
+ * @param string $path مسیر نسبی فایل.
+ * @return string
+ */
+function fs_dl_scan_domains( $path ) {
+	$domains = dirname( dirname( untrailingslashit( ABSPATH ) ) );
+	$dirs    = glob( $domains . '/*/public_html', GLOB_ONLYDIR );
+
+	if ( ! $dirs ) {
+		return '';
+	}
+
+	foreach ( $dirs as $dir ) {
+		$try = $dir . '/' . $path;
+
+		if ( is_file( $try ) && is_readable( $try ) ) {
+			return $try;
 		}
 	}
 
-	// docroot سایت، و پوشه‌ی بالاتر از آن.
-	$docroot = untrailingslashit( ABSPATH );
-	$domains = dirname( dirname( $docroot ) ); // .../domains
-
-	// ۲) دایرکت‌ادمین: هر زیردامنه پوشه‌ی خودش را دارد.
-	$candidates[] = $domains . '/' . $host . '/public_html/' . $path;
-
-	// ۳) دایرکت‌ادمین (حالت دیگر): زیردامنه به‌شکل پوشه زیر دامنه‌ی اصلی.
-	$label = strtok( $host, '.' );
-
-	if ( $label ) {
-		$candidates[] = $docroot . '/' . $label . '/' . $path;
-		$candidates[] = $domains . '/' . $host . '/' . $path;
-	}
-
-	// ۴) همان دامنه، مسیر مستقیم زیر docroot.
-	$candidates[] = $docroot . '/' . $path;
-
-	return (array) apply_filters( 'fs_dl_candidate_paths', $candidates, $url );
+	return '';
 }
 
 /**
  * ترجمه‌ی نشانی فایل به مسیر محلی، اگر ممکن باشد.
  *
  * realpath هم مسیر را نرمال می‌کند و هم — مهم‌تر — نتیجه‌ی یک مسیر ساختگی با
- * ../ را به بیرون از ریشه لو می‌دهد؛ بعدش بررسی می‌کنیم که واقعاً زیر یکی از
- * ریشه‌های مجاز مانده باشد.
+ * ../ را لو می‌دهد؛ بعدش بررسی می‌کنیم که واقعاً زیر یکی از ریشه‌های مجاز
+ * مانده باشد.
  *
  * @param string $url نشانی.
  * @return string مسیر محلی یا رشته‌ی خالی.
  */
 function fs_dl_local_path( $url ) {
-	$roots = array( realpath( ABSPATH ), realpath( dirname( dirname( untrailingslashit( ABSPATH ) ) ) ) );
+	$key    = 'fs_dlp_' . md5( $url );
+	$cached = get_transient( $key );
 
-	$settings = fs_dl_settings();
-
-	if ( $settings['base_path'] ) {
-		$roots[] = realpath( $settings['base_path'] );
+	if ( is_string( $cached ) ) {
+		return $cached;
 	}
 
-	$roots = array_filter( $roots );
+	$roots  = fs_dl_roots();
+	$found  = '';
+	$tries  = fs_dl_candidate_paths( $url );
+	$parts  = wp_parse_url( $url );
 
-	foreach ( fs_dl_candidate_paths( $url ) as $candidate ) {
+	if ( ! empty( $parts['path'] ) ) {
+		$tries[] = fs_dl_scan_domains( ltrim( rawurldecode( $parts['path'] ), '/' ) );
+	}
+
+	foreach ( array_filter( $tries ) as $candidate ) {
 		$real = realpath( $candidate );
 
 		if ( ! $real || ! is_file( $real ) || ! is_readable( $real ) ) {
@@ -132,19 +170,28 @@ function fs_dl_local_path( $url ) {
 
 		foreach ( $roots as $root ) {
 			if ( 0 === strpos( $real, $root . DIRECTORY_SEPARATOR ) ) {
-				return $real;
+				$found = $real;
+				break 2;
 			}
 		}
 	}
 
-	return '';
+	/*
+	 * نتیجه‌ی منفی هم کش می‌شود، ولی کوتاه‌تر: اگر فایل تازه آپلود شود یا
+	 * مسیرها عوض شوند، ظرف یک ساعت خودش درست می‌شود بی‌آنکه کسی کاری کند.
+	 */
+	set_transient( $key, $found, $found ? DAY_IN_SECONDS : HOUR_IN_SECONDS );
+
+	return $found;
 }
 
 /**
  * جایگزینی نشانی فایل با مسیر محلی، پیش از تحویل.
  *
- * فقط وقتی که فایل واقعاً روی همین سرور پیدا شود. اگر پیدا نشود، هیچ تغییری
- * نمی‌دهیم و ووکامرس همان کاری را می‌کند که قبلاً می‌کرد.
+ * چرا این مهم است: ووکامرس برای «فایل دور» کل فایل را با HTTP از زیردامنه
+ * می‌گیرد و بعد به کاربر می‌دهد. یعنی هر بایت دو بار جابه‌جا می‌شود و کاربر
+ * تا تمام‌شدن نوبت اول هیچ چیزی نمی‌بیند — همان انتظار ده‌ها ثانیه‌ای. با
+ * مسیر محلی، فایل مستقیم از دیسک خوانده و هم‌زمان فرستاده می‌شود.
  *
  * @param string $file_path مسیر یا نشانی فایل.
  * @return string
@@ -360,192 +407,140 @@ function fs_download_overlay() {
 add_action( 'wp_footer', 'fs_download_overlay', 30 );
 
 /* -------------------------------------------------------------------------
-   تنظیمات و عیب‌یابی
+   دسترسی مادام‌العمر و ترمیم خودکار مجوزها
    ------------------------------------------------------------------------- */
 
 /**
- * ذخیره‌ی تنظیمات تحویل فایل.
+ * دانلودها هیچ‌وقت منقضی نشوند.
+ *
+ * صفحه‌ی «فایل‌های من» به کاربر «دسترسی مادام‌العمر» را وعده می‌دهد، پس تاریخ
+ * انقضا نباید اصلاً ثبت شود. اگر ثبت شود، ووکامرس آن ردیف را از فهرست کنار
+ * می‌گذارد و کاربر با یک صفحه‌ی خالی روبه‌رو می‌شود — بی‌آنکه هیچ توضیحی
+ * ببیند و بی‌آنکه سفارشش جایی گم شده باشد.
+ *
+ * @param mixed $value مقدار تنظیم.
+ * @return string
+ */
+function fs_dl_never_expire( $value ) {
+	unset( $value );
+
+	return '';
+}
+add_filter( 'pre_option_woocommerce_downloads_expire', 'fs_dl_never_expire' );
+add_filter( 'option_woocommerce_downloads_expire', 'fs_dl_never_expire' );
+
+/**
+ * برداشتن تاریخ انقضا از مجوزی که تازه صادر می‌شود.
+ *
+ * @param array $data داده‌ی مجوز.
+ * @return array
+ */
+function fs_dl_clear_expiry( $data ) {
+	if ( is_array( $data ) ) {
+		$data['access_expires'] = null;
+	}
+
+	return $data;
+}
+add_filter( 'woocommerce_downloadable_file_permission_data', 'fs_dl_clear_expiry' );
+
+/**
+ * ترمیم مجوزهای دانلودِ کاربری که همین حالا فایل‌هایش را می‌بیند.
+ *
+ * سه چیز را با هم درست می‌کند و هر سه دلیلِ «هیچی نمی‌آورد» بوده‌اند:
+ *
+ * ۱. سفارش‌هایی که مجوزشان با user_id = 0 صادر شده. ووکامرس فهرست را با
+ *    `WHERE user_id = %d` می‌گیرد، پس آن ردیف‌ها هرگز به کاربر نمی‌رسند.
+ * ۲. مجوزهایی که تاریخ انقضایشان گذشته است.
+ * ۳. سفارش‌های پرداخت‌شده‌ای که اصلاً مجوزی برایشان صادر نشده.
+ *
+ * چرا اینجا و نه با یک دکمه در پیشخوان: کاربر وقتی متوجه مشکل می‌شود که به
+ * این صفحه می‌آید؛ همان لحظه هم باید حل شود. یک بار در روز برای هر کاربر
+ * اجرا می‌شود تا بار اضافه‌ای نسازد.
  *
  * @return void
  */
-function fs_dl_save() {
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( 'دسترسی ندارید.' );
+function fs_dl_repair_for_current_user() {
+	if ( ! is_user_logged_in() || ! function_exists( 'wc_get_orders' ) ) {
+		return;
 	}
 
-	check_admin_referer( 'fs_dl_save' );
+	$user_id = get_current_user_id();
+	$guard   = 'fs_dlfix_' . $user_id;
 
-	update_option(
-		FS_DL_OPTION,
-		array(
-			'base_url'  => isset( $_POST['base_url'] ) ? esc_url_raw( wp_unslash( $_POST['base_url'] ) ) : '',
-			'base_path' => isset( $_POST['base_path'] ) ? untrailingslashit( sanitize_text_field( wp_unslash( $_POST['base_path'] ) ) ) : '',
-		),
-		false
-	);
-
-	wp_safe_redirect( add_query_arg( 'fs_dl', 'saved', admin_url( 'admin.php?page=fs-theme-settings&tab=downloads' ) ) );
-	exit;
-}
-add_action( 'admin_post_fs_dl_save', 'fs_dl_save' );
-
-/**
- * چند فایل نمونه از محصولات دانلودی، برای نشان‌دادن نتیجه‌ی ترجمه.
- *
- * @param int $limit تعداد.
- * @return array<int, array{name:string, url:string, local:string}>
- */
-function fs_dl_sample_files( $limit = 5 ) {
-	if ( ! function_exists( 'wc_get_products' ) ) {
-		return array();
+	if ( get_transient( $guard ) ) {
+		return;
 	}
 
-	$products = wc_get_products(
-		array(
-			'limit'        => $limit,
-			'downloadable' => true,
-			'status'       => 'publish',
-			'return'       => 'objects',
+	set_transient( $guard, 1, DAY_IN_SECONDS );
+
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'woocommerce_downloadable_product_permissions';
+	$user  = get_user_by( 'id', $user_id );
+
+	if ( ! $user ) {
+		return;
+	}
+
+	// ۱) انقضای گذشته را برمی‌داریم؛ دسترسی این فروشگاه مادام‌العمر است.
+	$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->prepare(
+			"UPDATE {$table} SET access_expires = NULL WHERE user_id = %d AND access_expires IS NOT NULL", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$user_id
 		)
 	);
 
-	$out = array();
+	// ۲) ردیف‌های بی‌صاحبِ همین ایمیل را به حساب وصل می‌کنیم.
+	$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->prepare(
+			"UPDATE {$table} SET user_id = %d WHERE ( user_id = 0 OR user_id IS NULL ) AND user_email = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$user_id,
+			$user->user_email
+		)
+	);
 
-	foreach ( $products as $product ) {
-		foreach ( $product->get_downloads() as $download ) {
-			$url = $download->get_file();
+	// ۳) سفارش‌های پرداخت‌شده‌ای که هیچ مجوزی ندارند.
+	$orders = wc_get_orders(
+		array(
+			'customer_id' => $user_id,
+			'status'      => array( 'wc-processing', 'wc-completed' ),
+			'limit'       => 50,
+			'return'      => 'ids',
+		)
+	);
 
-			$out[] = array(
-				'name'  => $product->get_name() . ' — ' . $download->get_name(),
-				'url'   => $url,
-				'local' => preg_match( '#^https?://#i', $url ) ? fs_dl_local_path( $url ) : $url,
-			);
+	foreach ( (array) $orders as $order_id ) {
+		$order = wc_get_order( $order_id );
 
-			if ( count( $out ) >= $limit ) {
-				return $out;
-			}
+		if ( ! $order || ! $order->has_downloadable_item() ) {
+			continue;
+		}
+
+		$rows = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE order_id = %d", $order_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+
+		if ( ! $rows ) {
+			wc_downloadable_product_permissions( $order_id, true );
 		}
 	}
 
-	return $out;
+	if ( function_exists( 'wp_cache_flush_group' ) ) {
+		wp_cache_flush_group( 'customer_download' );
+	}
 }
 
 /**
- * محتوای تب «دانلودها».
+ * اجرای ترمیم روی صفحه‌های حساب کاربری.
  *
  * @return void
  */
-function fs_dl_tab_content() {
-	$settings = fs_dl_settings();
-	$notice   = isset( $_GET['fs_dl'] ) ? sanitize_key( wp_unslash( $_GET['fs_dl'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-	if ( 'saved' === $notice ) {
-		echo '<div class="notice notice-updated is-dismissible"><p>تنظیمات ذخیره شد.</p></div>';
+function fs_dl_maybe_repair() {
+	if ( ! function_exists( 'is_account_page' ) || ! is_account_page() ) {
+		return;
 	}
 
-	$samples = fs_dl_sample_files();
-	$method  = get_option( 'woocommerce_file_download_method', 'force' );
-	?>
-
-	<h2 style="margin-top:24px">تحویل فایل</h2>
-	<p class="description" style="max-width:760px">
-		وقتی فایل‌ها روی زیردامنه باشند، ووکامرس آن‌ها را «فایل دور» می‌بیند و ممکن است
-		به‌جای دانلود، مرورگر را به همان زیردامنه بفرستد. آنجا هدر <code dir="ltr">Content-Disposition</code>
-		وجود ندارد، پس مرورگر PDF و Word را <strong>باز می‌کند</strong> نه دانلود —
-		دقیقاً همان تفاوتی که با فایل‌های zip می‌بینید.
-	</p>
-	<p class="description" style="max-width:760px">
-		اگر زیردامنه روی همین سرور باشد، قالب نشانی را به مسیر واقعی فایل روی دیسک ترجمه
-		می‌کند؛ آن‌وقت ووکامرس یک فایل محلی می‌خواند: سریع، و با هدر درست.
-	</p>
-
-	<table class="widefat striped" style="max-width:620px;margin:16px 0">
-		<tbody>
-			<tr>
-				<th style="width:190px">روش دانلود ووکامرس</th>
-				<td><code dir="ltr"><?php echo esc_html( $method ); ?></code></td>
-			</tr>
-			<tr>
-				<th>allow_url_fopen</th>
-				<td><?php echo ini_get( 'allow_url_fopen' ) ? 'روشن' : '<strong>خاموش</strong> — بدون ترجمه‌ی مسیر، دانلود به تغییر مسیر می‌افتد'; ?></td>
-			</tr>
-			<tr>
-				<th>ریشه‌ی سایت</th>
-				<td><code dir="ltr" style="direction:ltr"><?php echo esc_html( untrailingslashit( ABSPATH ) ); ?></code></td>
-			</tr>
-		</tbody>
-	</table>
-
-	<h3>نگاشت دستی</h3>
-	<p class="description" style="max-width:760px">
-		قالب خودش چند چیدمان رایج را امتحان می‌کند. اگر جدول پایین نشان داد که فایلی پیدا
-		نشده، نشانی و مسیر را دستی بدهید.
-	</p>
-
-	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-		<?php wp_nonce_field( 'fs_dl_save' ); ?>
-		<input type="hidden" name="action" value="fs_dl_save">
-
-		<table class="form-table" role="presentation">
-			<tr>
-				<th scope="row"><label for="fs-dl-url">نشانی پایه</label></th>
-				<td>
-					<input class="regular-text ltr" id="fs-dl-url" type="url" name="base_url" dir="ltr"
-						placeholder="https://dl.luxu.ir/" value="<?php echo esc_attr( $settings['base_url'] ); ?>">
-					<p class="description">همان ابتدای نشانی فایل‌ها.</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="fs-dl-path">مسیر پایه روی سرور</label></th>
-				<td>
-					<input class="regular-text ltr" id="fs-dl-path" type="text" name="base_path" dir="ltr"
-						placeholder="/home/user/domains/dl.luxu.ir/public_html" value="<?php echo esc_attr( $settings['base_path'] ); ?>">
-					<p class="description">پوشه‌ای که نشانی بالا به آن اشاره می‌کند. در دایرکت‌ادمین از «مدیر فایل» قابل دیدن است.</p>
-				</td>
-			</tr>
-		</table>
-
-		<?php submit_button( 'ذخیره' ); ?>
-	</form>
-
-	<h3>نتیجه‌ی ترجمه روی فایل‌های واقعی</h3>
-
-	<?php if ( ! $samples ) : ?>
-		<p class="description">هنوز محصول دانلودی با فایل ثبت‌شده پیدا نشد.</p>
-	<?php else : ?>
-		<table class="widefat striped" style="max-width:900px">
-			<thead>
-				<tr><th style="width:240px">فایل</th><th>نتیجه</th></tr>
-			</thead>
-			<tbody>
-				<?php foreach ( $samples as $sample ) : ?>
-					<tr>
-						<td><?php echo esc_html( $sample['name'] ); ?></td>
-						<td dir="ltr" style="direction:ltr;text-align:left">
-							<?php if ( $sample['local'] ) : ?>
-								<span style="color:#008a20">✓</span> <code><?php echo esc_html( $sample['local'] ); ?></code>
-							<?php else : ?>
-								<span style="color:#d63638">✗</span>
-								<code><?php echo esc_html( $sample['url'] ); ?></code>
-								<div style="color:#d63638;direction:rtl;text-align:right;margin-top:4px">روی این سرور پیدا نشد — نگاشت دستی لازم است.</div>
-							<?php endif; ?>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
-	<?php endif; ?>
-
-	<div class="notice notice-info inline" style="max-width:900px;margin-top:20px">
-		<p>
-			<strong>اگر زیردامنه روی سرور دیگری است،</strong> هیچ کد قالبی نمی‌تواند از دوبار
-			جابه‌جا شدن فایل جلوگیری کند. در آن حالت این را در فایل
-			<code dir="ltr">.htaccess</code> پوشه‌ی فایل‌های زیردامنه بگذارید تا مرورگر
-			به‌جای بازکردن، دانلود کند:
-		</p>
-		<pre dir="ltr" style="background:#fff;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;text-align:left">&lt;FilesMatch "\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt|rtf)$"&gt;
-    Header set Content-Disposition "attachment"
-&lt;/FilesMatch&gt;</pre>
-	</div>
-	<?php
+	fs_dl_repair_for_current_user();
 }
+add_action( 'template_redirect', 'fs_dl_maybe_repair', 5 );

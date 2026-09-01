@@ -288,6 +288,27 @@ function fs_search_products( $query, $limit = 8, $category = '' ) {
 		}
 	}
 
+	/*
+	 * اگر جست‌وجوی معمولی چیزی نداد، یک بار دیگر با کلمه‌های کوتاه‌شده تلاش
+	 * می‌کنیم. کاربر فارسی‌زبان زیاد پیش می‌آید که «ریاضیات» را «ریاضیا» تایپ
+	 * کند یا جمع و مفرد را جابه‌جا بگیرد؛ حذف یکی دو حرف آخر بیشترِ این
+	 * حالت‌ها را می‌گیرد، بی‌آنکه به الگوریتم فاصله‌ی ویرایشی و هزینه‌اش نیاز
+	 * باشد.
+	 */
+	if ( ! $pool ) {
+		foreach ( $terms as $term ) {
+			$stem = mb_substr( $term, 0, max( 3, mb_strlen( $term, 'UTF-8' ) - 2 ), 'UTF-8' );
+
+			if ( $stem === $term ) {
+				continue;
+			}
+
+			foreach ( (array) wc_get_products( array_merge( $args, array( 's' => $stem ) ) ) as $id ) {
+				$pool[ (int) $id ] = true;
+			}
+		}
+	}
+
 	if ( ! $pool ) {
 		return array();
 	}
@@ -303,8 +324,13 @@ function fs_search_products( $query, $limit = 8, $category = '' ) {
 
 		$score = fs_search_score( $product, $terms, $phrase );
 
+		/*
+		 * امتیاز صفر یعنی هیچ کلمه‌ای در هیچ فیلدی پیدا نشد. این فقط وقتی
+		 * پیش می‌آید که محصول از مسیر «کلمه‌ی کوتاه‌شده» آمده باشد؛ آن را
+		 * نگه می‌داریم ولی با امتیاز یک، تا ته فهرست بنشیند نه اینکه حذف شود.
+		 */
 		if ( $score <= 0 ) {
-			continue;
+			$score = 1;
 		}
 
 		$scored[] = array(
